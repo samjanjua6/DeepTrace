@@ -1,0 +1,1702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DeepTrace — Commercial & Technical Proposal (Pakistan & Global Edition)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+  @page {
+    size: A4 portrait;
+    margin: 12mm 12mm 12mm 12mm;
+    @bottom-right {
+      content: counter(page);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 8pt;
+      color: #64748b;
+    }
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #1e293b;
+    background: #ffffff;
+    line-height: 1.48;
+    font-size: 9pt;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Page layout utilities */
+  .page {
+    page-break-after: always;
+    break-after: page;
+    position: relative;
+    padding-bottom: 3mm;
+  }
+  .page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+  .no-break {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Cover Page */
+  .cover-page {
+    height: 100%;
+    min-height: 265mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 16mm 10mm 12mm 10mm;
+    background: linear-gradient(145deg, #090d16 0%, #0f172a 50%, #064e3b 100%);
+    color: #ffffff;
+    border-radius: 12px;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover-page::before {
+    content: "";
+    position: absolute;
+    top: -100px;
+    right: -100px;
+    width: 450px;
+    height: 450px;
+    background: radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, rgba(59, 130, 246, 0.1) 50%, transparent 70%);
+    border-radius: 50%;
+  }
+  .cover-page::after {
+    content: "";
+    position: absolute;
+    bottom: -80px;
+    left: -80px;
+    width: 380px;
+    height: 380px;
+    background: radial-gradient(circle, rgba(52, 211, 153, 0.15) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+  .cover-header {
+    position: relative;
+    z-index: 2;
+  }
+  .cover-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    color: #34d399;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 8.5pt;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .cover-title {
+    font-size: 34pt;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    background: linear-gradient(135deg, #ffffff 30%, #6ee7b7 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 10px;
+  }
+  .cover-subtitle {
+    font-size: 12.5pt;
+    font-weight: 400;
+    color: #cbd5e1;
+    line-height: 1.4;
+    max-width: 600px;
+  }
+  .cover-quote {
+    position: relative;
+    z-index: 2;
+    background: rgba(255, 255, 255, 0.04);
+    border-left: 3px solid #10b981;
+    padding: 12px 16px;
+    border-radius: 0 8px 8px 0;
+    backdrop-filter: blur(10px);
+    margin: 18px 0;
+  }
+  .cover-quote p {
+    font-size: 10pt;
+    font-style: italic;
+    color: #f1f5f9;
+    font-weight: 500;
+  }
+  .cover-quote span {
+    display: block;
+    font-size: 7.5pt;
+    color: #34d399;
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .cover-footer {
+    position: relative;
+    z-index: 2;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    padding-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+  }
+  .cover-footer-item {
+    font-size: 8pt;
+  }
+  .cover-footer-item .label {
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  .cover-footer-item .value {
+    color: #f1f5f9;
+    font-weight: 600;
+    font-size: 8.8pt;
+  }
+
+  /* Typography & Structure */
+  h1.section-title {
+    font-size: 14.5pt;
+    font-weight: 800;
+    color: #0f172a;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 4px;
+    margin-top: 6px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    letter-spacing: -0.02em;
+  }
+  h1.section-title .sec-num {
+    background: #0f172a;
+    color: #ffffff;
+    font-size: 8pt;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  h2 {
+    font-size: 10.5pt;
+    font-weight: 700;
+    color: #1e293b;
+    margin-top: 7px;
+    margin-bottom: 4px;
+    letter-spacing: -0.01em;
+  }
+  h3 {
+    font-size: 9pt;
+    font-weight: 600;
+    color: #334155;
+    margin-top: 5px;
+    margin-bottom: 2px;
+  }
+  p {
+    margin-bottom: 5px;
+    color: #334155;
+    text-align: justify;
+  }
+  strong {
+    color: #0f172a;
+    font-weight: 600;
+  }
+
+  /* Grid & Flex Layouts */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 7px;
+    margin-bottom: 6px;
+  }
+  .grid-4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+
+  /* Card Components */
+  .card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 7px;
+    padding: 7px 9px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+  }
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 3px;
+    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 2px;
+  }
+  .card-title {
+    font-size: 8.5pt;
+    font-weight: 700;
+    color: #0f172a;
+  }
+  .card.highlight {
+    background: #f8fafc;
+    border-left: 3px solid #3b82f6;
+  }
+  .card.danger {
+    background: #fff5f5;
+    border-left: 3px solid #ef4444;
+  }
+  .card.success {
+    background: #f0fdf4;
+    border-left: 3px solid #10b981;
+  }
+  .card.pk-card {
+    background: #f0fdf4;
+    border-left: 3px solid #059669;
+  }
+
+  /* Badges & Pills */
+  .badge {
+    display: inline-block;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 6.8pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .badge-blue { background: #dbeafe; color: #1e40af; }
+  .badge-red { background: #fee2e2; color: #991b1b; }
+  .badge-green { background: #dcfce7; color: #166534; }
+  .badge-emerald { background: #a7f3d0; color: #065f46; }
+  .badge-amber { background: #fef3c7; color: #92400e; }
+  .badge-purple { background: #f3e8ff; color: #6b21a8; }
+  .badge-slate { background: #f1f5f9; color: #475569; }
+
+  /* Callout Alerts */
+  .callout {
+    padding: 6px 9px;
+    border-radius: 5px;
+    margin: 5px 0;
+    font-size: 8.2pt;
+    border-left: 3px solid transparent;
+  }
+  .callout-info {
+    background: #eff6ff;
+    border-color: #3b82f6;
+    color: #1e40af;
+  }
+  .callout-warning {
+    background: #fffbeb;
+    border-color: #f59e0b;
+    color: #92400e;
+  }
+  .callout-danger {
+    background: #fef2f2;
+    border-color: #ef4444;
+    color: #991b1b;
+  }
+  .callout-success {
+    background: #f0fdf4;
+    border-color: #10b981;
+    color: #166534;
+  }
+  .callout-nist {
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-left: 3px solid #475569;
+    color: #334155;
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 7.8pt;
+    margin: 5px 0;
+  }
+  th {
+    background: #0f172a;
+    color: #ffffff;
+    font-weight: 600;
+    text-align: left;
+    padding: 4px 6px;
+    border: 1px solid #0f172a;
+  }
+  td {
+    padding: 3px 6px;
+    border: 1px solid #e2e8f0;
+    color: #334155;
+  }
+  tr:nth-child(even) td {
+    background: #f8fafc;
+  }
+
+  /* Code / Monospace */
+  code, pre {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 7.3pt;
+  }
+  code {
+    background: #f1f5f9;
+    padding: 1px 3px;
+    border-radius: 3px;
+    color: #0f172a;
+    font-weight: 500;
+  }
+  pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 5px 7px;
+    border-radius: 5px;
+    overflow-x: auto;
+    margin: 4px 0;
+    line-height: 1.3;
+  }
+
+  /* Visual Diagrams & Flowcharts */
+  .diagram-container {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 7px;
+    padding: 6px;
+    margin: 5px 0;
+    text-align: center;
+  }
+  .diagram-caption {
+    font-size: 7pt;
+    color: #64748b;
+    margin-top: 2px;
+    font-style: italic;
+  }
+
+  /* UI Mockup styling */
+  .ui-mockup {
+    background: #090d16;
+    border: 1px solid #1e293b;
+    border-radius: 7px;
+    padding: 7px;
+    color: #f1f5f9;
+    font-size: 7.5pt;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    margin: 5px 0;
+  }
+  .ui-mockup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #1e293b;
+    padding-bottom: 4px;
+    margin-bottom: 5px;
+  }
+  .ui-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    margin-right: 3px;
+  }
+  .ui-dot.red { background: #ef4444; }
+  .ui-dot.yellow { background: #f59e0b; }
+  .ui-dot.green { background: #10b981; }
+
+  /* Metric Pill */
+  .metric-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 5px;
+    text-align: center;
+  }
+  .metric-value {
+    font-size: 12pt;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.1;
+  }
+  .metric-label {
+    font-size: 6.8pt;
+    color: #64748b;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-top: 2px;
+  }
+
+  /* Header on content pages */
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 3px;
+    margin-bottom: 6px;
+    font-size: 6.8pt;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+  }
+  .page-header .brand {
+    color: #059669;
+    font-weight: 700;
+  }
+
+  .step-flow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 3px;
+    margin: 5px 0;
+  }
+  .step-item {
+    flex: 1;
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    padding: 4px 2px;
+    text-align: center;
+    font-size: 6.8pt;
+    font-weight: 600;
+    color: #1e293b;
+  }
+  .step-arrow {
+    color: #94a3b8;
+    font-weight: 700;
+    font-size: 8pt;
+  }
+</style>
+</head>
+<body>
+
+<!-- ========================================== -->
+<!-- PAGE 1: COVER PAGE                         -->
+<!-- ========================================== -->
+<div class="page">
+  <div class="cover-page">
+    <div class="cover-header">
+      <div class="cover-badge">Commercial & Technical Proposal • Pakistan & Global Edition</div>
+      <div class="cover-title">DEEPTRACE</div>
+      <div class="cover-subtitle">
+        Explainable AI Document Forensics & Verification API Platform for Banking, Fintech, and Compliance in Pakistan
+      </div>
+    </div>
+
+    <div class="cover-quote">
+      <p>“Don’t just tell the investigator that a document is suspicious. Show them exactly why, where, and by how much.”</p>
+      <span>The DeepTrace Forensic Architecture Standard • SBP & NIST Compliant</span>
+    </div>
+
+    <div style="position: relative; z-index: 2; margin: 12px 0;">
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+        <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 9px;">
+          <div style="font-size: 7.2pt; color: #34d399; text-transform: uppercase; font-weight: 700;">Pakistan Banking Rigor</div>
+          <div style="font-size: 9.5pt; font-weight: 700; color: #ffffff; margin-top: 2px;">SBP & AML Aligned</div>
+          <div style="font-size: 7.2pt; color: #cbd5e1; margin-top: 2px;">PK-IBAN, Raast ledger auditing, FBR tax verification, and visa fraud prevention.</div>
+        </div>
+        <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 9px;">
+          <div style="font-size: 7.2pt; color: #60a5fa; text-transform: uppercase; font-weight: 700;">Multi-Modal Inspection</div>
+          <div style="font-size: 9.5pt; font-weight: 700; color: #ffffff; margin-top: 2px;">Evidence Fusion</div>
+          <div style="font-size: 7.2pt; color: #cbd5e1; margin-top: 2px;">Metadata + Glyphs + ELA Vision + Lakh/Crore Arithmetic Engines.</div>
+        </div>
+        <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 9px;">
+          <div style="font-size: 7.2pt; color: #f472b6; text-transform: uppercase; font-weight: 700;">Cognitive Layer</div>
+          <div style="font-size: 9.5pt; font-weight: 700; color: #ffffff; margin-top: 2px;">Multi-Agent AI</div>
+          <div style="font-size: 7.2pt; color: #cbd5e1; margin-top: 2px;">Evidence-bounded LLM reasoning & natural language assistant.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cover-footer">
+      <div class="cover-footer-item">
+        <div class="label">Document ID</div>
+        <div class="value">PROP-DT-PK-2026-V1</div>
+      </div>
+      <div class="cover-footer-item">
+        <div class="label">Classification</div>
+        <div class="value">Commercial & Technical Proposal</div>
+      </div>
+      <div class="cover-footer-item">
+        <div class="label">Target Market</div>
+        <div class="value">Pakistan & Global Fintech/Banking</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- PAGE 2: EXECUTIVE SUMMARY & PAKISTAN CONTEXT -->
+<!-- ========================================== -->
+<div class="page">
+  <div class="page-header">
+    <span class="brand">DeepTrace Pakistan Proposal</span>
+    <span>Section 1: Executive Summary & Pakistan Market Landscape</span>
+  </div>
+
+  <h1 class="section-title"><span class="sec-num">01</span> Executive Summary & Pakistan Market Landscape</h1>
+  
+  <p>
+    <strong>DeepTrace</strong> is an enterprise-grade document forensics and verification API platform built to detect manipulation, verify internal mathematical and structural consistency, and produce explainable visual evidence trails. In Pakistan's rapidly digitizing economy—driven by SBP Digital Banking frameworks, Raast instant payments, nano-lending apps, and stringent AML/CFT compliance mandates—document fraud has emerged as an urgent systemic risk.
+  </p>
+
+  <div class="grid-3" style="margin: 6px 0;">
+    <div class="metric-box">
+      <div class="metric-value">PKR 120B+</div>
+      <div class="metric-label">Annual Financial Fraud Exposure in Pakistan</div>
+    </div>
+    <div class="metric-box">
+      <div class="metric-value">74%</div>
+      <div class="metric-label">Surge in Altered Bank Statements for Visas/Loans</div>
+    </div>
+    <div class="metric-box">
+      <div class="metric-value">100%</div>
+      <div class="metric-label">Explainable Deterministic Evidence Trail</div>
+    </div>
+  </div>
+
+  <h2>1.1 The Problem in Pakistan: The Epidemic of Tampered Documents</h2>
+  <p>
+    Pakistani commercial banks (HBL, Meezan, UBL, Alfalah, MCB), digital wallets (Easypaisa, JazzCash, SadaPay, NayaPay), and microfinance lenders process millions of customer-submitted PDFs and scans annually. Due to accessible PDF editors and generative AI tools, financial fraud in Pakistan has reached unprecedented scale:
+  </p>
+
+  <div class="grid-2">
+    <div class="card danger">
+      <div class="card-header">
+        <span class="card-title">Major Fraud Vectors in Pakistan</span>
+        <span class="badge badge-red">High Risk</span>
+      </div>
+      <ul style="font-size: 7.4pt; margin-left: 12px; color: #475569;">
+        <li><strong>Visa & Student Bank Statements:</strong> Widespread forgery of bank statements (HBL, Meezan, SCB) for UKVI, Schengen, and Canadian visa applications.</li>
+        <li><strong>Digital Nano-Lending Defaults:</strong> Falsified salary slips, altered utility bills (LESCO/K-Electric), and doctored bank statements submitted to nano-lenders.</li>
+        <li><strong>FBR Tax & Withholding Evasion:</strong> Fabricated Active Taxpayer List (ATL) proofs and falsified withholding tax deduction certificates.</li>
+        <li><strong>Trade & Commercial Invoicing:</strong> Altered sales tax invoices to claim fraudulent input tax adjustments.</li>
+      </ul>
+    </div>
+    <div class="card success">
+      <div class="card-header">
+        <span class="card-title">The DeepTrace Pakistan Solution</span>
+        <span class="badge badge-emerald">Defensible</span>
+      </div>
+      <ul style="font-size: 7.4pt; margin-left: 12px; color: #166534;">
+        <li><strong>PK-IBAN & SBP Format Engine:</strong> 24-digit MOD-97 IBAN validator, Raast narration verification, and 1LINK code checks.</li>
+        <li><strong>Lakh & Crore Arithmetic Engine:</strong> Native support for South Asian numbering formats (<code>Rs. 12,50,000</code>) and ledger reconciliation.</li>
+        <li><strong>Pakistani Utility Bill Forensics:</strong> Dedicated anomaly checks for K-Electric, LESCO, IESCO, SNGPL, and SSGC bills.</li>
+        <li><strong>Court-Admissible Dossier:</strong> Aligned with Pakistan's Electronic Transactions Ordinance (ETO 2002) and PECA 2016.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>1.2 Core Product Interfaces</h2>
+  <div class="grid-3">
+    <div class="card highlight">
+      <div class="card-header">
+        <span class="card-title">1. Web Workbench</span>
+        <span class="badge badge-blue">Interactive</span>
+      </div>
+      <p style="font-size: 7.2pt; color: #475569;">
+        Split-screen dashboard for branch credit officers and fraud analysts featuring localized bounding box overlays, font inspectors, and PKR ledger reconciliations.
+      </p>
+    </div>
+    <div class="card pk-card">
+      <div class="card-header">
+        <span class="card-title">2. Enterprise REST API</span>
+        <span class="badge badge-emerald">Sub-Second</span>
+      </div>
+      <p style="font-size: 7.2pt; color: #475569;">
+        High-throughput endpoint (<code>/api/v1/verify</code>) integrated into Pakistani fintech onboarding flows (SadaPay, JazzCash, digital lending apps) for automated loan verification.
+      </p>
+    </div>
+    <div class="card highlight">
+      <div class="card-header">
+        <span class="card-title">3. Forensic PDF Dossier</span>
+        <span class="badge badge-slate">Audit-Ready</span>
+      </div>
+      <p style="font-size: 7.2pt; color: #475569;">
+        Certified report with SHA-256 chain-of-custody, visual evidence attachments, and regulatory disclosures admissible under SBP inspection frameworks.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout callout-nist">
+    <strong>SBP & NIST Compliance:</strong> Aligns with the <strong>State Bank of Pakistan (SBP) BPRD Circulars on AML/CFT</strong>, customer due diligence (CDD/KYC), and NIST SP 800-86 digital evidence standards to ensure zero hallucination and complete auditability.
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- PAGE 3: PAKISTAN SPECIFIC FORENSIC ENGINES -->
+<!-- ========================================== -->
+<div class="page">
+  <div class="page-header">
+    <span class="brand">DeepTrace Pakistan Proposal</span>
+    <span>Section 2: Pakistan-Specific Forensic Engines</span>
+  </div>
+
+  <h1 class="section-title"><span class="sec-num">02</span> Localized Pakistani Forensic Engines</h1>
+
+  <h2>2.1 Pakistani Banking & Financial Document Topology</h2>
+  <p>
+    DeepTrace includes domain-specific forensic parsers customized for Pakistani financial documents, accounting for unique national formats, numbering conventions, and clearing architectures:
+  </p>
+
+  <div class="grid-2">
+    <!-- PK Engine 1 -->
+    <div class="card pk-card">
+      <div class="card-header">
+        <span class="card-title">1. 24-Digit PK-IBAN & Clearing Validator</span>
+        <span class="badge badge-emerald">Deterministic</span>
+      </div>
+      <p style="font-size: 7.3pt;">
+        Pakistani IBANs follow strict SBP formatting (<code>PK</code> + 2-digit check + 4-char Bank Code + 16-digit Account). DeepTrace executes MOD-97 checksum validation and cross-references bank clearing codes (e.g., <code>MEZN</code> for Meezan, <code>HABP</code> for HBL, <code>UNIL</code> for UBL, <code>ALFH</code> for Alfalah).
+      </p>
+      <pre><code>PK36MEZN0001234567890123  --> Valid [Meezan Bank Ltd]
+PK36MEZN0001234567890199  --> ❌ CHECKSUM_FAILURE (Mod-97 mismatch)</code></pre>
+    </div>
+
+    <!-- PK Engine 2 -->
+    <div class="card pk-card">
+      <div class="card-header">
+        <span class="card-title">2. Lakh & Crore South Asian Numbering Parser</span>
+        <span class="badge badge-emerald">Deterministic</span>
+      </div>
+      <p style="font-size: 7.3pt;">
+        Pakistani statements frequently alternate between Western comma grouping (<code>1,250,000.00</code>) and South Asian Lakh/Crore notation (<code>12,50,000.00</code>). DeepTrace normalizes and verifies all arithmetic ledgers across both formats without delimiter hallucination.
+      </p>
+      <div style="font-size: 7pt; color: #065f46; background: #dcfce7; padding: 4px; border-radius: 4px;">
+        <strong>Normalization:</strong> <code>Rs. 1,25,00,000</code> &rarr; <code>12500000.00 PKR</code> (1.25 Crore).
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <!-- PK Engine 3 -->
+    <div class="card pk-card">
+      <div class="card-header">
+        <span class="card-title">3. Raast & 1LINK Narration Engine</span>
+        <span class="badge badge-emerald">Semantic Math</span>
+      </div>
+      <p style="font-size: 7.3pt;">
+        Parses Pakistani transaction strings (e.g., <code>RAAST/P2P/03001234567</code>, <code>IBFT/1LINK/FT26081...</code>, <code>ATM WDL/1LINK/KHI</code>). Verifies chronological date sequencing, SBP transaction reference structures, and running balance continuity.
+      </p>
+    </div>
+
+    <!-- PK Engine 4 -->
+    <div class="card pk-card">
+      <div class="card-header">
+        <span class="card-title">4. Pakistani Utility Bill (DISCOs/Gas) Analyzer</span>
+        <span class="badge badge-emerald">Visual & OCR</span>
+      </div>
+      <p style="font-size: 7.3pt;">
+        Specialized templates for K-Electric, LESCO, IESCO, GEPCO, SNGPL, and SSGC. Cross-verifies consumer number checksums, tariff slabs, billing months, and address consistency against applicant data.
+      </p>
+    </div>
+  </div>
+
+  <h2>2.2 Pakistani Document Verification Scope Matrix</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Document Category</th>
+        <th>Target Pakistani Issuers</th>
+        <th>Primary Forensic Signals Checked</th>
+        <th>Fraud Risk Mitigation</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Bank Statements</strong></td>
+        <td>HBL, Meezan, UBL, Alfalah, MCB, SCB Pakistan</td>
+        <td>Opening/Closing math ledger, PK-IBAN, font baseline, ELA compression</td>
+        <td>Visa application fraud, unsecured loan defaults</td>
+      </tr>
+      <tr>
+        <td><strong>Digital Wallet Ledgers</strong></td>
+        <td>Easypaisa (Telenor MFB), JazzCash (MMBL), SadaPay, NayaPay</td>
+        <td>Transaction ID checksum, Raast reference format, font object tree</td>
+        <td>Merchant fraud, fabricated nano-lending cashflows</td>
+      </tr>
+      <tr>
+        <td><strong>Tax Proofs & ATL</strong></td>
+        <td>Federal Board of Revenue (FBR) IRIS Portal</td>
+        <td>NTN format, ATL bar-code metadata, CPR number arithmetic, date logic</td>
+        <td>Falsified tax filer status, fraudulent commercial bidding</td>
+      </tr>
+      <tr>
+        <td><strong>Utility Bills (Proof of Residence)</strong></td>
+        <td>K-Electric, LESCO, IESCO, FESCO, SNGPL, SSGC</td>
+        <td>Consumer ID format, billing formula (units × slab + tax), Canva template fonts</td>
+        <td>Fake address verification for digital onboarding</td>
+      </tr>
+      <tr>
+        <td><strong>Salary Slips & Letters</strong></td>
+        <td>Corporate & SME employers across PK</td>
+        <td>Gross - Deductions = Net math, font consistency, ELA stamp splicing</td>
+        <td>Inflated income for auto loans & credit cards</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ========================================== -->
+<!-- PAGE 4: SYSTEM ARCHITECTURE                -->
+<!-- ========================================== -->
+<div class="page">
+  <div class="page-header">
+    <span class="brand">DeepTrace Proposal</span>
+    <span>Section 3: High-Level System Architecture</span>
+  </div>
+
+  <h1 class="section-title"><span class="sec-num">03</span> System Architecture & Core Philosophy</h1>
+
+  <h2>3.1 The "Deterministic First" Architectural Law</h2>
+  <p>
+    A fatal failure of modern AI startups is placing an LLM in charge of low-level perception and arithmetic. DeepTrace enforces strict architectural separation: <strong>code extracts facts, computer vision detects visual anomalies, and language models synthesize verified evidence.</strong>
+  </p>
+
+  <!-- Visual Architecture Diagram using SVG -->
+  <div class="diagram-container">
+    <svg viewBox="0 0 700 230" style="width: 100%; height: auto; max-height: 220px;">
+      <rect x="10" y="10" width="680" height="210" rx="8" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" />
+      
+      <!-- Top Level: Interfaces -->
+      <rect x="30" y="20" width="180" height="32" rx="5" fill="#0f172a" />
+      <text x="120" y="41" fill="#ffffff" font-family="'Plus Jakarta Sans', sans-serif" font-size="9.5" font-weight="700" text-anchor="middle">Next.js Web Workbench</text>
+
+      <rect x="260" y="20" width="180" height="32" rx="5" fill="#064e3b" />
+      <text x="350" y="41" fill="#ffffff" font-family="'Plus Jakarta Sans', sans-serif" font-size="9.5" font-weight="700" text-anchor="middle">FastAPI Gateway (REST)</text>
+
+      <rect x="490" y="20" width="180" height="32" rx="5" fill="#0f172a" />
+      <text x="580" y="41" fill="#ffffff" font-family="'Plus Jakarta Sans', sans-serif" font-size="9.5" font-weight="700" text-anchor="middle">PDF Report Generator</text>
+
+      <!-- Connecting Lines -->
+      <line x1="120" y1="52" x2="120" y2="70" stroke="#64748b" stroke-width="1.5" />
+      <line x1="350" y1="52" x2="350" y2="70" stroke="#64748b" stroke-width="1.5" />
+      <line x1="580" y1="52" x2="580" y2="70" stroke="#64748b" stroke-width="1.5" />
+      <line x1="120" y1="70" x2="580" y2="70" stroke="#64748b" stroke-width="1.5" />
+      <line x1="350" y1="70" x2="350" y2="85" stroke="#64748b" stroke-width="1.5" />
+
+      <!-- Orchestrator Box -->
+      <rect x="200" y="85" width="300" height="28" rx="5" fill="#059669" />
+      <text x="350" y="103" fill="#ffffff" font-family="'Plus Jakarta Sans', sans-serif" font-size="9.5" font-weight="700" text-anchor="middle">Investigation Orchestration Engine (Celery/Redis)</text>
+
+      <!-- Three Pillars -->
+      <line x1="350" y1="113" x2="350" y2="128" stroke="#64748b" stroke-width="1.5" />
+      <line x1="110" y1="128" x2="590" y2="128" stroke="#64748b" stroke-width="1.5" />
+      <line x1="110" y1="128" x2="110" y2="142" stroke="#64748b" stroke-width="1.5" />
+      <line x1="350" y1="128" x2="350" y2="142" stroke="#64748b" stroke-width="1.5" />
+      <line x1="590" y1="128" x2="590" y2="142" stroke="#64748b" stroke-width="1.5" />
+
+      <!-- Pillar 1: Deterministic -->
+      <rect x="30" y="142" width="160" height="65" rx="5" fill="#f8fafc" stroke="#3b82f6" stroke-width="1.2" />
+      <text x="110" y="159" fill="#1e40af" font-family="'Plus Jakarta Sans', sans-serif" font-size="8.5" font-weight="700" text-anchor="middle">PDF & STRUCTURAL</text>
+      <text x="110" y="174" fill="#475569" font-family="'Plus Jakarta Sans', sans-serif" font-size="7" text-anchor="middle">Metadata • Object Tree</text>
+      <text x="110" y="186" fill="#475569" font-family="'Plus Jakarta Sans', sans-serif" font-size="7" text-anchor="middle">Font Dictionaries • Glyphs</text>
+      <text x="110" y="198" fill="#475569" font-family="'Plus Jakarta Sans', sans-serif" font-size="7" text-anchor="middle">PK-IBAN Checksums</text>
+
+      <!-- Pillar 2: CV/Vision -->
+      <rect x="270" y="142" width="160" height="65" rx="5" fill="#f8fafc" stroke="#10b981" stroke-width="1.2" />
+      <text x="350" y="159" fill="#065f46" font-family="'Plus Jakarta Sans', sans-serif" font-size="8.5" font-weight="700" text-anchor="middle">VISION & FORENSIC CV</text>
+      <text x="350" y="174" fill="#475569" font-family="'Plus Jakarta Sans', sans-serif" font-size="7" text-anchor="middle">Error Level Analysis (ELA)</text>
+      <text x="350" y="186" fill="#475569" font-family="'Plus Jakarta Sans', sans-serif" font-size="7" text-anchor="middle">Compression Inconsistencies</text>
+      <text x="350" y="198" fill="#475569" font-family="'Plus Jakarta Sans', sans-serif" font-size="7" text-anchor="middle">Splice & Stamp Artifacts</text>
+
+      <!-- Pillar 3: Semantic & Agents -->
+      <rect x="510" y="142" width="160" height="65" rx="5" fill="#f8fafc" stroke="#8b5cf6" stroke-width="1.2" />
+      <text x="590" y="159" fill="#5b21b6" font-family="'Plus Jakarta Sans', sans-serif" font-size="8.5" font-weight="700" text-anchor="middle">SEMANTIC & MULTI-AGENT</text>
+      <text x="590" y="174" fill="#475569" font-family="'Plus Jakarta Sans', sans-serif" font-size="7" text-anchor="middle">OCR • Lakh/Crore Math</text>
+      <text x="590" y="186" fill="#475569" font-family="'Plus Jakarta Sans', sans-serif" font-size="7" text-anchor="middle">Raast & 1LINK Chronology</text>
+      <text x="590" y="198" fill="#475569" font-family="'Plus Jakarta Sans', sans-serif" font-size="7" text-anchor="middle">Multi-Agent Evidence Fusion</text>
+    </svg>
+    <div class="diagram-caption">Figure 3.1: DeepTrace Tri-Pillar Architecture tailored for Pakistani and Global Forensic Standards.</div>
+  </div>
+
+  <h2>3.2 Technical Responsibility Allocation Matrix</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25%;">Forensic Layer</th>
+        <th style="width: 25%;">Execution Paradigm</th>
+        <th style="width: 25%;">Key Technologies</th>
+        <th style="width: 25%;">Output Evidence Type</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>PDF Metadata & Structure</strong></td>
+        <td><span class="badge badge-blue">Deterministic Code</span></td>
+        <td><code>pikepdf</code>, <code>PyMuPDF</code>, <code>pdfplumber</code></td>
+        <td>Producer/Creator delta, Canva/iLovePDF layer injections</td>
+      </tr>
+      <tr>
+        <td><strong>Font & Glyph Metrics</strong></td>
+        <td><span class="badge badge-blue">Deterministic Code</span></td>
+        <td><code>freetype-py</code>, <code>fontTools</code>, Canvas</td>
+        <td>Sub-pixel baseline displacement, font object switch</td>
+      </tr>
+      <tr>
+        <td><strong>Visual Compression / ELA</strong></td>
+        <td><span class="badge badge-green">Computer Vision</span></td>
+        <td><code>OpenCV</code>, <code>NumPy</code>, <code>SciPy</code></td>
+        <td>Localized JPEG compression anomaly matrices</td>
+      </tr>
+      <tr>
+        <td><strong>PK Financial Math Engine</strong></td>
+        <td><span class="badge badge-emerald">Deterministic Code</span></td>
+        <td>Pure Python PK-Math Engine</td>
+        <td>Exact arithmetic discrepancy (Δ), PK-IBAN checksums</td>
+      </tr>
+      <tr>
+        <td><strong>Evidence Synthesis</strong></td>
+        <td><span class="badge badge-purple">Multi-Agent LLM</span></td>
+        <td>LangGraph + Gemini / Claude (Langfuse)</td>
+        <td>Natural language audit rationale, cross-signal correlation</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ========================================== -->
+<!-- PAGE 5: DETAILED FORENSIC PIPELINE         -->
+<!-- ========================================== -->
+<div class="page">
+  <div class="page-header">
+    <span class="brand">DeepTrace Proposal</span>
+    <span>Section 4: The 8-Stage Forensic Pipeline</span>
+  </div>
+
+  <h1 class="section-title"><span class="sec-num">04</span> The 8-Stage Forensic Investigation Pipeline</h1>
+
+  <div class="step-flow">
+    <div class="step-item">1. Custody Lock</div>
+    <div class="step-arrow">→</div>
+    <div class="step-item">2. PDF Structure</div>
+    <div class="step-arrow">→</div>
+    <div class="step-item">3. Font & Glyphs</div>
+    <div class="step-arrow">→</div>
+    <div class="step-item">4. CV & ELA</div>
+    <div class="step-arrow">→</div>
+    <div class="step-item">5. OCR & PK-Math</div>
+    <div class="step-arrow">→</div>
+    <div class="step-item">6. Evidence Fusion</div>
+  </div>
+
+  <div class="grid-2">
+    <!-- Stage 1 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Stage 1: Evidence Acquisition & Custody</span>
+        <span class="badge badge-slate">Step 1</span>
+      </div>
+      <p style="font-size: 7.3pt;">
+        Computes SHA-256 hash immediately upon upload, preserves an immutable clone, and registers an investigation session compliant with ETO 2002 electronic evidence preservation standards.
+      </p>
+      <pre><code>{
+  "investigation_id": "DT-PK-2026-000412",
+  "sha256": "4a7f92b1c8890123d4e5f6...",
+  "status": "IMMUTABLE_CUSTODY_LOCKED"
+}</code></pre>
+    </div>
+
+    <!-- Stage 2 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Stage 2: PDF Structural & Metadata Forensics</span>
+        <span class="badge badge-blue">Step 2</span>
+      </div>
+      <p style="font-size: 7.3pt;">
+        Inspects PDF trailer dictionaries, incremental updates, XObjects, creation vs. modification timestamps, and authoring software discrepancies (e.g., Word Creator vs. Canva/iLovePDF Producer).
+      </p>
+      <div style="font-size: 7pt; color: #475569; background: #f1f5f9; padding: 3px; border-radius: 4px;">
+        <strong>Signal:</strong> Bank statement originated from <em>Core Banking Spool</em> but shows incremental save via <em>Adobe Illustrator / Canva</em>.
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <!-- Stage 3 -->
+    <div class="card highlight">
+      <div class="card-header">
+        <span class="card-title">Stage 3: Font & Glyph Micro-Analysis</span>
+        <span class="badge badge-purple">Differentiator</span>
+      </div>
+      <p style="font-size: 7.3pt;">
+        Examines embedded font subsets, glyph bounding boxes, baseline offsets, and kerning variances. Detects inserted digits pasted into authentic Pakistani bank balances.
+      </p>
+      <div style="font-size: 7pt; background: #eff6ff; padding: 4px; border-radius: 4px; border-left: 2px solid #3b82f6;">
+        <strong>Example:</strong> Balance <code>Rs. 12,50,000</code> has baseline offset of <strong>+1.8px</strong> and uses Font Object <code>/F12_Subset</code> while document text uses <code>/F4_Regular</code>.
+      </div>
+    </div>
+
+    <!-- Stage 4 -->
+    <div class="card highlight">
+      <div class="card-header">
+        <span class="card-title">Stage 4: Computer Vision & ELA Heatmaps</span>
+        <span class="badge badge-green">Vision CV</span>
+      </div>
+      <p style="font-size: 7.3pt;">
+        Executes Error Level Analysis (ELA) by re-compressing at known quantization ratios (95%), calculating pixel-wise delta matrices, and localizing anomalous compression signatures.
+      </p>
+      <div style="font-size: 7pt; background: #f0fdf4; padding: 4px; border-radius: 4px; border-left: 2px solid #10b981;">
+        <strong>Signal:</strong> High-frequency ELA variance cluster localized at Coordinates <code>[x:412, y:628, w:120, h:24]</code>.
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <!-- Stage 5 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Stage 5: OCR & Semantic Topology</span>
+        <span class="badge badge-blue">Step 5</span>
+      </div>
+      <p style="font-size: 7.3pt;">
+        Executes high-precision text and tabular layout extraction to structure Pakistani statements, Raast transaction rows, and dates.
+      </p>
+    </div>
+
+    <!-- Stage 6 -->
+    <div class="card danger">
+      <div class="card-header">
+        <span class="card-title">Stage 6: Deterministic Financial Verification</span>
+        <span class="badge badge-red">High Signal</span>
+      </div>
+      <p style="font-size: 7.3pt;">
+        Executes zero-tolerance mathematical reconciliation:
+      </p>
+      <div style="font-family: monospace; background: #fee2e2; padding: 3px 5px; border-radius: 4px; font-size: 7pt; color: #991b1b;">
+        Opening Balance + Total Credits - Total Debits = Closing Balance<br>
+        Gross Salary - Tax/Deductions = Net Salary
+      </div>
+    </div>
+  </div>
+
+  <h2>4.1 Pakistani Bank Statement Reconciliation Case Study (PKR)</h2>
+  <div class="card" style="background: #fafafa;">
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 7.6pt;">
+      <div>
+        <div style="font-weight: 700; color: #0f172a; margin-bottom: 2px;">Extracted Bank Statement Ledger (HBL / Meezan)</div>
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed #cbd5e1; padding: 2px 0;"><span>Opening Balance (01/08/2026):</span> <strong>PKR 10,00,000.00</strong></div>
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed #cbd5e1; padding: 2px 0;"><span>Sum of Credit Deposits:</span> <strong style="color:#166534;">+ PKR 5,00,000.00</strong></div>
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed #cbd5e1; padding: 2px 0;"><span>Sum of Debit Withdrawals:</span> <strong style="color:#991b1b;">- PKR 2,00,000.00</strong></div>
+        <div style="display: flex; justify-content: space-between; padding: 2px 0; background: #e2e8f0; font-weight: 700;"><span>Document Reported Closing:</span> <strong>PKR 15,00,000.00</strong></div>
+      </div>
+      <div>
+        <div style="font-weight: 700; color: #ef4444; margin-bottom: 2px;">DeepTrace Arithmetic Engine Finding</div>
+        <div style="background: #fef2f2; border: 1px solid #fca5a5; padding: 5px; border-radius: 5px;">
+          <div style="color: #991b1b; font-weight: 700; font-size: 7.3pt;">🔴 CRITICAL MATHEMATICAL MISMATCH</div>
+          <div style="margin-top: 2px; font-size: 7pt;">Expected Ledger Sum: <code>10,00,000 + 5,00,000 - 2,00,000 = PKR 13,00,000</code></div>
+          <div style="font-size: 7pt;">Reported on Document: <code>PKR 15,00,000</code></div>
+          <div style="font-weight: 700; color: #b91c1c; margin-top: 2px; font-size: 7.3pt;">Unexplained Discrepancy: +PKR 2,00,000.00</div>
+          <div style="font-size: 6.6pt; color: #7f1d1d; margin-top: 1px;">Rule ID: <code>RULE_PK_LEDGER_01</code> | Severity: <strong>CRITICAL (+20 Risk)</strong></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- PAGE 6: EVIDENCE FUSION & RISK SCORING     -->
+<!-- ========================================== -->
+<div class="page">
+  <div class="page-header">
+    <span class="brand">DeepTrace Proposal</span>
+    <span>Section 5: Evidence Fusion & Risk Scoring</span>
+  </div>
+
+  <h1 class="section-title"><span class="sec-num">05</span> Evidence Fusion & Calibrated Risk Engine</h1>
+
+  <h2>5.1 Multi-Signal Evidence Fusion Architecture</h2>
+  <p>
+    Instead of an uninterpretable single-pass neural network classification, DeepTrace implements an <strong>Evidence Aggregation & Weighted Fusion Matrix</strong>. Each forensic module operates independently and submits discrete evidence items with associated certainty metrics.
+  </p>
+
+  <div class="diagram-container">
+    <svg viewBox="0 0 700 150" style="width: 100%; height: auto; max-height: 145px;">
+      <!-- Input Signals -->
+      <g transform="translate(20, 5)">
+        <rect x="0" y="0" width="130" height="18" rx="3" fill="#0f172a" />
+        <text x="65" y="13" fill="#ffffff" font-size="7.5" font-weight="700" text-anchor="middle">Metadata Vector (0.7)</text>
+
+        <rect x="0" y="23" width="130" height="18" rx="3" fill="#0f172a" />
+        <text x="65" y="36" fill="#ffffff" font-size="7.5" font-weight="700" text-anchor="middle">PDF Objects (0.9)</text>
+
+        <rect x="0" y="46" width="130" height="18" rx="3" fill="#0f172a" />
+        <text x="65" y="59" fill="#ffffff" font-size="7.5" font-weight="700" text-anchor="middle">Font Metrics (0.8)</text>
+
+        <rect x="0" y="69" width="130" height="18" rx="3" fill="#0f172a" />
+        <text x="65" y="82" fill="#ffffff" font-size="7.5" font-weight="700" text-anchor="middle">Vision ELA (0.6)</text>
+
+        <rect x="0" y="92" width="130" height="18" rx="3" fill="#0f172a" />
+        <text x="65" y="105" fill="#ffffff" font-size="7.5" font-weight="700" text-anchor="middle">PK-Math Ledger (1.0)</text>
+
+        <rect x="0" y="115" width="130" height="18" rx="3" fill="#0f172a" />
+        <text x="65" y="128" fill="#ffffff" font-size="7.5" font-weight="700" text-anchor="middle">Semantics / IBAN (0.4)</text>
+      </g>
+
+      <!-- Connecting Lines -->
+      <path d="M 160 14 L 260 70" stroke="#64748b" stroke-width="1.2" fill="none" />
+      <path d="M 160 37 L 260 70" stroke="#64748b" stroke-width="1.2" fill="none" />
+      <path d="M 160 60 L 260 70" stroke="#64748b" stroke-width="1.2" fill="none" />
+      <path d="M 160 83 L 260 70" stroke="#64748b" stroke-width="1.2" fill="none" />
+      <path d="M 160 106 L 260 70" stroke="#64748b" stroke-width="1.2" fill="none" />
+      <path d="M 160 128 L 260 70" stroke="#64748b" stroke-width="1.2" fill="none" />
+
+      <!-- Center Box: Evidence Fusion -->
+      <rect x="260" y="38" width="170" height="65" rx="6" fill="#059669" stroke="#047857" stroke-width="2" />
+      <text x="345" y="62" fill="#ffffff" font-family="'Plus Jakarta Sans', sans-serif" font-size="9.5" font-weight="800" text-anchor="middle">EVIDENCE FUSION</text>
+      <text x="345" y="76" fill="#d1fae5" font-family="'Plus Jakarta Sans', sans-serif" font-size="7" text-anchor="middle">Bayesian Weighting & Normalization</text>
+      <text x="345" y="88" fill="#d1fae5" font-family="'Plus Jakarta Sans', sans-serif" font-size="7" text-anchor="middle">Cross-Signal Correlation Check</text>
+
+      <line x1="430" y1="70" x2="490" y2="70" stroke="#64748b" stroke-width="1.5" />
+
+      <!-- Right Box: Risk Score & Tiers -->
+      <rect x="490" y="33" width="190" height="75" rx="6" fill="#0f172a" />
+      <text x="585" y="58" fill="#f87171" font-family="'Plus Jakarta Sans', sans-serif" font-size="13" font-weight="800" text-anchor="middle">87 / 100</text>
+      <text x="585" y="72" fill="#ef4444" font-family="'Plus Jakarta Sans', sans-serif" font-size="8.5" font-weight="700" text-anchor="middle">HIGH RISK CLASSIFICATION</text>
+      <text x="585" y="90" fill="#94a3b8" font-family="'Plus Jakarta Sans', sans-serif" font-size="6.8" text-anchor="middle">Calibrated Threshold: 81-100 CRITICAL</text>
+    </svg>
+    <div class="diagram-caption">Figure 5.1: Mathematical Evidence Fusion Flow aggregating 6 independent signals into a calibrated risk score.</div>
+  </div>
+
+  <h2>5.2 Risk Scoring Matrix & Threshold Calibration</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Signal Category</th>
+        <th>Max Weight</th>
+        <th>Trigger Condition</th>
+        <th>Deterministic / Probabilistic</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Mathematical Mismatch</strong></td>
+        <td>+20 pts</td>
+        <td>Ledger or tax arithmetic discrepancy &gt; 0.01 PKR</td>
+        <td><span class="badge badge-blue">100% Deterministic</span></td>
+      </tr>
+      <tr>
+        <td><strong>Image / ELA Manipulation</strong></td>
+        <td>+20 pts</td>
+        <td>Localized high-frequency compression gradient</td>
+        <td><span class="badge badge-green">CV Model (Probabilistic)</span></td>
+      </tr>
+      <tr>
+        <td><strong>Font & Baseline Inconsistency</strong></td>
+        <td>+15 pts</td>
+        <td>Font subset switch or &gt;1.5px baseline displacement</td>
+        <td><span class="badge badge-blue">100% Deterministic</span></td>
+      </tr>
+      <tr>
+        <td><strong>PDF Object Hierarchy Anomaly</strong></td>
+        <td>+15 pts</td>
+        <td>Orphaned streams, Canva/iLovePDF layer injections</td>
+        <td><span class="badge badge-blue">100% Deterministic</span></td>
+      </tr>
+      <tr>
+        <td><strong>Metadata Timestamp Mismatch</strong></td>
+        <td>+10 pts</td>
+        <td>Modification date precedes creation or tool mismatch</td>
+        <td><span class="badge badge-blue">100% Deterministic</span></td>
+      </tr>
+      <tr>
+        <td><strong>PK-IBAN / Checksum Failure</strong></td>
+        <td>+10 pts</td>
+        <td>Invalid MOD-97 check digit or unknown PK bank code</td>
+        <td><span class="badge badge-emerald">100% Deterministic</span></td>
+      </tr>
+      <tr>
+        <td><strong>AI Generation Artifacts</strong></td>
+        <td>+10 pts</td>
+        <td>Synthetic layout tokens, diffusion grid anomalies</td>
+        <td><span class="badge badge-green">Vision Model</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>5.3 Calibrated Tiers & Action Directives</h2>
+  <div class="grid-4" style="margin-top: 5px;">
+    <div class="card success" style="text-align: center;">
+      <div style="font-size: 10pt; font-weight: 800; color: #166534;">0 – 20</div>
+      <div style="font-size: 7.2pt; font-weight: 700; color: #15803d; text-transform: uppercase;">LOW RISK</div>
+      <div style="font-size: 6.8pt; color: #475569; margin-top: 1px;">Straight-Through Auto-Approval</div>
+    </div>
+    <div class="card" style="text-align: center; border-left: 3px solid #3b82f6;">
+      <div style="font-size: 10pt; font-weight: 800; color: #1e40af;">21 – 40</div>
+      <div style="font-size: 7.2pt; font-weight: 700; color: #2563eb; text-transform: uppercase;">MODERATE</div>
+      <div style="font-size: 6.8pt; color: #475569; margin-top: 1px;">Automated Secondary Scan</div>
+    </div>
+    <div class="card highlight" style="text-align: center; border-left: 3px solid #f59e0b;">
+      <div style="font-size: 10pt; font-weight: 800; color: #b45309;">41 – 60</div>
+      <div style="font-size: 7.2pt; font-weight: 700; color: #d97706; text-transform: uppercase;">ELEVATED</div>
+      <div style="font-size: 6.8pt; color: #475569; margin-top: 1px;">Human Credit Officer Review</div>
+    </div>
+    <div class="card danger" style="text-align: center;">
+      <div style="font-size: 10pt; font-weight: 800; color: #b91c1c;">61 – 100</div>
+      <div style="font-size: 7.2pt; font-weight: 700; color: #dc2626; text-transform: uppercase;">HIGH / CRITICAL</div>
+      <div style="font-size: 6.8pt; color: #475569; margin-top: 1px;">Immediate Rejection & STR Filing</div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- PAGE 7: MULTI-AGENT INVESTIGATION SWARM    -->
+<!-- ========================================== -->
+<div class="page">
+  <div class="page-header">
+    <span class="brand">DeepTrace Proposal</span>
+    <span>Section 6: Multi-Agent Forensic Investigation Unit</span>
+  </div>
+
+  <h1 class="section-title"><span class="sec-num">06</span> The Multi-Agent Forensic Investigation Unit</h1>
+
+  <h2>6.1 Specialized Agent Swarm Orchestration</h2>
+  <p>
+    Rather than relying on a general-purpose conversational LLM, DeepTrace deploys a specialized 4-agent swarm. Each sub-agent is strictly constrained to its domain tools and evidence buffers, eliminating hallucinations and ensuring courtroom-admissible explainability under Pakistani electronic evidence law.
+  </p>
+
+  <div class="grid-2">
+    <!-- Agent 1 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Agent 1: Structural Forensic Agent</span>
+        <span class="badge badge-blue">Structure</span>
+      </div>
+      <p style="font-size: 7.3pt;">
+        <strong>Scope:</strong> Evaluates PDF object streams, metadata revisions, hidden layers, font descriptors, and creation software fingerprints.
+      </p>
+      <div style="font-size: 6.8pt; color: #475569;">
+        <em>Guardrail:</em> Can only assert structural tampering if byte-level discrepancies or stream anomalies are verified.
+      </div>
+    </div>
+
+    <!-- Agent 2 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Agent 2: Visual Forensic Agent</span>
+        <span class="badge badge-green">Vision</span>
+      </div>
+      <p style="font-size: 7.3pt;">
+        <strong>Scope:</strong> Interprets ELA heatmaps, JPEG compression ghosting, copy-move clone boundaries, and visual resolution variations.
+      </p>
+      <div style="font-size: 6.8pt; color: #475569;">
+        <em>Guardrail:</em> Formulates visual findings strictly as localized bounding box probabilities without claiming definitive legal intent.
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <!-- Agent 3 -->
+    <div class="card pk-card">
+      <div class="card-header">
+        <span class="card-title">Agent 3: Semantic & PK-Financial Agent</span>
+        <span class="badge badge-emerald">Semantics</span>
+      </div>
+      <p style="font-size: 7.3pt;">
+        <strong>Scope:</strong> Verifies OCR token geometry, PK-IBAN check digits, Lakh/Crore ledger sums, Raast reference patterns, and FBR tax ratios.
+      </p>
+      <div style="font-size: 6.8pt; color: #475569;">
+        <em>Guardrail:</em> Executes deterministic math scripts directly rather than relying on LLM mental arithmetic.
+      </div>
+    </div>
+
+    <!-- Agent 4 -->
+    <div class="card highlight" style="border-left: 3px solid #0f172a;">
+      <div class="card-header">
+        <span class="card-title">Agent 4: Lead Investigator Agent</span>
+        <span class="badge badge-red">Synthesis</span>
+      </div>
+      <p style="font-size: 7.3pt;">
+        <strong>Scope:</strong> Receives structured findings from Agents 1–3, correlates cross-signal evidence, synthesizes the final risk explanation, and answers investigator queries.
+      </p>
+      <div style="font-size: 6.8pt; color: #475569;">
+        <em>Zero-Hallucination Policy:</em> Forbidden from introducing facts outside the verified evidence manifest.
+      </div>
+    </div>
+  </div>
+
+  <h2>6.2 Natural Language Forensic Investigator in Action</h2>
+  <div class="ui-mockup">
+    <div class="ui-mockup-header">
+      <div>
+        <span class="ui-dot red"></span>
+        <span class="ui-dot yellow"></span>
+        <span class="ui-dot green"></span>
+        <span style="font-weight: 700; color: #94a3b8; font-size: 7.2pt; margin-left: 6px;">DeepTrace Interactive Investigator Assistant</span>
+      </div>
+      <span class="badge badge-emerald">Session #DT-PK-884</span>
+    </div>
+
+    <div style="margin-bottom: 5px;">
+      <span style="color: #60a5fa; font-weight: 600;">Bank Credit Officer:</span>
+      <span style="color: #e2e8f0;"> "Why was this Meezan Bank statement classified as High Risk (87/100)?"</span>
+    </div>
+
+    <div style="background: rgba(255,255,255,0.06); padding: 6px; border-radius: 4px; border-left: 2px solid #10b981; margin-bottom: 5px;">
+      <span style="color: #34d399; font-weight: 600;">DeepTrace Lead Investigator:</span>
+      <p style="color: #f1f5f9; font-size: 7.1pt; margin: 2px 0;">
+        Three independent verified indicators contributed to the <strong style="color: #f87171;">87/100 High Risk</strong> assessment:
+      </p>
+      <ol style="margin-left: 14px; color: #cbd5e1; font-size: 6.9pt; line-height: 1.35;">
+        <li><strong style="color: #fca5a5;">Ledger Arithmetic Mismatch:</strong> Transaction sum (PKR 13,00,000) does not equal the printed Closing Balance (PKR 15,00,000), creating an unexplained delta of <strong style="color: #f87171;">+PKR 2,00,000.00</strong>.</li>
+        <li><strong style="color: #fca5a5;">Font Substitution Anomaly:</strong> The balance value <code>Rs. 15,00,000</code> uses font object <code>/F12_Subset</code> with a <strong style="color: #f87171;">+1.8px</strong> vertical baseline shift relative to the column.</li>
+        <li><strong style="color: #fde68a;">Visual Compression Discontinuity:</strong> ELA reveals a distinct 95% JPEG compression boundary surrounding the balance box coordinates <code>[x:412, y:628]</code>.</li>
+      </ol>
+    </div>
+
+    <div>
+      <span style="color: #60a5fa; font-weight: 600;">Investigator:</span>
+      <span style="color: #e2e8f0;"> "Is the IBAN authentic?"</span>
+    </div>
+    <div style="color: #6ee7b7; font-size: 6.9pt; margin-top: 1px;">
+      ✓ PK-IBAN Check: <code>PK36MEZN0001234567890123</code> is mathematically valid (Meezan Bank Ltd). The forgery is localized strictly to the numeric balance digits.
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- PAGE 8: UI/UX FORENSIC WORKBENCH           -->
+<!-- ========================================== -->
+<div class="page">
+  <div class="page-header">
+    <span class="brand">DeepTrace Proposal</span>
+    <span>Section 7: Forensic Workbench & UI/UX Design</span>
+  </div>
+
+  <h1 class="section-title"><span class="sec-num">07</span> Forensic Dashboard & Visual Evidence Overlays</h1>
+
+  <h2>7.1 The Split-Screen Forensic Workstation</h2>
+  <p>
+    The DeepTrace user interface is engineered for institutional fraud analysts. Built using <strong>Next.js 15</strong>, <strong>Tailwind CSS</strong>, <strong>shadcn/ui</strong>, and a hardware-accelerated <strong>HTML5 Canvas/SVG</strong> layer, it provides instant visual correlation between raw evidence and the physical document.
+  </p>
+
+  <!-- UI Wireframe Schematic -->
+  <div class="ui-mockup">
+    <div class="ui-mockup-header">
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <span style="font-weight: 800; color: #34d399; font-size: 8pt;">DEEPTRACE WORKBENCH</span>
+        <span class="badge badge-slate">Case: DT-PK-2026-000412</span>
+        <span class="badge badge-red">Risk: 87/100 (HIGH)</span>
+      </div>
+      <div style="color: #94a3b8; font-size: 7.1pt;">File: <code>meezan_statement_aug26.pdf</code> (SHA: 4a7f9...)</div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 260px 1fr; gap: 8px;">
+      <!-- Left Column: Evidence Drawer -->
+      <div style="background: rgba(15,23,42,0.6); border: 1px solid #334155; border-radius: 6px; padding: 6px;">
+        <div style="font-size: 7.3pt; font-weight: 700; color: #34d399; margin-bottom: 4px;">DISCOVERED EVIDENCE (4)</div>
+        
+        <!-- Evidence Item 1 -->
+        <div style="background: rgba(239,68,68,0.1); border-left: 2px solid #ef4444; padding: 3px; margin-bottom: 3px; border-radius: 2px;">
+          <div style="display: flex; justify-content: space-between; font-size: 6.8pt; font-weight: 700;">
+            <span style="color: #f87171;">🔴 Mathematical Mismatch</span>
+            <span style="color: #94a3b8;">Page 1</span>
+          </div>
+          <div style="font-size: 6.4pt; color: #cbd5e1; margin-top: 1px;">Ledger delta: +PKR 2,00,000 vs. reported balance.</div>
+        </div>
+
+        <!-- Evidence Item 2 -->
+        <div style="background: rgba(239,68,68,0.1); border-left: 2px solid #ef4444; padding: 3px; margin-bottom: 3px; border-radius: 2px;">
+          <div style="display: flex; justify-content: space-between; font-size: 6.8pt; font-weight: 700;">
+            <span style="color: #f87171;">🔴 Font Inconsistency</span>
+            <span style="color: #94a3b8;">Coords: 412, 628</span>
+          </div>
+          <div style="font-size: 6.4pt; color: #cbd5e1; margin-top: 1px;">Font Object /F12 | Baseline +1.8px offset.</div>
+        </div>
+
+        <!-- Evidence Item 3 -->
+        <div style="background: rgba(245,158,11,0.1); border-left: 2px solid #f59e0b; padding: 3px; margin-bottom: 3px; border-radius: 2px;">
+          <div style="display: flex; justify-content: space-between; font-size: 6.8pt; font-weight: 700;">
+            <span style="color: #fbbf24;">🟠 ELA Compression Anomaly</span>
+            <span style="color: #94a3b8;">Page 1</span>
+          </div>
+          <div style="font-size: 6.4pt; color: #cbd5e1; margin-top: 1px;">JPEG re-compression error peak in balance box.</div>
+        </div>
+
+        <!-- Evidence Item 4 -->
+        <div style="background: rgba(59,130,246,0.1); border-left: 2px solid #3b82f6; padding: 3px; border-radius: 2px;">
+          <div style="display: flex; justify-content: space-between; font-size: 6.8pt; font-weight: 700;">
+            <span style="color: #60a5fa;">🔵 Metadata Tool Conflict</span>
+            <span style="color: #94a3b8;">Header</span>
+          </div>
+          <div style="font-size: 6.4pt; color: #cbd5e1; margin-top: 1px;">Word 2019 creator modified with Canva.</div>
+        </div>
+      </div>
+
+      <!-- Right Column: Document Visualizer with Interactive Bounding Box -->
+      <div style="background: #ffffff; color: #0f172a; border-radius: 6px; padding: 9px; position: relative; min-height: 180px;">
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #e2e8f0; padding-bottom: 3px; margin-bottom: 5px;">
+          <span style="font-weight: 700; font-size: 7.3pt; color: #065f46;">MEEZAN BANK LIMITED • ACCOUNT STATEMENT</span>
+          <span style="font-size: 6.6pt; color: #64748b;">IBAN: PK36MEZN0001...9281</span>
+        </div>
+
+        <div style="font-size: 7pt; line-height: 1.45; color: #334155;">
+          <div><strong>Account Title:</strong> Tariq Mahmood &nbsp;&nbsp;|&nbsp;&nbsp; <strong>Branch:</strong> Gulberg III, Lahore</div>
+          <div style="margin: 5px 0; border: 1px solid #cbd5e1; padding: 3px; border-radius: 4px;">
+            <div style="display: flex; justify-content: space-between;"><span>Opening Balance (01/08/2026):</span> <span>PKR 10,00,000.00</span></div>
+            <div style="display: flex; justify-content: space-between;"><span>Total Credit Deposits:</span> <span>+PKR 5,00,000.00</span></div>
+            <div style="display: flex; justify-content: space-between;"><span>Total Debit Withdrawals:</span> <span>-PKR 2,00,000.00</span></div>
+          </div>
+
+          <!-- Highlighted Tampered Region -->
+          <div style="position: relative; display: inline-block; width: 100%; border: 2px solid #ef4444; background: rgba(239, 68, 68, 0.08); padding: 3px 5px; border-radius: 4px;">
+            <div style="display: flex; justify-content: space-between; font-weight: 800; font-size: 7.8pt;">
+              <span>Closing Balance (31/08/2026):</span>
+              <span style="color: #b91c1c; font-family: monospace; background: #fee2e2; padding: 1px 3px; border-radius: 2px;">PKR 15,00,000.00 ⚠</span>
+            </div>
+            <div style="position: absolute; right: -6px; top: -8px; background: #ef4444; color: #fff; font-size: 5.5pt; font-weight: 800; padding: 1px 3px; border-radius: 2px;">
+              ANOMALY: +PKR 200k &amp; FONT MISMATCH
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>7.2 The Real-Time Forensic Audit Timeline</h2>
+  <div class="card" style="background: #f8fafc;">
+    <div style="font-size: 7.2pt; font-family: 'JetBrains Mono', monospace; color: #334155; line-height: 1.45;">
+      <div><span style="color: #64748b;">19:32:11.002</span> [ACQUISITION] SHA-256 computed: <code>4a7f92b...</code> | ETO 2002 custody clone locked.</div>
+      <div><span style="color: #64748b;">19:32:11.380</span> [STRUCTURE]   PDF trailer parsed. 3 incremental revision saves detected.</div>
+      <div><span style="color: #64748b;">19:32:11.910</span> [PK-IBAN]     IBAN <code>PK36MEZN...</code> validated via MOD-97 checksum.</div>
+      <div><span style="color: #64748b;">19:32:12.420</span> [FONTS]       Font dictionary extracted. Discrepancy logged: <code>/F12_Subset</code> (+1.8px).</div>
+      <div><span style="color: #64748b;">19:32:13.110</span> [VISION]      ELA pass completed (Q=95). Compression delta localized [412, 628].</div>
+      <div><span style="color: #64748b;">19:32:13.800</span> [ARITHMETIC]  Lakh/Crore Ledger reconciled: Expected PKR 13,00,000 vs. Found PKR 15,00,000 (+PKR 200,000).</div>
+      <div><span style="color: #64748b;">19:32:14.450</span> [FUSION]      Evidence Matrix converged. Final Risk Score: <strong>87 / 100 (HIGH RISK)</strong>.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- PAGE 9: CONTROLLED DATASET & BENCHMARKS    -->
+<!-- ========================================== -->
+<div class="page">
+  <div class="page-header">
+    <span class="brand">DeepTrace Proposal</span>
+    <span>Section 8: Controlled Dataset & Evaluation</span>
+  </div>
+
+  <h1 class="section-title"><span class="sec-num">08</span> Dataset Strategy & Scientific Benchmarking</h1>
+
+  <h2>8.1 Controlled Ground-Truth Dataset Pipeline (Pakistani & Global)</h2>
+  <p>
+    In forensic computer science, training models without rigorous ground-truth manipulation records results in brittle detection. DeepTrace establishes a <strong>Tripartite Evaluation Corpus</strong> spanning authentic records, controlled manual manipulations, and generative AI synthetic documents.
+  </p>
+
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Corpus A: Authentic PK/Global</span>
+        <span class="badge badge-green">Baseline</span>
+      </div>
+      <p style="font-size: 7.3pt; color: #475569;">
+        <strong>1,200+ Verified Records:</strong> Authentic Pakistani bank statements (HBL, Meezan, Alfalah), utility bills (KE, LESCO), and FBR tax certificates with verified provenance.
+      </p>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Corpus B: Controlled Tampering</span>
+        <span class="badge badge-red">Annotated</span>
+      </div>
+      <p style="font-size: 7.3pt; color: #475569;">
+        <strong>1,800+ Programmatic Forgeries:</strong> Exact ground-truth masks for altered numerical balances, spliced logos, replaced names, and injected Canva fonts.
+      </p>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Corpus C: GenAI Synthetic</span>
+        <span class="badge badge-purple">Modern Threat</span>
+      </div>
+      <p style="font-size: 7.3pt; color: #475569;">
+        <strong>1,000+ AI-Generated PDFs:</strong> Completely fabricated bank statements generated via GPT-4o, Midjourney layout renders, and Diffusion canvas tools.
+      </p>
+    </div>
+  </div>
+
+  <h2>8.2 Quantitative Evaluation Metrics</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Evaluation Dimension</th>
+        <th>Primary Metric</th>
+        <th>Target Benchmark</th>
+        <th>Measurement Protocol</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Document Classification</strong></td>
+        <td>ROC-AUC / F1-Score</td>
+        <td><strong>&gt; 0.96 AUC</strong> (F1 &gt; 0.94)</td>
+        <td>Binary classification of authentic vs. manipulated corpus across 5-fold cross validation.</td>
+      </tr>
+      <tr>
+        <td><strong>Manipulation Localization</strong></td>
+        <td>Intersection over Union (IoU)</td>
+        <td><strong>&gt; 0.82 IoU</strong></td>
+        <td>Bounding box overlap between detected suspicious regions and pixel ground-truth masks.</td>
+      </tr>
+      <tr>
+        <td><strong>Financial Math Accuracy</strong></td>
+        <td>Exact Match Accuracy</td>
+        <td><strong>100% Deterministic</strong></td>
+        <td>Arithmetic reconciliation on ledger balances, tax sums, and line items.</td>
+      </tr>
+      <tr>
+        <td><strong>False Positive Rate (FPR)</strong></td>
+        <td>FPR at 95% Recall</td>
+        <td><strong>&lt; 2.5% FPR</strong></td>
+        <td>Ensures authentic customer documents are not wrongly flagged or delayed in loan pipelines.</td>
+      </tr>
+      <tr>
+        <td><strong>Pipeline Processing Latency</strong></td>
+        <td>End-to-End Latency</td>
+        <td><strong>&lt; 1.8 seconds</strong> (p95)</td>
+        <td>Full execution from PDF ingestion to structured evidence JSON generation.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>8.3 The 3-Document Live University / Investor Demo Scenario</h2>
+  <div class="grid-3" style="margin-top: 5px;">
+    <div class="card success">
+      <div style="font-weight: 800; font-size: 7.8pt; color: #166534;">Document A: Authentic Statement</div>
+      <div style="font-size: 11pt; font-weight: 800; color: #15803d; margin: 1px 0;">Risk: 04 / 100</div>
+      <p style="font-size: 6.8pt; color: #475569;">
+        Matches all math formulas. Consistent font objects and uniform ELA noise. <em>Result: Instant Verification.</em>
+      </p>
+    </div>
+    <div class="card danger">
+      <div style="font-weight: 800; font-size: 7.8pt; color: #991b1b;">Document B: Tampered Balance</div>
+      <div style="font-size: 11pt; font-weight: 800; color: #b91c1c; margin: 1px 0;">Risk: 78 / 100</div>
+      <p style="font-size: 6.8pt; color: #475569;">
+        Single balance field modified. Triggers ledger mismatch, font baseline offset, and localized ELA peak.
+      </p>
+    </div>
+    <div class="card highlight" style="border-left: 3px solid #6b21a8;">
+      <div style="font-weight: 800; font-size: 7.8pt; color: #581c87;">Document C: Synthetic AI PDF</div>
+      <div style="font-size: 11pt; font-weight: 800; color: #6b21a8; margin: 1px 0;">Risk: 91 / 100</div>
+      <p style="font-size: 6.8pt; color: #475569;">
+        AI hallucinated transactions. Multiple ledger errors, impossible dates, and missing banking metadata streams.
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- PAGE 10: ROADMAP & TECHNICAL ARCHITECTURE  -->
+<!-- ========================================== -->
+<div class="page">
+  <div class="page-header">
+    <span class="brand">DeepTrace Proposal</span>
+    <span>Section 9: Roadmap, Milestones & Tech Stack</span>
+  </div>
+
+  <h1 class="section-title"><span class="sec-num">09</span> Roadmap & Technical Architecture</h1>
+
+  <h2>9.1 4-Phase Development Roadmap (16 Weeks to Commercial MVP)</h2>
+  <div style="position: relative; margin: 5px 0;">
+    <div class="card highlight" style="margin-bottom: 4px;">
+      <div class="card-header">
+        <span class="card-title">🟢 Phase 1: Foundational MVP (Weeks 1 – 4)</span>
+        <span class="badge badge-blue">Milestone 1</span>
+      </div>
+      <div style="font-size: 7.2pt; color: #334155;">
+        <strong>Focus:</strong> Pakistani Bank Statements (PDF). SHA-256 custody lock, metadata extraction, OCR topology, PK-IBAN validation, Lakh/Crore math ledger reconciliation, basic ELA, and Next.js dashboard.
+      </div>
+    </div>
+    <div class="card" style="margin-bottom: 4px; border-left: 3px solid #10b981;">
+      <div class="card-header">
+        <span class="card-title">🔵 Phase 2: Advanced Forensics & Utility Bills (Weeks 5 – 8)</span>
+        <span class="badge badge-green">Milestone 2</span>
+      </div>
+      <div style="font-size: 7.2pt; color: #334155;">
+        <strong>Focus:</strong> Sub-pixel font baseline analysis, ELA heatmaps, Raast/1LINK narration chronology, K-Electric/LESCO bill forensics, and localized bounding box drawer.
+      </div>
+    </div>
+    <div class="card" style="margin-bottom: 4px; border-left: 3px solid #8b5cf6;">
+      <div class="card-header">
+        <span class="card-title">🟣 Phase 3: Multi-Agent AI Swarm & Q&A (Weeks 9 – 11)</span>
+        <span class="badge badge-purple">Milestone 3</span>
+      </div>
+      <div style="font-size: 7.2pt; color: #334155;">
+        <strong>Focus:</strong> Structural, Visual, Semantic, and Lead Investigator agents. Langfuse tracing, zero-hallucination guardrails, and natural language interactive Q&A assistant.
+      </div>
+    </div>
+    <div class="card" style="border-left: 3px solid #0f172a;">
+      <div class="card-header">
+        <span class="card-title">⚫ Phase 4: Commercial Hardening & SBP Enterprise API (Weeks 12 – 16)</span>
+        <span class="badge badge-slate">Milestone 4</span>
+      </div>
+      <div style="font-size: 7.2pt; color: #334155;">
+        <strong>Focus:</strong> Multi-tenant accounts, API key rate limits, court-admissible PDF dossier export, SOC2/audit logging, and Docker containerization.
+      </div>
+    </div>
+  </div>
+
+  <h2>9.2 Scope Management: What NOT to Build</h2>
+  <div class="grid-2">
+    <div class="card danger">
+      <div style="font-weight: 700; font-size: 7.5pt; color: #991b1b; margin-bottom: 2px;">❌ Excluded from MVP Scope</div>
+      <ul style="font-size: 6.8pt; margin-left: 12px; color: #7f1d1d; line-height: 1.35;">
+        <li>• Biometric facial matching or physical card tampering</li>
+        <li>• Blockchain timestamping networks</li>
+        <li>• Native mobile applications (iOS / Android)</li>
+        <li>• Custom pre-trained LLM model development</li>
+      </ul>
+    </div>
+    <div class="card success">
+      <div style="font-weight: 700; font-size: 7.5pt; color: #166534; margin-bottom: 2px;">✔ Core Strategic Focus</div>
+      <ul style="font-size: 6.8pt; margin-left: 12px; color: #14532d; line-height: 1.35;">
+        <li>• High-accuracy PK bank statement & utility verification</li>
+        <li>• 100% deterministic arithmetic ledger reconciliation</li>
+        <li>• Sub-pixel font object & baseline micro-analysis</li>
+        <li>• High-throughput sub-second REST API</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>9.3 Technical Stack & Core REST API Endpoints</h2>
+  <div class="grid-4" style="margin-bottom: 5px;">
+    <div class="card"><div style="font-weight: 700; font-size: 7.5pt;">Frontend</div><p style="font-size: 6.8pt; color: #475569;">Next.js 15, TypeScript, Tailwind, shadcn/ui, PDF.js, Canvas</p></div>
+    <div class="card"><div style="font-weight: 700; font-size: 7.5pt;">Backend</div><p style="font-size: 6.8pt; color: #475569;">FastAPI, Python 3.12, Celery, Redis, PostgreSQL, S3</p></div>
+    <div class="card"><div style="font-weight: 700; font-size: 7.5pt;">Forensics</div><p style="font-size: 6.8pt; color: #475569;">PyMuPDF, pikepdf, OpenCV, PaddleOCR, fontTools</p></div>
+    <div class="card"><div style="font-weight: 700; font-size: 7.5pt;">AI & Trace</div><p style="font-size: 6.8pt; color: #475569;">LangChain/Graph, Gemini/Claude, Langfuse, OpenTelemetry</p></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th style="width: 15%;">Method</th><th style="width: 35%;">Endpoint</th><th style="width: 50%;">Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>POST</code></td><td><code>/api/v1/investigations</code></td><td>Initializes investigation session and presigned upload URLs.</td></tr>
+      <tr><td><code>POST</code></td><td><code>/api/v1/investigations/{id}/analyze</code></td><td>Triggers full asynchronous multi-stage pipeline across all forensic engines.</td></tr>
+      <tr><td><code>GET</code></td><td><code>/api/v1/investigations/{id}/evidence</code></td><td>Returns localized bounding boxes, font metrics, and arithmetic mismatches.</td></tr>
+      <tr><td><code>POST</code></td><td><code>/api/v1/investigations/{id}/ask</code></td><td>Natural Language Investigator endpoint answering audit queries.</td></tr>
+      <tr><td><code>POST</code></td><td><code>/api/v1/verify</code></td><td>High-throughput synchronous verification endpoint for automated loan flows.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ========================================== -->
+<!-- PAGE 11: COMMERCIAL STRATEGY & MONETIZATION -->
+<!-- ========================================== -->
+<div class="page">
+  <div class="page-header">
+    <span class="brand">DeepTrace Pakistan Proposal</span>
+    <span>Section 10: Commercial Strategy & Monetization</span>
+  </div>
+
+  <h1 class="section-title"><span class="sec-num">10</span> Go-To-Market & Commercial Monetization</h1>
+
+  <h2>10.1 Pakistan Beachhead Customer Strategy</h2>
+  <p>
+    Rather than starting with lengthy 18-month procurement cycles at Tier-1 commercial banks, DeepTrace targets high-velocity Pakistani fintechs, digital nano-lenders, insurance claims departments, and immigration consultancies:
+  </p>
+
+  <div class="grid-3">
+    <div class="card pk-card">
+      <div class="card-header">
+        <span class="card-title">1. Digital Wallets & Nano-Lenders</span>
+        <span class="badge badge-emerald">Primary</span>
+      </div>
+      <p style="font-size: 7.2pt; color: #475569;">
+        <strong>Target:</strong> SadaPay, NayaPay, JazzCash, Easypaisa, Tez, PostEx.<br>
+        <strong>Pain Point:</strong> Automated verification of applicant income, bank statements, and utility bills to curb rampant nano-loan defaults.
+      </p>
+    </div>
+    <div class="card highlight">
+      <div class="card-header">
+        <span class="card-title">2. Commercial Retail Lending</span>
+        <span class="badge badge-blue">Secondary</span>
+      </div>
+      <p style="font-size: 7.2pt; color: #475569;">
+        <strong>Target:</strong> Meezan Bank, HBL Konnect, Bank Alfalah Alfa, UBL Digital.<br>
+        <strong>Pain Point:</strong> Eliminating manual branch verification of salary slips and statement ledgers for auto and consumer financing.
+      </p>
+    </div>
+    <div class="card highlight">
+      <div class="card-header">
+        <span class="card-title">3. Visa & Educational Consultancies</span>
+        <span class="badge badge-purple">High Margin</span>
+      </div>
+      <p style="font-size: 7.2pt; color: #475569;">
+        <strong>Target:</strong> Major student/immigration agencies (Lahore, Karachi, Islamabad).<br>
+        <strong>Pain Point:</strong> Pre-submission bank statement authentication to prevent UKVI/Schengen embassy visa refusals and bans.
+      </p>
+    </div>
+  </div>
+
+  <h2>10.2 Tiered SaaS & API Pricing Model (PKR / USD)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Tier</th>
+        <th>Monthly Volume</th>
+        <th>Pricing (PKR / USD)</th>
+        <th>Included Features</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Developer / Free</strong></td>
+        <td>100 docs / mo</td>
+        <td>Free</td>
+        <td>Web Workbench, Basic PK-IBAN & Math analysis, Community support</td>
+      </tr>
+      <tr>
+        <td><strong>Fintech Growth</strong></td>
+        <td>2,000 docs / mo</td>
+        <td>PKR 75,000 / mo ($270)</td>
+        <td>Full REST API, ELA Vision, Font Inspector, Webhook alerts</td>
+      </tr>
+      <tr>
+        <td><strong>Business Scale</strong></td>
+        <td>15,000 docs / mo</td>
+        <td>PKR 350,000 / mo ($1,250)</td>
+        <td>Multi-Agent Swarm, Priority SLA (99.9%), Batch processing, PDF dossiers</td>
+      </tr>
+      <tr>
+        <td><strong>Enterprise Bank</strong></td>
+        <td>Unlimited / Custom</td>
+        <td>Custom Annual License</td>
+        <td>On-Prem / Private VPC deployment, Custom SBP rule engines, 24/7 dedicated support</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>10.3 Regulatory Alignment & Legal Admissibility in Pakistan</h2>
+  <div class="callout callout-success">
+    <strong>Admissibility Under Pakistani Law:</strong> Under the <strong>Electronic Transactions Ordinance (ETO 2002, Section 3)</strong> and the <strong>Prevention of Electronic Crimes Act (PECA 2016)</strong>, digital evidence preserved via SHA-256 cryptographic hashes and deterministic algorithmic trails holds recognized evidential weight for internal bank fraud tribunals and FIA Cybercrime investigations.
+  </div>
+
+  <div style="margin-top: 18px; border-top: 2px solid #0f172a; padding-top: 8px; display: flex; justify-content: space-between; align-items: center;">
+    <div>
+      <div style="font-weight: 800; font-size: 9.5pt; color: #0f172a;">DEEPTRACE FORENSICS LABS PAKISTAN</div>
+      <div style="font-size: 7.2pt; color: #64748b;">Explainable AI Document Forensics & Verification API Platform</div>
+    </div>
+    <div style="text-align: right;">
+      <div style="font-size: 7.8pt; font-weight: 700; color: #059669;">SBP & NIST COMPLIANT PROPOSAL</div>
+      <div style="font-size: 7.2pt; color: #64748b;">Ready for Immediate Phase 1 Implementation</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

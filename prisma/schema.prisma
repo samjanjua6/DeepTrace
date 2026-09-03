@@ -1,0 +1,941 @@
+// =============================================================================
+// DeepTrace — Prisma Schema
+// Database: PostgreSQL 16
+// ORM: Prisma Client Python (prisma-client-py)
+//
+// Architecture: Multi-tenant, audit-trail-first, SBP/NIST/ETO-2002 compliant
+// 7 Domains | 28 Tables
+// =============================================================================
+
+generator client {
+  provider             = "prisma-client-py"
+  interface            = "asyncio"
+  recursive_type_depth = 5
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// DOMAIN 1: IDENTITY & MULTI-TENANCY
+// =============================================================================
+
+enum UserRole {
+  OWNER
+  ADMIN
+  ANALYST
+  VIEWER
+  API_SERVICE
+}
+
+enum SubscriptionTier {
+  FREE
+  FINTECH_GROWTH
+  BUSINESS_SCALE
+  ENTERPRISE
+}
+
+/// Top-level tenancy boundary. Every data-bearing table has an organization_id FK.
+model Organization {
+  id                String           @id @default(cuid())
+  name              String
+  slug              String           @unique
+  subscriptionTier  SubscriptionTier @default(FREE)
+  /// Max documents allowed per billing cycle per tier
+  monthlyDocLimit   Int              @default(100)
+  /// Running count, reset on billing cycle start
+  monthlyDocUsed    Int              @default(0)
+  billingCycleStart DateTime?
+  logoUrl           String?
+  /// Custom domain for white-label enterprise deployments
+  domain            String?          @unique
+  /// Flexible org-level config (e.g., custom rule weights, branding)
+  settings          Json             @default("{}")
+  isActive          Boolean          @default(true)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  deletedAt         DateTime?
+
+  users             User[]
+  apiKeys           ApiKey[]
+  investigations    Investigation[]
+  webhookEndpoints  WebhookEndpoint[]
+  auditLogs         AuditLog[]
+
+  @@index([slug])
+  @@index([isActive])
+  @@index([subscriptionTier])
+  @@map("organizations")
+}
+
+/// Platform users. Belong to exactly one organization.
+model User {
+  id               String    @id @default(cuid())
+  organizationId   String
+  email            String    @unique
+  passwordHash     String
+  firstName        String
+  lastName         String
+  role             UserRole  @default(ANALYST)
+  avatarUrl        String?
+  isActive         Boolean   @default(true)
+  emailVerifiedAt  DateTime?
+  lastLoginAt      DateTime?
+  /// Incremented on each failed login; reset on success
+  failedLoginCount Int       @default(0)
+  /// Account auto-locks after 5 failed attempts
+  lockedUntil      DateTime?
+  /// TOTP secret (stored encrypted at app layer)
+  mfaSecret        String?
+  mfaEnabled       Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  organization       Organization        @relation(fields: [organizationId], references: [id])
+  investigations     Investigation[]
+  sessions           UserSession[]
+  auditLogs          AuditLog[]
+  investigationNotes InvestigationNote[]
+
+  @@index([organizationId])
+  @@index([email])
+  @@index([organizationId, role])
+  @@index([organizationId, isActive])
+  @@map("users")
+}
+
+/// API keys for machine-to-machine access. Scoped per organization.
+model ApiKey {
+  id              String       @id @default(cuid())
+  organizationId  String
+  name            String
+  /// First 8 chars of the plaintext key, shown in dashboard for identification
+  keyPrefix       String
+  /// SHA-256 hash of the full plaintext key (irreversible). Used for lookups.
+  keyHash         String       @unique
+  /// Permissions: ["read", "write", "admin"]
+  scopes          String[]     @default(["read", "write"])
+  rateLimitPerMin Int          @default(60)
+  expiresAt       DateTime?
+  lastUsedAt      DateTime?
+  lastUsedIp      String?
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  revokedAt       DateTime?
+
+  organization    Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([keyHash])
+  @@index([organizationId, isActive])
+  @@index([organizationId])
+  @@map("api_keys")
+}
+
+/// Active user login sessions. Supports multi-device and forced revocation.
+model UserSession {
+  id          String    @id @default(cuid())
+  userId      String
+  /// SHA-256 hash of the session token (never store raw tokens in DB)
+  tokenHash   String    @unique
+  ipAddress   String?
+  userAgent   String?
+  /// Parsed device info: { browser, os, device_type }
+  deviceInfo  Json?
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([expiresAt])
+  @@map("user_sessions")
+}
+
+// =============================================================================
+// DOMAIN 2: INVESTIGATION CORE
+// =============================================================================
+
+enum InvestigationStatus {
+  CREATED
+  UPLOADING
+  QUEUED
+  PROCESSING
+  AWAITING_REVIEW
+  REVIEWED
+  CLOSED
+  ARCHIVED
+  FAILED
+}
+
+enum DocumentType {
+  BANK_STATEMENT
+  SALARY_SLIP
+  UTILITY_BILL
+  TAX_CERTIFICATE
+  IDENTITY_DOCUMENT
+  COMMERCIAL_INVOICE
+  DIGITAL_WALLET_LEDGER
+  OTHER
+}
+
+enum DocumentSource {
+  WEB_UPLOAD
+  API_UPLOAD
+  BATCH_IMPORT
+  EMAIL_INGESTION
+}
+
+/// Top-level forensic case. One investigation per document submission event.
+model Investigation {
+  id                String              @id @default(cuid())
+  organizationId    String
+  /// The user who initiated / owns this investigation
+  userId            String
+  /// Human-readable case number: "DT-PK-2026-000412"
+  caseNumber        String              @unique
+  title             String?
+  description       String?
+  status            InvestigationStatus @default(CREATED)
+  /// 0 = normal, 1 = high, 2 = urgent
+  priority          Int                 @default(0)
+  source            DocumentSource      @default(WEB_UPLOAD)
+  /// External reference ID from the client's system (e.g. loan application ID)
+  clientReference   String?
+  assignedAnalystId String?
+  reviewedById      String?
+  reviewedAt        DateTime?
+  reviewNotes       String?
+  /// Flexible metadata bag for integration-specific fields
+  metadata          Json                @default("{}")
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  closedAt          DateTime?
+  deletedAt         DateTime?
+
+  organization      Organization        @relation(fields: [organizationId], references: [id])
+  user              User                @relation(fields: [userId], references: [id])
+  documents         Document[]
+  pipelineRuns      PipelineRun[]
+  riskAssessment    RiskAssessment?
+  agentSessions     AgentSession[]
+  notes             InvestigationNote[]
+  tags              InvestigationTag[]
+  custodyEvents     CustodyEvent[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([caseNumber])
+  @@index([userId])
+  @@index([status])
+  @@index([organizationId, status, createdAt(sort: Desc)])
+  @@index([clientReference])
+  @@map("investigations")
+}
+
+/// An uploaded file within an investigation.
+/// One investigation may contain multiple documents for cross-referencing.
+model Document {
+  id                  String           @id @default(cuid())
+  investigationId     String
+  originalFilename    String
+  mimeType            String
+  fileSizeBytes       BigInt
+  documentType        DocumentType     @default(OTHER)
+  /// Immutable SHA-256 hash computed immediately upon upload (ETO 2002)
+  sha256Hash          String
+  md5Hash             String?
+  /// S3/MinIO primary object key
+  storagePath         String
+  /// Immutable custody clone — written once, never overwritten
+  storagePathClone    String?
+  thumbnailPath       String?
+  pageCount           Int?
+  isPasswordProtected Boolean          @default(false)
+  /// Tesseract / PaddleOCR language codes (e.g., "eng+urd")
+  ocrLanguage         String           @default("eng+urd")
+  processingStatus    String           @default("pending")
+  processingError     String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  investigation       Investigation    @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  documentMetadata    DocumentMetadata?
+  pages               DocumentPage[]
+  evidenceItems       EvidenceItem[]
+
+  /// Prevent duplicate uploads within the same investigation
+  @@unique([investigationId, sha256Hash])
+  @@index([investigationId])
+  @@index([sha256Hash])
+  @@index([documentType])
+  @@index([processingStatus])
+  @@map("documents")
+}
+
+/// Deep PDF internals extracted during Stage 2 (PDF Structural Forensics).
+/// 1:1 with Document.
+model DocumentMetadata {
+  id                   String    @id @default(cuid())
+  documentId           String    @unique
+  // --- PDF Info Dictionary ---
+  pdfVersion           String?
+  /// Authoring tool that produced the original file (e.g., "Core Banking Spool")
+  producer             String?
+  /// Tool that created the file (e.g., "Microsoft Word 2019")
+  creator              String?
+  creationDate         DateTime?
+  modificationDate     DateTime?
+  author               String?
+  title                String?
+  subject              String?
+  keywords             String?
+  // --- Structural Indicators ---
+  /// Number of incremental saves (non-zero = post-creation edits)
+  incrementalSaveCount Int       @default(0)
+  hasJavaScript        Boolean   @default(false)
+  hasEmbeddedFiles     Boolean   @default(false)
+  hasAnnotations       Boolean   @default(false)
+  hasAcroForm          Boolean   @default(false)
+  hasXFA               Boolean   @default(false)
+  fontCount            Int       @default(0)
+  imageCount           Int       @default(0)
+  xObjectCount         Int       @default(0)
+  // --- Forensic Flags ---
+  /// Tools known to be used for document manipulation
+  suspiciousProducers  String[]  @default([])
+  /// null = unchecked, true = match (clean), false = mismatch (suspicious)
+  producerCreatorMatch Boolean?
+  // --- Raw Extracted Data ---
+  rawTrailerDict       Json?
+  rawInfoDict          Json?
+  /// All embedded font objects: { fontName, type, subset, encoding, ... }
+  fontDictionary       Json?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  document             Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([producer])
+  @@index([creator])
+  @@map("document_metadata")
+}
+
+/// Per-page data extracted from each document page.
+/// Enables pixel-precise bounding box overlays in the forensic workbench.
+model DocumentPage {
+  id                String    @id @default(cuid())
+  documentId        String
+  /// 1-indexed page number
+  pageNumber        Int
+  widthPx           Int?
+  heightPx          Int?
+  /// Dimensions in PDF points (1pt = 1/72 inch)
+  widthPts          Float?
+  heightPts         Float?
+  dpi               Int?
+  /// S3 path to rendered PNG of this page (used for ELA and UI display)
+  renderedImagePath String?
+  /// Full OCR text for this page (indexed for full-text search via raw SQL)
+  ocrText           String?
+  /// Average OCR word confidence 0.0–1.0
+  ocrConfidence     Float?
+  /// Structured OCR output with word/line-level bounding boxes
+  ocrDataJson       Json?
+  /// Tabular data extracted and structured from this page
+  extractedTables   Json?
+  createdAt         DateTime  @default(now())
+
+  document          Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, pageNumber])
+  @@index([documentId])
+  @@map("document_pages")
+}
+
+// =============================================================================
+// DOMAIN 3: FORENSIC PIPELINE EXECUTION
+// =============================================================================
+
+enum PipelineStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+  TIMED_OUT
+}
+
+enum PipelineStageType {
+  /// Stage 1: SHA-256 custody lock + immutable clone creation
+  CUSTODY_LOCK
+  /// Stage 2: PDF trailer, info dict, incremental save detection
+  PDF_STRUCTURE
+  /// Stage 3: Sub-pixel font baseline and glyph metric analysis
+  FONT_GLYPH_ANALYSIS
+  /// Stage 4: Error Level Analysis (ELA) heatmaps via OpenCV
+  VISION_ELA
+  /// Stage 5: OCR extraction, Raast/1LINK narration parsing
+  OCR_EXTRACTION
+  /// Stage 6: Deterministic Lakh/Crore ledger reconciliation, PK-IBAN MOD-97
+  FINANCIAL_VERIFICATION
+  /// Stage 7: Bayesian multi-signal evidence fusion and risk scoring
+  EVIDENCE_FUSION
+  /// Stage 8: Court-admissible PDF dossier generation
+  REPORT_GENERATION
+}
+
+/// One PipelineRun per analysis request. Supports re-analysis (runNumber > 1).
+model PipelineRun {
+  id              String         @id @default(cuid())
+  investigationId String
+  /// Monotonically increasing per investigation (1 = first run, 2 = re-analysis, ...)
+  runNumber       Int            @default(1)
+  status          PipelineStatus @default(PENDING)
+  /// What triggered this run: "api", "web", "batch", "retry", "scheduled"
+  triggerSource   String         @default("api")
+  triggerUserId   String?
+  /// Custom parameters for this specific run (e.g., ELA quality level override)
+  parameters      Json           @default("{}")
+  totalDurationMs Int?
+  errorMessage    String?
+  workerNodeId    String?
+  celeryTaskId    String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  investigation   Investigation  @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  stages          PipelineStage[]
+
+  @@unique([investigationId, runNumber])
+  @@index([investigationId])
+  @@index([status])
+  @@index([celeryTaskId])
+  @@map("pipeline_runs")
+}
+
+/// One row per forensic stage within a PipelineRun.
+model PipelineStage {
+  id            String            @id @default(cuid())
+  pipelineRunId String
+  stageType     PipelineStageType
+  /// Execution order (1–8). Stored explicitly for easy ordering.
+  stageOrder    Int
+  status        PipelineStatus    @default(PENDING)
+  durationMs    Int?
+  /// Configuration / data fed into this stage
+  inputPayload  Json?
+  /// Raw structured output from this stage consumed by downstream stages
+  outputPayload Json?
+  errorMessage  String?
+  errorStack    String?
+  retryCount    Int               @default(0)
+  startedAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime          @default(now())
+
+  pipelineRun   PipelineRun       @relation(fields: [pipelineRunId], references: [id], onDelete: Cascade)
+  evidenceItems EvidenceItem[]
+
+  @@unique([pipelineRunId, stageType])
+  @@index([pipelineRunId])
+  @@index([stageType, status])
+  @@map("pipeline_stages")
+}
+
+// =============================================================================
+// DOMAIN 4: EVIDENCE & FORENSIC FINDINGS
+// =============================================================================
+
+enum EvidenceSeverity {
+  INFO
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum EvidenceCategory {
+  MATHEMATICAL_MISMATCH
+  IMAGE_ELA_MANIPULATION
+  FONT_BASELINE_INCONSISTENCY
+  PDF_OBJECT_ANOMALY
+  METADATA_TIMESTAMP_MISMATCH
+  IBAN_CHECKSUM_FAILURE
+  AI_GENERATION_ARTIFACT
+  OCR_CONFIDENCE_ANOMALY
+  DATE_SEQUENCE_VIOLATION
+  TRANSACTION_FORMAT_VIOLATION
+  UTILITY_BILL_ANOMALY
+  SALARY_CALCULATION_MISMATCH
+}
+
+/// A single discrete forensic finding. Each has a rule ID, severity, and
+/// contribution to the final risk score. Fully traceable to its discovery stage.
+model EvidenceItem {
+  id              String            @id @default(cuid())
+  documentId      String
+  pipelineStageId String?
+  category        EvidenceCategory
+  severity        EvidenceSeverity  @default(MEDIUM)
+  /// Unique rule identifier, e.g., "RULE_PK_LEDGER_01", "RULE_FONT_BASELINE_02"
+  ruleId          String
+  /// Points added to the investigation's risk score (0–20 per finding)
+  riskPoints      Int               @default(0)
+  title           String
+  description     String
+  /// true = 100% deterministic detection, false = probabilistic (CV/LLM)
+  isDeterministic Boolean           @default(true)
+  /// Confidence 0.0–1.0 for probabilistic detections. NULL for deterministic.
+  confidence      Float?
+  pageNumber      Int?
+  // --- Structured Finding Fields ---
+  /// What the document claims (e.g., "PKR 15,00,000")
+  expectedValue   String?
+  /// What DeepTrace computed or detected (e.g., "PKR 13,00,000")
+  actualValue     String?
+  /// The delta / discrepancy (e.g., "+PKR 2,00,000")
+  discrepancy     String?
+  /// Full technical breakdown: font objects, compression ratios, checksums, etc.
+  technicalDetails Json?
+  createdAt       DateTime          @default(now())
+
+  document        Document          @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  pipelineStage   PipelineStage?    @relation(fields: [pipelineStageId], references: [id])
+  boundingBoxes   BoundingBox[]
+  artifacts       EvidenceArtifact[]
+
+  @@index([documentId])
+  @@index([category])
+  @@index([severity])
+  @@index([documentId, category])
+  @@index([ruleId])
+  @@index([documentId, severity])
+  @@map("evidence_items")
+}
+
+/// Pixel-precise anomaly location on a document page.
+/// Used by the forensic workbench to render interactive evidence overlays.
+model BoundingBox {
+  id             String       @id @default(cuid())
+  evidenceItemId String
+  pageNumber     Int
+  // --- Pixel coordinates (relative to rendered page image) ---
+  x              Float
+  y              Float
+  width          Float
+  height         Float
+  // --- PDF point coordinates (for precise PDF-layer overlays) ---
+  xPts           Float?
+  yPts           Float?
+  widthPts       Float?
+  heightPts      Float?
+  /// Display label shown in UI overlay (e.g., "Font Mismatch", "ELA Anomaly")
+  label          String?
+  /// Hex color for UI overlay (e.g., "#ef4444" for critical, "#f59e0b" for medium)
+  color          String?
+  createdAt      DateTime     @default(now())
+
+  evidenceItem   EvidenceItem @relation(fields: [evidenceItemId], references: [id], onDelete: Cascade)
+
+  @@index([evidenceItemId])
+  @@index([pageNumber])
+  @@map("bounding_boxes")
+}
+
+/// Visual proof files generated by forensic stages and attached to evidence.
+/// Examples: ELA heatmap PNGs, annotated comparison images, diff overlays.
+model EvidenceArtifact {
+  id             String       @id @default(cuid())
+  evidenceItemId String
+  /// "ela_heatmap" | "annotated_image" | "diff_overlay" | "font_comparison"
+  artifactType   String
+  storagePath    String
+  mimeType       String
+  fileSizeBytes  Int?
+  caption        String?
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+
+  evidenceItem   EvidenceItem @relation(fields: [evidenceItemId], references: [id], onDelete: Cascade)
+
+  @@index([evidenceItemId])
+  @@index([artifactType])
+  @@map("evidence_artifacts")
+}
+
+// =============================================================================
+// DOMAIN 5: RISK ASSESSMENT & EVIDENCE FUSION
+// =============================================================================
+
+enum RiskTier {
+  /// 0–20: Straight-Through Auto-Approval
+  LOW
+  /// 21–40: Automated Secondary Scan
+  MODERATE
+  /// 41–60: Human Credit Officer Review
+  ELEVATED
+  /// 61–80: Escalation Required
+  HIGH
+  /// 81–100: Immediate Rejection & STR Filing
+  CRITICAL
+}
+
+/// The final computed risk profile for an investigation.
+/// One-to-one with Investigation. Computed by the Evidence Fusion stage.
+model RiskAssessment {
+  id                 String         @id @default(cuid())
+  investigationId    String         @unique
+  /// Calibrated 0–100 risk score
+  overallScore       Int
+  riskTier           RiskTier
+  /// System-computed directive: "STRAIGHT_THROUGH_APPROVAL" | "SECONDARY_SCAN"
+  /// | "HUMAN_REVIEW" | "ESCALATION_REQUIRED" | "IMMEDIATE_REJECTION"
+  actionDirective    String
+  totalEvidenceCount Int            @default(0)
+  criticalCount      Int            @default(0)
+  highCount          Int            @default(0)
+  mediumCount        Int            @default(0)
+  lowCount           Int            @default(0)
+  infoCount          Int            @default(0)
+  fusionAlgorithm    String         @default("bayesian_weighted")
+  /// Full algorithm parameters: weights, normalization factors, correlations
+  fusionParameters   Json?
+  /// AI-generated natural language explanation (Lead Investigator Agent output)
+  narrativeSummary   String?
+  computedAt         DateTime       @default(now())
+  // --- Analyst Override (when human overrides computed score) ---
+  overriddenById     String?
+  overriddenScore    Int?
+  overriddenTier     RiskTier?
+  overrideReason     String?
+  overriddenAt       DateTime?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  investigation      Investigation  @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  riskSignals        RiskSignal[]
+
+  @@index([riskTier])
+  @@index([overallScore])
+  @@index([riskTier, computedAt(sort: Desc)])
+  @@map("risk_assessments")
+}
+
+/// Per-category breakdown of how each signal contributed to the final score.
+/// Provides full Bayesian fusion auditability.
+model RiskSignal {
+  id                String           @id @default(cuid())
+  riskAssessmentId  String
+  signalCategory    EvidenceCategory
+  rawScore          Float
+  /// Normalized weight in the Bayesian fusion matrix (0.0–1.0)
+  normalizedWeight  Float
+  weightedScore     Float
+  maxPossiblePoints Int
+  isDeterministic   Boolean          @default(true)
+  /// Number of EvidenceItems belonging to this category
+  evidenceCount     Int              @default(0)
+  details           Json?
+  createdAt         DateTime         @default(now())
+
+  riskAssessment    RiskAssessment   @relation(fields: [riskAssessmentId], references: [id], onDelete: Cascade)
+
+  @@unique([riskAssessmentId, signalCategory])
+  @@index([riskAssessmentId])
+  @@map("risk_signals")
+}
+
+// =============================================================================
+// DOMAIN 6: MULTI-AGENT AI INVESTIGATION SWARM
+// =============================================================================
+
+enum AgentRole {
+  /// Agent 1: PDF object streams, metadata revisions, font descriptors
+  STRUCTURAL_FORENSIC
+  /// Agent 2: ELA heatmaps, JPEG ghosting, copy-move clone boundaries
+  VISUAL_FORENSIC
+  /// Agent 3: PK-IBAN, Lakh/Crore math, Raast narration, FBR tax ratios
+  SEMANTIC_PK_FINANCIAL
+  /// Agent 4: Synthesizes findings from Agents 1-3, produces final report
+  LEAD_INVESTIGATOR
+  /// Interactive Q&A sessions initiated by analysts post-investigation
+  INTERACTIVE_QA
+}
+
+enum AgentMessageRole {
+  SYSTEM
+  USER
+  ASSISTANT
+  TOOL_CALL
+  TOOL_RESULT
+}
+
+/// One session per agent swarm invocation. Also used for interactive Q&A.
+model AgentSession {
+  id              String       @id @default(cuid())
+  investigationId String
+  agentRole       AgentRole
+  /// LLM provider: "gemini" | "claude" | "openai"
+  modelProvider   String?
+  /// Specific model: "gemini-2.5-pro" | "claude-sonnet-4-5"
+  modelName       String?
+  systemPrompt    String?
+  /// Langfuse cross-reference trace ID for LLM observability
+  langfuseTraceId String?
+  totalTokensIn   Int          @default(0)
+  totalTokensOut  Int          @default(0)
+  totalCostUsd    Float        @default(0.0)
+  /// "active" | "completed" | "failed"
+  status          String       @default("active")
+  startedAt       DateTime     @default(now())
+  completedAt     DateTime?
+  createdAt       DateTime     @default(now())
+
+  investigation   Investigation @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  messages        AgentMessage[]
+
+  @@index([investigationId])
+  @@index([agentRole])
+  @@index([investigationId, agentRole])
+  @@index([status])
+  @@map("agent_sessions")
+}
+
+/// Individual message turns within an agent session.
+/// Captures the full LLM conversation including tool calls and their results.
+model AgentMessage {
+  id             String           @id @default(cuid())
+  agentSessionId String
+  role           AgentMessageRole
+  content        String
+  /// Set when role is TOOL_CALL or TOOL_RESULT
+  toolName       String?
+  toolInput      Json?
+  toolOutput     Json?
+  tokensIn       Int?
+  tokensOut      Int?
+  latencyMs      Int?
+  /// 1-based sequence number within the session for deterministic ordering
+  sequenceOrder  Int
+  langfuseSpanId String?
+  createdAt      DateTime         @default(now())
+
+  agentSession   AgentSession     @relation(fields: [agentSessionId], references: [id], onDelete: Cascade)
+
+  @@index([agentSessionId])
+  @@index([agentSessionId, sequenceOrder])
+  @@map("agent_messages")
+}
+
+// =============================================================================
+// DOMAIN 7: AUDIT, COMPLIANCE & CHAIN OF CUSTODY
+// =============================================================================
+
+enum AuditAction {
+  // Authentication
+  USER_LOGIN
+  USER_LOGOUT
+  USER_LOGIN_FAILED
+  USER_MFA_ENABLED
+  USER_MFA_DISABLED
+  USER_PASSWORD_CHANGED
+  USER_ACCOUNT_LOCKED
+  // Investigation lifecycle
+  INVESTIGATION_CREATED
+  INVESTIGATION_UPDATED
+  INVESTIGATION_REVIEWED
+  INVESTIGATION_CLOSED
+  INVESTIGATION_ARCHIVED
+  INVESTIGATION_DELETED
+  // Document
+  DOCUMENT_UPLOADED
+  DOCUMENT_DOWNLOADED
+  DOCUMENT_VIEWED
+  DOCUMENT_DELETED
+  // Pipeline
+  PIPELINE_TRIGGERED
+  PIPELINE_COMPLETED
+  PIPELINE_FAILED
+  PIPELINE_RETRIED
+  PIPELINE_CANCELLED
+  // Risk
+  RISK_SCORE_COMPUTED
+  RISK_SCORE_OVERRIDDEN
+  // Agent
+  AGENT_SESSION_STARTED
+  AGENT_SESSION_COMPLETED
+  AGENT_QUERY_ASKED
+  // Export
+  DOSSIER_GENERATED
+  DOSSIER_DOWNLOADED
+  // API
+  API_KEY_CREATED
+  API_KEY_REVOKED
+  // Administration
+  ORGANIZATION_SETTINGS_UPDATED
+  USER_CREATED
+  USER_ROLE_CHANGED
+  USER_DEACTIVATED
+  USER_REACTIVATED
+}
+
+/// Append-only, immutable audit trail. Protected by a DB-level trigger that
+/// prevents UPDATE and DELETE. Compliant with SBP audit requirements.
+model AuditLog {
+  id             String       @id @default(cuid())
+  organizationId String
+  userId         String?
+  action         AuditAction
+  /// Type of the affected entity: "investigation" | "document" | "user" | ...
+  entityType     String?
+  entityId       String?
+  ipAddress      String?
+  userAgent      String?
+  /// Snapshot of state before the action (for change diff tracking)
+  previousState  Json?
+  /// Snapshot of state after the action
+  newState       Json?
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+  // NOTE: No updatedAt — this table is append-only by design.
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  user           User?        @relation(fields: [userId], references: [id])
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([organizationId, action, createdAt(sort: Desc)])
+  @@map("audit_logs")
+}
+
+/// ETO 2002 compliant chain-of-custody events for each investigation.
+/// Append-only, immutable. Tracks every access, transfer, and export.
+model CustodyEvent {
+  id              String        @id @default(cuid())
+  investigationId String
+  /// "ACQUIRED" | "HASH_COMPUTED" | "CLONE_LOCKED" | "ACCESSED"
+  /// | "EXPORTED" | "TRANSFERRED" | "REVIEWED" | "ARCHIVED"
+  eventType       String
+  description     String
+  /// SHA-256 at the time of this event (for integrity verification)
+  sha256Hash      String?
+  /// User or system component that performed the action
+  actorId         String?
+  /// "user" | "system" | "api" | "celery_worker"
+  actorType       String        @default("system")
+  ipAddress       String?
+  metadata        Json?
+  /// Use the actual event time (may differ from DB insert time)
+  timestamp       DateTime      @default(now())
+
+  investigation   Investigation @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+
+  @@index([investigationId, timestamp(sort: Asc)])
+  @@index([investigationId])
+  @@index([eventType])
+  @@map("custody_events")
+}
+
+/// Analyst notes attached to an investigation (internal or client-facing).
+model InvestigationNote {
+  id              String        @id @default(cuid())
+  investigationId String
+  userId          String
+  content         String
+  /// true = internal analyst note only, false = visible to client org
+  isInternal      Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  investigation   Investigation @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id])
+
+  @@index([investigationId, createdAt(sort: Desc)])
+  @@index([userId])
+  @@map("investigation_notes")
+}
+
+/// Global taxonomy tags for organizing investigations.
+model Tag {
+  id             String             @id @default(cuid())
+  name           String             @unique
+  color          String?
+  createdAt      DateTime           @default(now())
+
+  investigations InvestigationTag[]
+
+  @@map("tags")
+}
+
+/// Many-to-many join table between Investigations and Tags.
+model InvestigationTag {
+  investigationId String
+  tagId           String
+
+  investigation   Investigation @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  tag             Tag           @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([investigationId, tagId])
+  @@index([tagId])
+  @@map("investigation_tags")
+}
+
+/// Outbound webhook endpoint configuration per organization.
+model WebhookEndpoint {
+  id              String            @id @default(cuid())
+  organizationId  String
+  url             String
+  /// HMAC-SHA256 signing secret. Stored encrypted at application layer.
+  secret          String
+  /// Event types: ["investigation.completed", "risk.critical", "pipeline.failed"]
+  events          String[]
+  isActive        Boolean           @default(true)
+  description     String?
+  /// Consecutive delivery failures; endpoint auto-disabled at threshold
+  failureCount    Int               @default(0)
+  disabledAt      DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  organization    Organization      @relation(fields: [organizationId], references: [id])
+  deliveries      WebhookDelivery[]
+
+  @@index([organizationId, isActive])
+  @@index([organizationId])
+  @@map("webhook_endpoints")
+}
+
+/// Delivery log for each webhook event. Supports retry logic and failure tracking.
+model WebhookDelivery {
+  id                String          @id @default(cuid())
+  webhookEndpointId String
+  eventType         String
+  payload           Json
+  httpStatusCode    Int?
+  responseBody      String?
+  responseDurationMs Int?
+  attempt           Int             @default(1)
+  maxAttempts       Int             @default(3)
+  deliveredAt       DateTime?
+  failedAt          DateTime?
+  errorMessage      String?
+  /// Celery schedules the retry at this time
+  nextRetryAt       DateTime?
+  createdAt         DateTime        @default(now())
+
+  webhookEndpoint   WebhookEndpoint @relation(fields: [webhookEndpointId], references: [id], onDelete: Cascade)
+
+  @@index([webhookEndpointId, createdAt(sort: Desc)])
+  @@index([nextRetryAt])
+  @@index([httpStatusCode])
+  @@map("webhook_deliveries")
+}
