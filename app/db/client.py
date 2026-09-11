@@ -19,6 +19,7 @@ from __future__ import annotations
 import logging
 import os
 from contextlib import asynccontextmanager
+from datetime import timedelta
 from typing import AsyncGenerator
 
 from prisma import Prisma
@@ -82,7 +83,11 @@ _ORG_ID_REGEX = re.compile(r"^[a-zA-Z0-9_\-]+$")
 
 
 @asynccontextmanager
-async def set_org_context(org_id: str) -> AsyncGenerator[Prisma, None]:
+async def set_org_context(
+    org_id: str,
+    timeout: timedelta = timedelta(minutes=15),
+    max_wait: timedelta = timedelta(seconds=60),
+) -> AsyncGenerator[Prisma, None]:
     """Set the PostgreSQL session variable used by Row-Level Security policies.
 
     Every tenant-scoped query should be wrapped in this context manager to
@@ -101,12 +106,50 @@ async def set_org_context(org_id: str) -> AsyncGenerator[Prisma, None]:
     if not isinstance(org_id, str) or not _ORG_ID_REGEX.match(org_id):
         raise ValueError(f"Invalid organization ID format for RLS context: {org_id!r}")
 
-    async with db.tx() as tx:
+    # Auto-connect if invoked outside of FastAPI lifespan (e.g. Celery workers, background threads, scripts)
+    if not db.is_connected():
+        logger.info("Prisma client not connected; initializing connection for context...")
+        await connect()
+
+    async with db.tx(timeout=timeout, max_wait=max_wait) as tx:
         await tx.execute_raw(
             "SELECT set_config('app.current_org_id', $1, true);",
             org_id,
         )
         yield tx
 
+
+# ---------------------------------------------------------------------------
+# Celery worker process lifecycle integration
+# ---------------------------------------------------------------------------
+try:
+    from celery.signals import worker_process_init, worker_process_shutdown
+
+    @worker_process_init.connect
+    def init_celery_worker_process(**kwargs):
+        """Ensure fresh database connection pool when Celery forks worker processes."""
+        import asyncio
+        logger.info("Initializing Prisma client for Celery worker process...")
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        if not db.is_connected():
+            loop.run_until_complete(connect())
+
+    @worker_process_shutdown.connect
+    def shutdown_celery_worker_process(**kwargs):
+        """Disconnect Prisma client on Celery worker shutdown."""
+        import asyncio
+        logger.info("Disconnecting Prisma client on Celery worker shutdown...")
+        try:
+            loop = asyncio.get_event_loop()
+            if db.is_connected():
+                loop.run_until_complete(disconnect())
+        except Exception:
+            pass
+except ImportError:
+    pass
 
 __all__ = ["db", "connect", "disconnect", "get_db", "get_db_dep", "set_org_context"]

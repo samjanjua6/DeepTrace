@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     s3_bucket_documents: str = "deeptrace-documents"
     s3_bucket_artifacts: str = "deeptrace-artifacts"
     s3_region: str = "ap-south-1"
+    storage_strict_remote: bool = False
+    storage_local_dir: str = "storage"
 
     # ── JWT ──────────────────────────────────────────────────────────────────
     jwt_secret_key: str = Field(min_length=32)

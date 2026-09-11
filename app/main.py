@@ -80,6 +80,30 @@ def create_app() -> FastAPI:
     # Platform integrations
     app.include_router(webhooks_router,        prefix="/api/v1/webhooks",       tags=["Webhooks"])
 
+    # ── Local Storage Preview Streaming ───────────────────────────────────────
+    @app.api_route("/api/v1/storage/{bucket}/{path:path}", methods=["GET", "HEAD"], tags=["Storage"], include_in_schema=False)
+    async def serve_local_storage(bucket: str, path: str):
+        from pathlib import Path
+        from fastapi import HTTPException
+        from fastapi.responses import FileResponse, Response
+        from app.core import storage
+
+        local_file = storage.LOCAL_STORAGE_DIR / bucket / path
+        if local_file.is_file():
+            mime = "image/png" if path.endswith(".png") else "application/pdf"
+            return FileResponse(local_file, media_type=mime)
+
+        try:
+            data = storage.download_file(bucket, path)
+            if data is None:
+                raise HTTPException(status_code=404, detail="File not found in storage.")
+            mime = "image/png" if path.endswith(".png") else "application/pdf"
+            return Response(content=data, media_type=mime)
+        except HTTPException:
+            raise
+        except Exception:
+            raise HTTPException(status_code=404, detail="File not found in storage.")
+
     # ── Health check ─────────────────────────────────────────────────────────
     @app.get("/health", tags=["Health"], include_in_schema=False)
     async def health_check():

@@ -22,6 +22,7 @@ celery_app = Celery(
         "app.features.pipeline.tasks.stage_6_financial",
         "app.features.pipeline.tasks.stage_7_fusion",
         "app.features.pipeline.tasks.stage_8_report",
+        "app.features.pipeline.tasks.orchestrator",
         "app.features.webhooks.tasks",
     ],
 )
@@ -35,9 +36,15 @@ celery_app.conf.update(
     task_track_started=True,
     task_acks_late=True,
     worker_prefetch_multiplier=1,
+    broker_connection_retry_on_startup=False,
+    broker_connection_timeout=1.0,
+    broker_connection_max_retries=1,
     # Route forensic pipeline tasks to a dedicated queue for prioritization
     task_routes={
         "app.features.pipeline.tasks.*": {"queue": "pipeline"},
         "app.features.webhooks.tasks.*": {"queue": "webhooks"},
+    },
+    task_annotations={
+        "app.features.webhooks.tasks.*": {"ignore_result": True},
     },
 )

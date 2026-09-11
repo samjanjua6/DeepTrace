@@ -1,22 +1,223 @@
-"""
-Agents service — multi-agent swarm orchestration and interactive Q&A.
-TODO: Implement LangGraph agent orchestration.
-"""
+import asyncio
+import json
+import logging
+from typing import AsyncGenerator
 from prisma import Prisma
 
+from app.config import get_settings
+from app.features.agents import schemas
+from app.features.agents.swarm.lead_investigator import LeadInvestigatorAgent
 
-async def run_interactive_qa(db: Prisma, investigation_id: str, user_id: str,
-                              question: str) -> object:
+logger = logging.getLogger(__name__)
+settings = get_settings()
+
+
+async def _build_evidence_manifest(db: Prisma, investigation_id: str) -> dict:
+    """Compile verified evidence items, risk assessment, and documents for the investigation."""
+    inv = await db.investigation.find_unique(
+        where={"id": investigation_id},
+        include={"documents": True, "riskAssessment": True},
+    )
+    if not inv:
+        return {}
+
+    # Query all evidence items for this investigation (via document IDs)
+    doc_ids = [d.id for d in (inv.documents or [])]
+    evidence_items = []
+    if doc_ids:
+        items = await db.evidenceitem.find_many(
+            where={"documentId": {"in": doc_ids}},
+            include={"boundingBoxes": True},
+        )
+        for it in items:
+            evidence_items.append({
+                "id": it.id,
+                "documentId": it.documentId,
+                "ruleId": it.ruleId,
+                "category": it.category,
+                "severity": it.severity,
+                "riskPoints": it.riskPoints,
+                "title": it.title,
+                "description": it.description,
+                "expectedValue": it.expectedValue,
+                "actualValue": it.actualValue,
+                "discrepancy": it.discrepancy,
+                "pageNumber": it.pageNumber,
+                "isDeterministic": it.isDeterministic,
+                "boundingBoxes": [
+                    {
+                        "id": b.id,
+                        "pageNumber": b.pageNumber,
+                        "xPts": b.xPts,
+                        "yPts": b.yPts,
+                        "widthPts": b.widthPts,
+                        "heightPts": b.heightPts,
+                        "label": b.label,
+                        "color": b.color,
+                    }
+                    for b in (it.boundingBoxes or [])
+                ],
+            })
+
+    risk_dict = {}
+    if inv.riskAssessment:
+        risk_dict = {
+            "overallScore": inv.riskAssessment.overallScore,
+            "riskTier": inv.riskAssessment.riskTier,
+            "actionDirective": inv.riskAssessment.actionDirective,
+            "totalEvidenceCount": inv.riskAssessment.totalEvidenceCount,
+            "criticalCount": inv.riskAssessment.criticalCount,
+            "highCount": inv.riskAssessment.highCount,
+            "mediumCount": inv.riskAssessment.mediumCount,
+            "lowCount": inv.riskAssessment.lowCount,
+        }
+
+    return {
+        "investigation": {
+            "id": inv.id,
+            "caseNumber": inv.caseNumber,
+            "title": inv.title,
+            "status": inv.status,
+            "priority": inv.priority,
+        },
+        "documents": [
+            {
+                "id": d.id,
+                "originalFilename": d.originalFilename,
+                "sha256Hash": d.sha256Hash,
+                "fileSizeBytes": d.fileSizeBytes,
+                "documentType": d.documentType,
+                "pageCount": d.pageCount,
+            }
+            for d in (inv.documents or [])
+        ],
+        "risk_assessment": risk_dict,
+        "evidence_items": evidence_items,
+    }
+
+
+async def run_interactive_qa(
+    db: Prisma,
+    investigation_id: str,
+    user_id: str,
+    question: str,
+    stream: bool = False,
+):
     """
     Dispatch an interactive Q&A query to the Lead Investigator Agent.
     The agent is constrained to the verified evidence manifest for this investigation
     (zero-hallucination policy from proposal §6).
-    TODO: Implement LangGraph agent invocation.
     """
-    raise NotImplementedError
+    manifest = await _build_evidence_manifest(db, investigation_id)
+    lead_agent = LeadInvestigatorAgent(manifest)
+
+    # Check or create interactive QA agent session
+    session = await db.agentsession.find_first(
+        where={"investigationId": investigation_id, "agentRole": "INTERACTIVE_QA"},
+        order={"createdAt": "desc"},
+    )
+    if not session:
+        session = await db.agentsession.create(
+            data={
+                "investigationId": investigation_id,
+                "agentRole": "INTERACTIVE_QA",
+                "modelProvider": "gemini" if settings.google_gemini_api_key else "deeptrace-rules",
+                "modelName": "gemini-2.0-flash" if settings.google_gemini_api_key else "lead-investigator-v1",
+                "status": "active",
+            }
+        )
+
+    # Determine message sequence orders
+    existing_messages_count = await db.agentmessage.count(
+        where={"agentSessionId": session.id}
+    )
+    user_seq = existing_messages_count + 1
+    asst_seq = existing_messages_count + 2
+
+    # Save User message
+    await db.agentmessage.create(
+        data={
+            "agentSessionId": session.id,
+            "role": "USER",
+            "content": question,
+            "sequenceOrder": user_seq,
+        }
+    )
+
+    # Generate answer using LeadInvestigatorAgent (bound to verified evidence)
+    answer_dict = await lead_agent.answer_query(question)
+    answer_text = answer_dict["answer"]
+    evidence_refs = answer_dict.get("evidence_references", [])
+    tokens_used = answer_dict.get("tokens_used", 100)
+
+    # Save Assistant response
+    await db.agentmessage.create(
+        data={
+            "agentSessionId": session.id,
+            "role": "ASSISTANT",
+            "content": answer_text,
+            "tokensIn": len(question.split()),
+            "tokensOut": tokens_used,
+            "sequenceOrder": asst_seq,
+        }
+    )
+
+    # Update session token usage
+    await db.agentsession.update(
+        where={"id": session.id},
+        data={
+            "totalTokensIn": session.totalTokensIn + len(question.split()),
+            "totalTokensOut": session.totalTokensOut + tokens_used,
+        },
+    )
+
+    if stream:
+        async def stream_generator() -> AsyncGenerator[str, None]:
+            # Stream by words / small token chunks
+            words = answer_text.split(" ")
+            for i, word in enumerate(words):
+                chunk = word + (" " if i < len(words) - 1 else "")
+                payload = {"chunk": chunk, "done": False}
+                yield f"data: {json.dumps(payload)}\n\n"
+                await asyncio.sleep(0.01)
+
+            final_payload = {
+                "done": True,
+                "answer": answer_text,
+                "agent_session_id": session.id,
+                "evidence_references": evidence_refs,
+                "tokens_used": tokens_used,
+            }
+            yield f"data: {json.dumps(final_payload)}\n\n"
+
+        return stream_generator()
+
+    return schemas.AskResponse(
+        answer=answer_text,
+        agent_session_id=session.id,
+        evidence_references=evidence_refs,
+        tokens_used=tokens_used,
+    )
 
 
-async def get_agent_sessions(db: Prisma, investigation_id: str) -> list:
+async def get_agent_sessions(db: Prisma, investigation_id: str) -> list[schemas.AgentSessionResponse]:
     """List all agent sessions (swarm + Q&A) for an investigation."""
-    # TODO: db.agentsession.find_many(where={"investigationId": investigation_id})
-    raise NotImplementedError
+    sessions = await db.agentsession.find_many(
+        where={"investigationId": investigation_id},
+        order={"createdAt": "desc"},
+    )
+    return [
+        schemas.AgentSessionResponse(
+            id=s.id,
+            agent_role=str(s.agentRole),
+            model_provider=s.modelProvider,
+            model_name=s.modelName,
+            total_tokens_in=s.totalTokensIn,
+            total_tokens_out=s.totalTokensOut,
+            total_cost_usd=s.totalCostUsd,
+            status=s.status,
+            started_at=s.startedAt,
+            completed_at=s.completedAt,
+        )
+        for s in sessions
+    ]

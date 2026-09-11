@@ -99,3 +99,17 @@ def compute_sha256(data: bytes) -> str:
 def compute_md5(data: bytes) -> str:
     """Compute MD5 hash of binary data (secondary integrity check)."""
     return hashlib.md5(data).hexdigest()
+
+
+def detect_file_mime_type(data: bytes) -> str | None:
+    """Detect MIME type from file magic bytes to prevent extension spoofing."""
+    if data.startswith(b"%PDF-"):
+        return "application/pdf"
+    elif data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    elif data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    elif data.startswith(b"RIFF") and len(data) >= 12 and data[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+

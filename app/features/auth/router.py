@@ -20,6 +20,28 @@ async def login(
     return await service.login(db, body.email, body.password, ip_address=request.client.host if request.client else None)
 
 
+@router.post("/token", response_model=schemas.TokenResponse, summary="OAuth2 compatible token endpoint")
+async def token(
+    request: Request,
+    db: Annotated[Prisma, Depends(get_db_dep)],
+):
+    """Accept both application/x-www-form-urlencoded (OAuth2) and application/json."""
+    content_type = request.headers.get("content-type", "")
+    if "application/x-www-form-urlencoded" in content_type:
+        form = await request.form()
+        email = str(form.get("username") or form.get("email") or "")
+        password = str(form.get("password") or "")
+    else:
+        try:
+            data = await request.json()
+            email = str(data.get("email") or data.get("username") or "")
+            password = str(data.get("password") or "")
+        except Exception:
+            email, password = "", ""
+    return await service.login(db, email, password, ip_address=request.client.host if request.client else None)
+
+
+
 @router.post("/logout", status_code=204, summary="Revoke current session")
 async def logout(
     body: schemas.RefreshRequest,

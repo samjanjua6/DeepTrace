@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paper-0: #FBF9F5;
+  --color-paper-1: #F5F2EC;
+  --color-paper-2: #ECE8DF;
+  --color-rule: #DDD8CE;
+  --color-rule-dark: #C8C2B6;
+  
+  --color-ink-900: #141413;
+  --color-ink-700: #2B2A27;
+  --color-ink-500: #6E6A63;
+  --color-ink-300: #A8A39A;
+  
+  --color-forensic-red: #BA2518;
+  --color-forensic-amber: #C27803;
+  --color-forensic-green: #1E5E3A;
+  --color-forensic-blue: #1D4ED8;
+
+  --font-serif: var(--font-newsreader), "Georgia", "Times New Roman", serif;
+  --font-sans: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-geist-mono), "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+:root {
+  --background: #FBF9F5;
+  --foreground: #141413;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Tabular numbers for forensic coordinates, hashes, and financial tables */
+.tabular-nums {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Custom scrollbars matching tactile editorial paper */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F5F2EC;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #DDD8CE;
+  border-radius: 0px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #A8A39A;
+}
+
