@@ -15,6 +15,14 @@ from app.config import get_settings
 from app.core.celery_app import celery_app
 from app.core.storage import storage
 from app.db.client import db, set_org_context
+from app.features.pipeline.tasks.ledger_state_machine import CrossPageLedgerStateMachine
+from app.features.pipeline.tasks.pk_calendar import (
+    parse_transaction_date,
+    evaluate_transaction_date,
+    is_bank_holiday,
+    is_future_date,
+    is_gazetted_holiday,
+)
 
 settings = get_settings()
 
@@ -652,13 +660,24 @@ async def process_financial(
                 # ─────────────────────────────────────────────────────────────
                 # 3. Multi-Page Transaction Table Running Balance Verification
                 # ─────────────────────────────────────────────────────────────
-                # Track running balance continuously across ALL pages (never reset per page)
+                # Extract statement period end date for chronological sanity checks
+                statement_period_end: Optional[date] = None
+                period_match = re.search(
+                    r"\b(?:To\s*Date|Statement\s*To|Period\s*To|End\s*Date|To)\s*[:\-]?\s*(\d{1,2}[\/\-\.\s](?:\d{1,2}|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[\/\-\.\s]\d{2,4})",
+                    all_text,
+                    re.IGNORECASE,
+                )
+                if period_match:
+                    statement_period_end = parse_transaction_date(period_match.group(1))
+
+                # Initialize Cross-Page Ledger State Machine
+                ledger_sm = CrossPageLedgerStateMachine(
+                    stated_opening=stated_opening,
+                    stated_closing=stated_closing,
+                    stated_credits=stated_credits,
+                    stated_debits=stated_debits,
+                )
                 previous_balance: Decimal | None = stated_opening
-                last_page_closing_balance: Decimal | None = None
-                first_transaction_processed: bool = False
-                opening_row_found: bool = False
-                implied_opening: Decimal | None = None
-                all_ledger_rows: list[dict[str, Any]] = []
 
                 # Column geometry discovered dynamically from table headers across pages
                 doc_column_geometry: dict[str, Any] = {
@@ -675,6 +694,7 @@ async def process_financial(
                     page = pdf_doc[page_idx]
                     page_meta = page_meta_map.get(page_num)
                     page_first_row_processed = False
+                    ledger_sm.start_page(page_num)
 
                     scale_x = (page_meta.widthPx / page_meta.widthPts) if (page_meta and page_meta.widthPts) else (150.0 / 72.0)
                     scale_y = (page_meta.heightPx / page_meta.heightPts) if (page_meta and page_meta.heightPts) else (150.0 / 72.0)
@@ -771,18 +791,14 @@ async def process_financial(
                             continue
 
 
-                        # ── Check A: Dedicated Opening Balance Row on Page 1 ──
+                        # ── Check A: Dedicated Opening Balance Row ──
                         if (
-                            not first_transaction_processed
-                            and page_num == 1
-                            and OPENING_ROW_REGEX.search(line_text)
-                            and DATE_REGEX.search(line_text)
+                            OPENING_ROW_REGEX.search(line_text)
                             and amounts
                         ):
                             table_opening = amounts[-1][0]
-                            opening_row_found = True
-                            if stated_opening is not None and abs(table_opening - stated_opening) > Decimal("0.01"):
-                                discrepancy = table_opening - stated_opening
+                            finding_data = ledger_sm.process_opening_row(page_num, table_opening, raw_line=line_text)
+                            if finding_data:
                                 line_bbox_x0 = min([w[0] for w in line_words])
                                 line_bbox_y0 = min([w[1] for w in line_words])
                                 line_bbox_x1 = max([w[2] for w in line_words])
@@ -792,30 +808,21 @@ async def process_financial(
                                     data={
                                         "document": {"connect": {"id": doc.id}},
                                         "pipelineStage": {"connect": {"id": pipeline_stage_id}},
-                                        "category": "MATHEMATICAL_MISMATCH",
-                                        "severity": "CRITICAL",
-                                        "ruleId": "RULE_PK_OPENING_BALANCE_MISMATCH",
-                                        "riskPoints": 50,
-                                        "title": "Opening Balance Mismatch Between Header and Ledger",
-                                        "description": (
-                                            f"The document header states an Opening Balance of PKR {stated_opening:,.2f}, "
-                                            f"but the ledger table specifies PKR {table_opening:,.2f}. "
-                                            f"Discrepancy: PKR {discrepancy:+,.2f}. This indicates an edited opening figure."
-                                        ),
+                                        "category": finding_data["category"],
+                                        "severity": finding_data["severity"],
+                                        "ruleId": finding_data["rule_id"],
+                                        "riskPoints": finding_data["risk_points"],
+                                        "title": finding_data["title"],
+                                        "description": finding_data["description"],
                                         "isDeterministic": True,
                                         "pageNumber": page_num,
-                                        "expectedValue": f"PKR {stated_opening:,.2f}",
-                                        "actualValue": f"PKR {table_opening:,.2f}",
-                                        "discrepancy": f"PKR {discrepancy:+,.2f}",
-                                        "technicalDetails": Json({
-                                            "stated_opening": str(stated_opening),
-                                            "table_opening": str(table_opening),
-                                            "discrepancy": str(discrepancy),
-                                            "line_text": line_text,
-                                        }),
+                                        "expectedValue": finding_data.get("expected_value"),
+                                        "actualValue": finding_data.get("actual_value"),
+                                        "discrepancy": finding_data.get("discrepancy"),
+                                        "technicalDetails": Json(finding_data.get("technical_details", {})),
                                     }
                                 )
-                                if "opening_balance" in summary_bboxes:
+                                if "opening_balance" in summary_bboxes and finding_data["rule_id"] == "RULE_PK_OPENING_BALANCE_MISMATCH":
                                     s_page, s_box = summary_bboxes["opening_balance"]
                                     s_meta = page_meta_map.get(s_page)
                                     s_sx = (s_meta.widthPx / s_meta.widthPts) if (s_meta and s_meta.widthPts) else (150.0 / 72.0)
@@ -851,74 +858,49 @@ async def process_financial(
                                         "yPts": float(line_bbox_y0),
                                         "widthPts": float(w_pts),
                                         "heightPts": float(h_pts),
-                                        "label": "Ledger Opening Row",
-                                        "color": "#f59e0b",
+                                        "label": finding_data.get("label", "Ledger Opening Row"),
+                                        "color": finding_data.get("color", "#f59e0b"),
                                     }
                                 )
                                 stage_findings.append({
                                     "id": finding.id,
-                                    "rule_id": "RULE_PK_OPENING_BALANCE_MISMATCH",
+                                    "rule_id": finding_data["rule_id"],
                                     "severity": finding.severity,
                                     "page": page_num,
                                     "title": finding.title,
                                 })
-
-
-                            previous_balance = table_opening
-                            first_transaction_processed = True
-                            implied_opening = table_opening
-                            all_ledger_rows.append({
-                                "date": line_text[:11].strip() if line_text else "—",
-                                "particulars": "Opening Balance",
-                                "debit": None,
-                                "credit": None,
-                                "expectedBalance": float(table_opening),
-                                "recordedBalance": float(table_opening),
-                                "discrepancy": float(table_opening - (stated_opening or table_opening)),
-                                "isTampered": (stated_opening is not None and abs(table_opening - stated_opening) > Decimal("0.01")),
-                                "pageNumber": page_num,
-                            })
                             continue
 
                         # ── Check B: Balance Brought Forward Row (Top of page 2+) ──
                         if page_num > 1 and BROUGHT_FORWARD_REGEX.search(line_text) and amounts:
                             bf_val = amounts[-1][0]
-                            if last_page_closing_balance is not None and abs(bf_val - last_page_closing_balance) > Decimal("0.01"):
-                                discrepancy = bf_val - last_page_closing_balance
+                            finding_data = ledger_sm.process_brought_forward(page_num, bf_val, raw_line=line_text)
+                            if finding_data:
                                 line_bbox_x0 = min([w[0] for w in line_words])
                                 line_bbox_y0 = min([w[1] for w in line_words])
                                 line_bbox_x1 = max([w[2] for w in line_words])
                                 line_bbox_y1 = max([w[3] for w in line_words])
+                                w_pts = line_bbox_x1 - line_bbox_x0
+                                h_pts = line_bbox_y1 - line_bbox_y0
 
                                 finding = await tx.evidenceitem.create(
                                     data={
                                         "document": {"connect": {"id": doc.id}},
                                         "pipelineStage": {"connect": {"id": pipeline_stage_id}},
-                                        "category": "MATHEMATICAL_MISMATCH",
-                                        "severity": "CRITICAL",
-                                        "ruleId": "RULE_PK_PAGE_BALANCE_DISCONTINUITY",
-                                        "riskPoints": 50,
-                                        "title": f"Multi-Page Balance Discontinuity on Page {page_num}",
-                                        "description": (
-                                            f"Page {page_num - 1} concluded with a balance of PKR {last_page_closing_balance:,.2f}, "
-                                            f"but Page {page_num} states Brought Forward balance of PKR {bf_val:,.2f}. "
-                                            f"Discrepancy across page boundary: PKR {discrepancy:+,.2f}. This indicates inter-page balance manipulation."
-                                        ),
+                                        "category": finding_data["category"],
+                                        "severity": finding_data["severity"],
+                                        "ruleId": finding_data["rule_id"],
+                                        "riskPoints": finding_data["risk_points"],
+                                        "title": finding_data["title"],
+                                        "description": finding_data["description"],
                                         "isDeterministic": True,
                                         "pageNumber": page_num,
-                                        "expectedValue": f"PKR {last_page_closing_balance:,.2f}",
-                                        "actualValue": f"PKR {bf_val:,.2f}",
-                                        "discrepancy": f"PKR {discrepancy:+,.2f}",
-                                        "technicalDetails": Json({
-                                            "previous_page_closing": str(last_page_closing_balance),
-                                            "brought_forward_balance": str(bf_val),
-                                            "discrepancy": str(discrepancy),
-                                            "page_number": page_num,
-                                        }),
+                                        "expectedValue": finding_data.get("expected_value"),
+                                        "actualValue": finding_data.get("actual_value"),
+                                        "discrepancy": finding_data.get("discrepancy"),
+                                        "technicalDetails": Json(finding_data.get("technical_details", {})),
                                     }
                                 )
-                                w_pts = line_bbox_x1 - line_bbox_x0
-                                h_pts = line_bbox_y1 - line_bbox_y0
                                 await tx.boundingbox.create(
                                     data={
                                         "evidenceItem": {"connect": {"id": finding.id}},
@@ -931,60 +913,49 @@ async def process_financial(
                                         "yPts": float(line_bbox_y0),
                                         "widthPts": float(w_pts),
                                         "heightPts": float(h_pts),
-                                        "label": "Page Discontinuity",
-                                        "color": "#dc2626",
+                                        "label": finding_data.get("label", "Page Discontinuity"),
+                                        "color": finding_data.get("color", "#dc2626"),
                                     }
                                 )
                                 stage_findings.append({
                                     "id": finding.id,
-                                    "rule_id": "RULE_PK_PAGE_BALANCE_DISCONTINUITY",
+                                    "rule_id": finding_data["rule_id"],
                                     "severity": finding.severity,
                                     "page": page_num,
                                     "title": finding.title,
                                 })
-
-                            previous_balance = bf_val
                             continue
 
                         # ── Check C: Balance Carried Forward Row (Bottom of page) ──
                         if CARRIED_FORWARD_REGEX.search(line_text) and amounts:
                             cf_val = amounts[-1][0]
-                            if previous_balance is not None and abs(cf_val - previous_balance) > Decimal("0.01"):
-                                discrepancy = cf_val - previous_balance
+                            finding_data = ledger_sm.process_carried_forward(page_num, cf_val, raw_line=line_text)
+                            if finding_data:
                                 line_bbox_x0 = min([w[0] for w in line_words])
                                 line_bbox_y0 = min([w[1] for w in line_words])
                                 line_bbox_x1 = max([w[2] for w in line_words])
                                 line_bbox_y1 = max([w[3] for w in line_words])
+                                w_pts = line_bbox_x1 - line_bbox_x0
+                                h_pts = line_bbox_y1 - line_bbox_y0
 
                                 finding = await tx.evidenceitem.create(
                                     data={
                                         "document": {"connect": {"id": doc.id}},
                                         "pipelineStage": {"connect": {"id": pipeline_stage_id}},
-                                        "category": "MATHEMATICAL_MISMATCH",
-                                        "severity": "CRITICAL",
-                                        "ruleId": "RULE_PK_PAGE_BALANCE_DISCONTINUITY",
-                                        "riskPoints": 50,
-                                        "title": f"Page Carried Forward Balance Mismatch on Page {page_num}",
-                                        "description": (
-                                            f"Page {page_num} transactions left a calculated running balance of PKR {previous_balance:,.2f}, "
-                                            f"but the Carried Forward total specifies PKR {cf_val:,.2f}. "
-                                            f"Discrepancy: PKR {discrepancy:+,.2f}."
-                                        ),
+                                        "category": finding_data["category"],
+                                        "severity": finding_data["severity"],
+                                        "ruleId": finding_data["rule_id"],
+                                        "riskPoints": finding_data["risk_points"],
+                                        "title": finding_data["title"],
+                                        "description": finding_data["description"],
                                         "isDeterministic": True,
                                         "pageNumber": page_num,
-                                        "expectedValue": f"PKR {previous_balance:,.2f}",
-                                        "actualValue": f"PKR {cf_val:,.2f}",
-                                        "discrepancy": f"PKR {discrepancy:+,.2f}",
-                                        "technicalDetails": Json({
-                                            "running_balance": str(previous_balance),
-                                            "carried_forward": str(cf_val),
-                                            "discrepancy": str(discrepancy),
-                                            "page_number": page_num,
-                                        }),
+                                        "expectedValue": finding_data.get("expected_value"),
+                                        "actualValue": finding_data.get("actual_value"),
+                                        "discrepancy": finding_data.get("discrepancy"),
+                                        "technicalDetails": Json(finding_data.get("technical_details", {})),
                                     }
                                 )
-                                w_pts = line_bbox_x1 - line_bbox_x0
-                                h_pts = line_bbox_y1 - line_bbox_y0
                                 await tx.boundingbox.create(
                                     data={
                                         "evidenceItem": {"connect": {"id": finding.id}},
@@ -997,19 +968,17 @@ async def process_financial(
                                         "yPts": float(line_bbox_y0),
                                         "widthPts": float(w_pts),
                                         "heightPts": float(h_pts),
-                                        "label": "Carryover Mismatch",
-                                        "color": "#dc2626",
+                                        "label": finding_data.get("label", "Carryover Mismatch"),
+                                        "color": finding_data.get("color", "#dc2626"),
                                     }
                                 )
                                 stage_findings.append({
                                     "id": finding.id,
-                                    "rule_id": "RULE_PK_PAGE_BALANCE_DISCONTINUITY",
+                                    "rule_id": finding_data["rule_id"],
                                     "severity": finding.severity,
                                     "page": page_num,
                                     "title": finding.title,
                                 })
-
-                            previous_balance = cf_val
                             continue
 
                         # ── Check D: Transaction Rows ──
@@ -1029,434 +998,155 @@ async def process_financial(
                         if not is_primary_date:
                             continue
 
-                        # ── Check E: Calendar Sanity (Bank Holiday / Future Date) ──────
-                        # Runs for every confirmed transaction date row, independent of amounts.
-                        try:
-                            from app.features.pipeline.tasks.pk_calendar import (
-                                parse_transaction_date,
-                                is_bank_holiday,
-                                is_future_date,
-                                is_gazetted_holiday,
+                        # ── Calendar Sanity: Future Dates & National Bank Holidays ──
+                        tx_date = parse_transaction_date(date_str)
+                        if tx_date is not None:
+                            cal_anomaly = evaluate_transaction_date(
+                                tx_date,
+                                narration=line_text,
+                                statement_period_end=statement_period_end,
                             )
-                            tx_date = parse_transaction_date(date_str)
-                            if tx_date is not None:
-                                _is_future = is_future_date(tx_date)
-                                _is_holiday = is_bank_holiday(tx_date)
-                                _is_gazetted = is_gazetted_holiday(tx_date)
-
-                                # Automated 24/7 channels (Raast, ATM, IBFT, POS, Cards, Online Banking)
-                                # operate legitimately on standard Saturday/Sunday weekends.
-                                # Only flag weekend transactions if they represent non-digital OTC/branch transactions
-                                # OR if it is an official gazetted national public holiday.
-                                is_digital_channel = any(
-                                    kw in line_text.lower()
-                                    for kw in [
-                                        "raast", "atm", "ibft", "online", "pos", "card",
-                                        "1link", "p2p", "digital", "ft", "interbank",
-                                        "paypak", "visa", "mastercard", "fee", "tax", "wht", "fed"
-                                    ]
-                                )
-                                _should_flag_holiday = _is_gazetted or (_is_holiday and not is_digital_channel)
-
-                                if _is_future or _should_flag_holiday:
-                                    cal_rule = (
-                                        "RULE_PK_FUTURE_DATE_TRANSACTION" if _is_future
-                                        else "RULE_PK_HOLIDAY_TRANSACTION"
-                                    )
-                                    cal_severity = "HIGH" if _is_future else ("HIGH" if _is_gazetted else "MEDIUM")
-                                    cal_risk = 30 if _is_future else (25 if _is_gazetted else 15)
-                                    cal_title = (
-                                        f"Impossible Future Date Transaction on Page {page_num} ({date_str})"
-                                        if _is_future
-                                        else (
-                                            f"Transaction on Gazetted National Holiday on Page {page_num} ({date_str})"
-                                            if _is_gazetted
-                                            else f"Branch Transaction on Weekend on Page {page_num} ({date_str})"
-                                        )
-                                    )
-                                    cal_desc = (
-                                        f"Transaction row on Page {page_num} carries date '{date_str}' "
-                                        f"({tx_date.strftime('%d %b %Y')}), which is in the future. "
-                                        "No legitimate bank can post a transaction to a future date. "
-                                        "This proves the transaction date was fabricated."
-                                        if _is_future
-                                        else (
-                                            f"Transaction row on Page {page_num} carries date '{date_str}' "
-                                            f"({tx_date.strftime('%d %b %Y')}), which is a gazetted national public holiday. "
-                                            "Bank branches and clearing settlements are closed on this date."
-                                            if _is_gazetted
-                                            else (
-                                                f"Transaction row on Page {page_num} carries date '{date_str}' "
-                                                f"({tx_date.strftime('%d %b %Y')}), which falls on a weekend non-working day. "
-                                                "Retail branch transactions on this date are abnormal and warrant verification."
-                                            )
-                                        )
-                                    )
-
-                                    # Find the date word's bounding box for precise highlighting
-                                    date_word_bbox = None
-                                    for w in line_words:
-                                        if date_str in w[4] or w[4] in date_str:
-                                            date_word_bbox = w
-                                            break
-
-                                    cal_finding = await tx.evidenceitem.create(
-                                        data={
-                                            "document": {"connect": {"id": doc.id}},
-                                            "pipelineStage": {"connect": {"id": pipeline_stage_id}},
-                                            "category": "DATE_SEQUENCE_VIOLATION",
-                                            "severity": cal_severity,
-                                            "ruleId": cal_rule,
-                                            "riskPoints": cal_risk,
-                                            "title": cal_title,
-                                            "description": cal_desc,
-                                            "isDeterministic": True,
-                                            "pageNumber": page_num,
-                                            "expectedValue": "Valid working-day transaction date (Mon–Fri, non-holiday)",
-                                            "actualValue": f"{date_str} ({tx_date.strftime('%A, %d %b %Y')})",
-                                            "discrepancy": "Future date" if _is_future else "Bank holiday / weekend",
-                                            "technicalDetails": Json({
-                                                "parsed_date": tx_date.isoformat(),
-                                                "weekday": tx_date.strftime("%A"),
-                                                "is_future": _is_future,
-                                                "is_holiday": _is_holiday,
-                                                "line_text": line_text[:120],
-                                            }),
-                                        }
-                                    )
-
-                                    if date_word_bbox is not None:
-                                        dw_x0, dw_y0, dw_x1, dw_y1 = date_word_bbox[0], date_word_bbox[1], date_word_bbox[2], date_word_bbox[3]
-                                        await tx.boundingbox.create(
-                                            data={
-                                                "evidenceItem": {"connect": {"id": cal_finding.id}},
-                                                "pageNumber": page_num,
-                                                "x": float(dw_x0 * scale_x),
-                                                "y": float(dw_y0 * scale_y),
-                                                "width": float((dw_x1 - dw_x0) * scale_x),
-                                                "height": float((dw_y1 - dw_y0) * scale_y),
-                                                "xPts": float(dw_x0),
-                                                "yPts": float(dw_y0),
-                                                "widthPts": float(dw_x1 - dw_x0),
-                                                "heightPts": float(dw_y1 - dw_y0),
-                                                "label": "Invalid Date" if _is_future else "Holiday Date",
-                                                "color": "#dc2626" if _is_future else "#f59e0b",
-                                            }
-                                        )
-
-                                    stage_findings.append({
-                                        "id": cal_finding.id,
-                                        "rule_id": cal_rule,
-                                        "severity": cal_finding.severity,
-                                        "page": page_num,
-                                        "title": cal_finding.title,
-                                    })
-                        except Exception as _cal_err:
-                            import logging as _lcal
-                            _lcal.getLogger(__name__).debug("Calendar check non-fatal error: %s", _cal_err)
-
-                        # A valid transaction row has at least an amount and a balance
-                        if len(amounts) >= 2:
-
-                            balance_candidate = amounts[-1][0]
-                            balance_bbox = amounts[-1][1]
-
-                            # Implicit Opening Balance Verification on Row 1 (if no dedicated opening row was present)
-                            if not first_transaction_processed:
-                                first_transaction_processed = True
-                                page_first_row_processed = True
-
-                                tx_candidates = amounts[:-1]
-                                # If first candidate is an un-decimalized integer (cheque no), strip it:
-                                if len(tx_candidates) >= 2 and "." not in tx_candidates[0][2]:
-                                    tx_candidates = tx_candidates[1:]
-
-                                if len(tx_candidates) == 1:
-                                    tx_raw = tx_candidates[0][0]
-                                    if tx_raw < 0:
-                                        implied_opening = balance_candidate + abs(tx_raw)
-                                        debit_1 = abs(tx_raw)
-                                        credit_1 = None
-                                    else:
-                                        implied_opening = balance_candidate - abs(tx_raw)
-                                        debit_1 = None
-                                        credit_1 = abs(tx_raw)
+                            if cal_anomaly:
+                                date_word_bbox = None
+                                for w in line_words:
+                                    if date_str in w[4] or w[4] in date_str:
+                                        date_word_bbox = w
+                                        break
+                                if date_word_bbox is not None:
+                                    dw_x0, dw_y0, dw_x1, dw_y1 = date_word_bbox[0], date_word_bbox[1], date_word_bbox[2], date_word_bbox[3]
                                 else:
-                                    debit_1 = abs(tx_candidates[-2][0])
-                                    credit_1 = abs(tx_candidates[-1][0])
-                                    implied_opening = balance_candidate - credit_1 + debit_1
+                                    dw_x0 = min([w[0] for w in line_words])
+                                    dw_y0 = min([w[1] for w in line_words])
+                                    dw_x1 = dw_x0 + 75.0
+                                    dw_y1 = max([w[3] for w in line_words])
 
-                                if stated_opening is not None and abs(stated_opening - implied_opening) > Decimal("0.01"):
-                                    discrepancy = stated_opening - implied_opening
-                                    line_bbox_x0 = min([w[0] for w in line_words])
-                                    line_bbox_y0 = min([w[1] for w in line_words])
-                                    line_bbox_x1 = max([w[2] for w in line_words])
-                                    line_bbox_y1 = max([w[3] for w in line_words])
+                                dw_w_pts = dw_x1 - dw_x0
+                                dw_h_pts = dw_y1 - dw_y0
 
-                                    finding = await tx.evidenceitem.create(
-                                        data={
-                                            "document": {"connect": {"id": doc.id}},
-                                            "pipelineStage": {"connect": {"id": pipeline_stage_id}},
-                                            "category": "MATHEMATICAL_MISMATCH",
-                                            "severity": "CRITICAL",
-                                            "ruleId": "RULE_PK_OPENING_BALANCE_MISMATCH",
-                                            "riskPoints": 50,
-                                            "title": f"Opening Balance Tampering Detected (+{discrepancy:,.2f} PKR Discrepancy)",
-                                            "description": (
-                                                f"The statement header claims an Opening Balance of PKR {stated_opening:,.2f}, "
-                                                f"but the transaction ledger calculations prove an authentic opening balance of "
-                                                f"PKR {implied_opening:,.2f} (implied by Row 1 transaction math). "
-                                                f"Discrepancy: PKR {discrepancy:+,.2f}. This proves the opening balance was artificially inflated."
-                                            ),
-                                            "isDeterministic": True,
-                                            "pageNumber": 1,
-                                            "expectedValue": f"PKR {implied_opening:,.2f}",
-                                            "actualValue": f"PKR {stated_opening:,.2f}",
-                                            "discrepancy": f"PKR {discrepancy:+,.2f}",
-                                            "technicalDetails": Json({
-                                                "stated_opening": str(stated_opening),
-                                                "implied_opening": str(implied_opening),
-                                                "discrepancy": str(discrepancy),
-                                                "first_row_text": line_text,
-                                            }),
-                                        }
-                                    )
-                                    # Highlight stated opening in header
-                                    if "opening_balance" in summary_bboxes:
-                                        s_page, s_box = summary_bboxes["opening_balance"]
-                                        s_meta = page_meta_map.get(s_page)
-                                        s_sx = (s_meta.widthPx / s_meta.widthPts) if (s_meta and s_meta.widthPts) else (150.0 / 72.0)
-                                        s_sy = (s_meta.heightPx / s_meta.heightPts) if (s_meta and s_meta.heightPts) else (150.0 / 72.0)
-                                        await tx.boundingbox.create(
-                                            data={
-                                                "evidenceItem": {"connect": {"id": finding.id}},
-                                                "pageNumber": s_page,
-                                                "x": float(s_box[0] * s_sx),
-                                                "y": float(s_box[1] * s_sy),
-                                                "width": float((s_box[2] - s_box[0]) * s_sx),
-                                                "height": float((s_box[3] - s_box[1]) * s_sy),
-                                                "xPts": float(s_box[0]),
-                                                "yPts": float(s_box[1]),
-                                                "widthPts": float(s_box[2] - s_box[0]),
-                                                "heightPts": float(s_box[3] - s_box[1]),
-                                                "label": "Stated Opening (Tampered)",
-                                                "color": "#dc2626",
-                                            }
-                                        )
-                                    # Highlight refuting Row 1
-                                    w_pts = line_bbox_x1 - line_bbox_x0
-                                    h_pts = line_bbox_y1 - line_bbox_y0
-                                    await tx.boundingbox.create(
-                                        data={
-                                            "evidenceItem": {"connect": {"id": finding.id}},
-                                            "pageNumber": page_num,
-                                            "x": float(line_bbox_x0 * scale_x),
-                                            "y": float(line_bbox_y0 * scale_y),
-                                            "width": float(w_pts * scale_x),
-                                            "height": float(h_pts * scale_y),
-                                            "xPts": float(line_bbox_x0),
-                                            "yPts": float(line_bbox_y0),
-                                            "widthPts": float(w_pts),
-                                            "heightPts": float(h_pts),
-                                            "label": "Ledger Origin Row",
-                                            "color": "#f59e0b",
-                                        }
-                                    )
-                                    stage_findings.append({
-                                        "id": finding.id,
-                                        "rule_id": "RULE_PK_OPENING_BALANCE_MISMATCH",
-                                        "severity": finding.severity,
-                                        "page": page_num,
-                                        "title": finding.title,
-                                    })
-
-                                all_ledger_rows.append({
-                                    "date": line_text[:11].strip() if line_text else "—",
-                                    "particulars": line_text[11:65].strip() if len(line_text) > 11 else line_text,
-                                    "debit": float(debit_1) if debit_1 else None,
-                                    "credit": float(credit_1) if credit_1 else None,
-                                    "expectedBalance": float(balance_candidate),
-                                    "recordedBalance": float(balance_candidate),
-                                    "discrepancy": 0.0,
-                                    "isTampered": False,
-                                    "pageNumber": page_num,
-                                })
-                                previous_balance = balance_candidate
-                                continue
-
-                            is_page_boundary = (page_num > 1 and not page_first_row_processed and last_page_closing_balance is not None)
-                            page_first_row_processed = True
-
-                            if previous_balance is not None:
-                                reconciled = False
-                                expected_balance = None
-                                discrepancy = Decimal("0.00")
-                                rule_id = "RULE_PK_PAGE_BALANCE_DISCONTINUITY" if is_page_boundary else "RULE_PK_LEDGER_RECONCILIATION_FAIL"
-                                title = (
-                                    f"Multi-Page Balance Discontinuity on Page {page_num}"
-                                    if is_page_boundary
-                                    else "Ledger Running Balance Mathematical Inconsistency"
-                                )
-                                boundary_note = (
-                                    f" Across page boundary from Page {page_num - 1} (ended at PKR {last_page_closing_balance:,.2f}), "
-                                    if is_page_boundary
-                                    else ""
+                                cal_finding = await tx.evidenceitem.create(
+                                    data={
+                                        "document": {"connect": {"id": doc.id}},
+                                        "pipelineStage": {"connect": {"id": pipeline_stage_id}},
+                                        "category": cal_anomaly["category"],
+                                        "severity": cal_anomaly["severity"],
+                                        "ruleId": cal_anomaly["rule_id"],
+                                        "riskPoints": cal_anomaly["risk_points"],
+                                        "title": f"{cal_anomaly['title']} on Page {page_num}",
+                                        "description": (
+                                            f"Transaction row on Page {page_num} ('{line_text[:80]}...') "
+                                            f"{cal_anomaly['description']}"
+                                        ),
+                                        "isDeterministic": True,
+                                        "pageNumber": page_num,
+                                        "expectedValue": cal_anomaly["expected_value"],
+                                        "actualValue": cal_anomaly["actual_value"],
+                                        "discrepancy": cal_anomaly["discrepancy"],
+                                        "technicalDetails": Json({
+                                            "parsed_date": tx_date.isoformat(),
+                                            "weekday": tx_date.strftime("%A"),
+                                            "is_future": cal_anomaly.get("is_future", False),
+                                            "channel": cal_anomaly.get("channel", "GENERIC"),
+                                            "line_text": line_text[:120],
+                                            "page_number": page_num,
+                                        }),
+                                    }
                                 )
 
-                                if len(amounts) == 2:
-                                    tx_amount = amounts[0][0]
-                                    abs_tx = abs(tx_amount)
-                                    exp_credit = previous_balance + abs_tx
-                                    exp_debit = previous_balance - abs_tx
+                                await tx.boundingbox.create(
+                                    data={
+                                        "evidenceItem": {"connect": {"id": cal_finding.id}},
+                                        "pageNumber": page_num,
+                                        "x": float(dw_x0 * scale_x),
+                                        "y": float(dw_y0 * scale_y),
+                                        "width": float(dw_w_pts * scale_x),
+                                        "height": float(dw_h_pts * scale_y),
+                                        "xPts": float(dw_x0),
+                                        "yPts": float(dw_y0),
+                                        "widthPts": float(dw_w_pts),
+                                        "heightPts": float(dw_h_pts),
+                                        "label": "Invalid Date" if cal_anomaly.get("is_future") else "Holiday Date",
+                                        "color": "#dc2626" if cal_anomaly.get("is_future") else "#f59e0b",
+                                    }
+                                )
 
-                                    if abs(balance_candidate - exp_credit) <= Decimal("0.01"):
-                                        reconciled = True
-                                        previous_balance = balance_candidate
-                                    elif abs(balance_candidate - exp_debit) <= Decimal("0.01"):
-                                        reconciled = True
-                                        previous_balance = balance_candidate
-                                    else:
-                                        expected_balance = exp_credit if balance_candidate > previous_balance else exp_debit
-                                        discrepancy = balance_candidate - previous_balance
-                                        desc_msg = (
-                                            f"Transaction row on Page {page_num} ('{line_text[:80]}...') contains an impossible "
-                                            f"running balance.{boundary_note} Previous balance was PKR {previous_balance:,.2f}. Transaction amount "
-                                            f"is PKR {tx_amount:,.2f}. Expected resulting balance: PKR {exp_credit:,.2f} (credit) "
-                                            f"or PKR {exp_debit:,.2f} (debit), but statement reports PKR {balance_candidate:,.2f}. "
-                                            f"Unaccounted discrepancy: PKR {discrepancy:+,.2f}."
-                                        )
-
-                                elif len(amounts) >= 3:
-                                    # Candidate amounts
-                                    n1 = amounts[-3][0]
-                                    n1_str = amounts[-3][2]
-                                    n2 = amounts[-2][0]
-
-                                    # Hyp A: Standard 3-col [Debit, Credit, Balance]
-                                    exp_3col = previous_balance + n2 - n1
-                                    # Hyp B: n1 is Cheque/Ref, n2 is Credit
-                                    exp_chq_credit = previous_balance + abs(n2)
-                                    # Hyp C: n1 is Cheque/Ref, n2 is Debit
-                                    exp_chq_debit = previous_balance - abs(n2)
-
-                                    if abs(balance_candidate - exp_3col) <= Decimal("0.01"):
-                                        reconciled = True
-                                        previous_balance = balance_candidate
-                                    elif ("." not in n1_str) and abs(balance_candidate - exp_chq_credit) <= Decimal("0.01"):
-                                        reconciled = True
-                                        previous_balance = balance_candidate
-                                    elif ("." not in n1_str) and abs(balance_candidate - exp_chq_debit) <= Decimal("0.01"):
-                                        reconciled = True
-                                        previous_balance = balance_candidate
-                                    else:
-                                        # Neither standard 3-col nor cheque-col matched -> genuine mismatch
-                                        if ("." not in n1_str) and n1 > 1000:
-                                            expected_balance = exp_chq_credit if balance_candidate > previous_balance else exp_chq_debit
-                                            discrepancy = balance_candidate - expected_balance
-                                            desc_msg = (
-                                                f"Transaction row on Page {page_num} ('{line_text[:80]}...') fails arithmetic reconciliation:{boundary_note} "
-                                                f"Previous (PKR {previous_balance:,.2f}) ± Tx (PKR {n2:,.2f}) [Cheque No: {n1_str}] "
-                                                f"= Expected PKR {expected_balance:,.2f}, but statement reports PKR {balance_candidate:,.2f}. "
-                                                f"Discrepancy: PKR {discrepancy:+,.2f}."
-                                            )
-                                        else:
-                                            expected_balance = exp_3col
-                                            discrepancy = balance_candidate - exp_3col
-                                            desc_msg = (
-                                                f"Transaction row on Page {page_num} fails arithmetic reconciliation:{boundary_note} "
-                                                f"Previous (PKR {previous_balance:,.2f}) + Credit (PKR {n2:,.2f}) "
-                                                f"- Debit (PKR {n1:,.2f}) = Expected PKR {exp_3col:,.2f}, "
-                                                f"but statement reports PKR {balance_candidate:,.2f}. Discrepancy: PKR {discrepancy:+,.2f}."
-                                            )
-
-                                if not reconciled and expected_balance is not None:
-                                    line_bbox_x0 = min([w[0] for w in line_words])
-                                    line_bbox_y0 = min([w[1] for w in line_words])
-                                    line_bbox_x1 = max([w[2] for w in line_words])
-                                    line_bbox_y1 = max([w[3] for w in line_words])
-
-                                    finding = await tx.evidenceitem.create(
-                                        data={
-                                            "document": {"connect": {"id": doc.id}},
-                                            "pipelineStage": {"connect": {"id": pipeline_stage_id}},
-                                            "category": "MATHEMATICAL_MISMATCH",
-                                            "severity": "CRITICAL",
-                                            "ruleId": rule_id,
-                                            "riskPoints": 50,
-                                            "title": title,
-                                            "description": desc_msg,
-                                            "isDeterministic": True,
-                                            "pageNumber": page_num,
-                                            "expectedValue": f"PKR {expected_balance:,.2f}",
-                                            "actualValue": f"PKR {balance_candidate:,.2f}",
-                                            "discrepancy": f"PKR {discrepancy:+,.2f}",
-                                            "technicalDetails": Json({
-                                                "line_text": line_text,
-                                                "previous_balance": str(previous_balance),
-                                                "reported_balance": str(balance_candidate),
-                                                "expected_balance": str(expected_balance),
-                                                "discrepancy": str(discrepancy),
-                                                "is_page_boundary": is_page_boundary,
-                                            }),
-                                        }
-                                    )
-
-                                    w_pts = line_bbox_x1 - line_bbox_x0
-                                    h_pts = line_bbox_y1 - line_bbox_y0
-                                    await tx.boundingbox.create(
-                                        data={
-                                            "evidenceItem": {"connect": {"id": finding.id}},
-                                            "pageNumber": page_num,
-                                            "x": float(line_bbox_x0 * scale_x),
-                                            "y": float(line_bbox_y0 * scale_y),
-                                            "width": float(w_pts * scale_x),
-                                            "height": float(h_pts * scale_y),
-                                            "xPts": float(line_bbox_x0),
-                                            "yPts": float(line_bbox_y0),
-                                            "widthPts": float(w_pts),
-                                            "heightPts": float(h_pts),
-                                            "label": "Math Mismatch",
-                                            "color": "#dc2626",
-                                        }
-                                    )
-
-                                    stage_findings.append({
-                                        "id": finding.id,
-                                        "rule_id": rule_id,
-                                        "severity": finding.severity,
-                                        "page": page_num,
-                                        "title": finding.title,
-                                    })
-
-                                row_debit = None
-                                row_credit = None
-                                if len(amounts) == 2:
-                                    tx_amount = amounts[0][0]
-                                    abs_tx = abs(tx_amount)
-                                    exp_debit = previous_balance - abs_tx
-                                    if (tx_amount < 0) or (abs(balance_candidate - exp_debit) <= Decimal("0.01")):
-                                        row_debit = abs_tx
-                                    else:
-                                        row_credit = abs_tx
-                                elif len(amounts) >= 3:
-                                    row_debit = abs(amounts[-3][0])
-                                    row_credit = abs(amounts[-2][0])
-
-                                all_ledger_rows.append({
-                                    "date": line_text[:11].strip() if line_text else "—",
-                                    "particulars": line_text[11:65].strip() if len(line_text) > 11 else line_text,
-                                    "debit": float(row_debit) if row_debit else None,
-                                    "credit": float(row_credit) if row_credit else None,
-                                    "expectedBalance": float(expected_balance or balance_candidate),
-                                    "recordedBalance": float(balance_candidate),
-                                    "discrepancy": float(discrepancy),
-                                    "isTampered": not reconciled,
-                                    "pageNumber": page_num,
+                                stage_findings.append({
+                                    "id": cal_finding.id,
+                                    "rule_id": cal_anomaly["rule_id"],
+                                    "severity": cal_finding.severity,
+                                    "page": page_num,
+                                    "title": cal_finding.title,
                                 })
-                                previous_balance = balance_candidate
 
-                    # Record page closing balance for carryover into next page
-                    last_page_closing_balance = previous_balance
+                        # ── Running Balance Reconciliation via State Machine ──
+                        if len(amounts) >= 2:
+                            balance_candidate = amounts[-1][0]
+                            particulars_extracted = line_text[11:65].strip() if len(line_text) > 11 else line_text
+                            reconciled, new_bal, sm_finding = ledger_sm.process_transaction(
+                                page_num=page_num,
+                                date_str=date_str,
+                                particulars=particulars_extracted,
+                                balance_candidate=balance_candidate,
+                                amounts=amounts,
+                                raw_line=line_text,
+                            )
+                            previous_balance = new_bal
+
+                            if sm_finding is not None:
+                                line_bbox_x0 = min([w[0] for w in line_words])
+                                line_bbox_y0 = min([w[1] for w in line_words])
+                                line_bbox_x1 = max([w[2] for w in line_words])
+                                line_bbox_y1 = max([w[3] for w in line_words])
+
+                                finding = await tx.evidenceitem.create(
+                                    data={
+                                        "document": {"connect": {"id": doc.id}},
+                                        "pipelineStage": {"connect": {"id": pipeline_stage_id}},
+                                        "category": sm_finding["category"],
+                                        "severity": sm_finding["severity"],
+                                        "ruleId": sm_finding["rule_id"],
+                                        "riskPoints": sm_finding["risk_points"],
+                                        "title": sm_finding["title"],
+                                        "description": sm_finding["description"],
+                                        "isDeterministic": True,
+                                        "pageNumber": page_num,
+                                        "expectedValue": sm_finding.get("expected_value"),
+                                        "actualValue": sm_finding.get("actual_value"),
+                                        "discrepancy": sm_finding.get("discrepancy"),
+                                        "technicalDetails": Json(sm_finding.get("technical_details", {})),
+                                    }
+                                )
+
+                                w_pts = line_bbox_x1 - line_bbox_x0
+                                h_pts = line_bbox_y1 - line_bbox_y0
+                                await tx.boundingbox.create(
+                                    data={
+                                        "evidenceItem": {"connect": {"id": finding.id}},
+                                        "pageNumber": page_num,
+                                        "x": float(line_bbox_x0 * scale_x),
+                                        "y": float(line_bbox_y0 * scale_y),
+                                        "width": float(w_pts * scale_x),
+                                        "height": float(h_pts * scale_y),
+                                        "xPts": float(line_bbox_x0),
+                                        "yPts": float(line_bbox_y0),
+                                        "widthPts": float(w_pts),
+                                        "heightPts": float(h_pts),
+                                        "label": sm_finding.get("label", "Math Mismatch"),
+                                        "color": sm_finding.get("color", "#dc2626"),
+                                    }
+                                )
+
+                                stage_findings.append({
+                                    "id": finding.id,
+                                    "rule_id": sm_finding["rule_id"],
+                                    "severity": finding.severity,
+                                    "page": page_num,
+                                    "title": finding.title,
+                                })
+
+                    # Record page closing balance in state machine for carryover into next page
+                    ledger_sm.end_page(page_num)
+                    last_page_closing_balance = ledger_sm.last_page_closing_balance
+                    previous_balance = ledger_sm.running_balance
 
                 # ─────────────────────────────────────────────────────────────
                 # 4. Document-Level Balance & Summary Identity Reconciliation
@@ -1663,13 +1353,13 @@ async def process_financial(
                     for f in stage_findings
                 ),
                 "stated_opening": float(stated_opening) if stated_opening is not None else None,
-                "implied_opening": float(implied_opening) if implied_opening is not None else None,
-                "opening_discrepancy": float(stated_opening - implied_opening) if (stated_opening is not None and implied_opening is not None) else None,
+                "implied_opening": float(ledger_sm.implied_opening) if ledger_sm.implied_opening is not None else (float(stated_opening) if stated_opening is not None else None),
+                "opening_discrepancy": float(stated_opening - ledger_sm.implied_opening) if (stated_opening is not None and ledger_sm.implied_opening is not None) else None,
                 "stated_closing": float(stated_closing) if stated_closing is not None else None,
-                "implied_closing": float(previous_balance) if previous_balance is not None else None,
-                "closing_discrepancy": float(stated_closing - previous_balance) if (stated_closing is not None and previous_balance is not None) else None,
+                "implied_closing": float(ledger_sm.running_balance) if ledger_sm.running_balance is not None else None,
+                "closing_discrepancy": float(stated_closing - ledger_sm.running_balance) if (stated_closing is not None and ledger_sm.running_balance is not None) else None,
                 "iban": primary_iban_info,
-                "rows": all_ledger_rows,
+                "rows": ledger_sm.get_ledger_rows(),
             }
 
             await tx.pipelinestage.update(

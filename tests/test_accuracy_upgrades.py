@@ -559,5 +559,258 @@ class TestCrossStageSplicingSynergy(unittest.TestCase):
         self.assertTrue(overlap_ratio >= 0.15)
 
 
+# ---------------------------------------------------------------------------
+# A3b — Cross-Page Ledger State Machine Tests
+# ---------------------------------------------------------------------------
+
+class TestCrossPageLedgerStateMachine(unittest.TestCase):
+    """Deterministic tests for multi-page financial ledger state tracking and boundary invariants."""
+
+    def test_multipage_continuous_carryforward_5_pages(self):
+        """5-page continuous transaction run must maintain running balance across all page transitions."""
+        from app.features.pipeline.tasks.ledger_state_machine import CrossPageLedgerStateMachine
+
+        sm = CrossPageLedgerStateMachine(
+            stated_opening=Decimal("100000.00"),
+            stated_closing=Decimal("250000.00"),
+            stated_credits=Decimal("200000.00"),
+            stated_debits=Decimal("50000.00"),
+        )
+
+        # Page 1
+        sm.start_page(1)
+        f_op = sm.process_opening_row(1, Decimal("100000.00"), raw_line="01/01/2026 Opening Balance 100,000.00")
+        self.assertIsNone(f_op)
+        # Tx 1: Credit 50k -> 150k
+        rec, b, f = sm.process_transaction(
+            1, "02/01/2026", "Salary Deposit", Decimal("150000.00"),
+            [(Decimal("50000.00"), (0,0,0,0), "50,000.00"), (Decimal("150000.00"), (0,0,0,0), "150,000.00")]
+        )
+        self.assertTrue(rec)
+        self.assertEqual(b, Decimal("150000.00"))
+        # Page 1 CF: 150k
+        f_cf = sm.process_carried_forward(1, Decimal("150000.00"))
+        self.assertIsNone(f_cf)
+        sm.end_page(1)
+
+        # Page 2 (Explicit BF)
+        sm.start_page(2)
+        f_bf = sm.process_brought_forward(2, Decimal("150000.00"))
+        self.assertIsNone(f_bf)
+        # Tx 2: Debit 20k -> 130k
+        rec, b, f = sm.process_transaction(
+            2, "05/01/2026", "Utility Bill", Decimal("130000.00"),
+            [(Decimal("-20000.00"), (0,0,0,0), "-20,000.00"), (Decimal("130000.00"), (0,0,0,0), "130,000.00")]
+        )
+        self.assertTrue(rec)
+        sm.end_page(2)
+
+        # Page 3 (Seamless - no BF line)
+        sm.start_page(3)
+        # Tx 3: Credit 70k -> 200k
+        rec, b, f = sm.process_transaction(
+            3, "10/01/2026", "Consulting Fee", Decimal("200000.00"),
+            [(Decimal("70000.00"), (0,0,0,0), "70,000.00"), (Decimal("200000.00"), (0,0,0,0), "200,000.00")]
+        )
+        self.assertTrue(rec)
+        sm.end_page(3)
+
+        # Page 4 (Explicit BF)
+        sm.start_page(4)
+        f_bf4 = sm.process_brought_forward(4, Decimal("200000.00"))
+        self.assertIsNone(f_bf4)
+        # Tx 4: Debit 30k -> 170k
+        rec, b, f = sm.process_transaction(
+            4, "15/01/2026", "Office Rent", Decimal("170000.00"),
+            [(Decimal("-30000.00"), (0,0,0,0), "-30,000.00"), (Decimal("170000.00"), (0,0,0,0), "170,000.00")]
+        )
+        self.assertTrue(rec)
+        sm.end_page(4)
+
+        # Page 5 (Seamless)
+        sm.start_page(5)
+        # Tx 5: Credit 80k -> 250k
+        rec, b, f = sm.process_transaction(
+            5, "20/01/2026", "Client Remittance", Decimal("250000.00"),
+            [(Decimal("80000.00"), (0,0,0,0), "80,000.00"), (Decimal("250000.00"), (0,0,0,0), "250,000.00")]
+        )
+        self.assertTrue(rec)
+        sm.end_page(5)
+
+        # Final audit
+        final_findings = sm.finalize()
+        self.assertEqual(len(final_findings), 0)
+        self.assertEqual(len(sm.discontinuities), 0)
+        self.assertEqual(len(sm.get_ledger_rows()), 9)  # 1 open + 1 CF + 2 BF + 5 tx = 9 rows
+
+    def test_brought_forward_mismatch_detected(self):
+        """Page N Brought Forward mismatch vs Page N-1 terminal balance must produce RULE_PK_PAGE_BALANCE_DISCONTINUITY."""
+        from app.features.pipeline.tasks.ledger_state_machine import CrossPageLedgerStateMachine
+
+        sm = CrossPageLedgerStateMachine(stated_opening=Decimal("50000.00"))
+        sm.start_page(1)
+        sm.process_opening_row(1, Decimal("50000.00"))
+        sm.process_transaction(
+            1, "01/02/2026", "Deposit", Decimal("100000.00"),
+            [(Decimal("50000.00"), (0,0,0,0), "50,000.00"), (Decimal("100000.00"), (0,0,0,0), "100,000.00")]
+        )
+        sm.end_page(1)
+
+        sm.start_page(2)
+        # Fraudster inserts inflated Brought Forward 150,000 instead of 100,000
+        finding = sm.process_brought_forward(2, Decimal("150000.00"))
+        self.assertIsNotNone(finding)
+        self.assertEqual(finding["rule_id"], "RULE_PK_PAGE_BALANCE_DISCONTINUITY")
+        self.assertEqual(finding["discrepancy"], "PKR +50,000.00")
+        self.assertTrue(sm.pages[2].has_discontinuity)
+
+    def test_carried_forward_mismatch_detected(self):
+        """Page N Carried Forward mismatch vs running balance must produce RULE_PK_PAGE_BALANCE_DISCONTINUITY."""
+        from app.features.pipeline.tasks.ledger_state_machine import CrossPageLedgerStateMachine
+
+        sm = CrossPageLedgerStateMachine()
+        sm.start_page(1)
+        sm.process_opening_row(1, Decimal("80000.00"))
+        sm.process_transaction(
+            1, "01/02/2026", "Withdrawal", Decimal("60000.00"),
+            [(Decimal("-20000.00"), (0,0,0,0), "-20,000.00"), (Decimal("60000.00"), (0,0,0,0), "60,000.00")]
+        )
+        # Actual running balance is 60,000. C/F line claims 90,000.
+        finding = sm.process_carried_forward(1, Decimal("90000.00"))
+        self.assertIsNotNone(finding)
+        self.assertEqual(finding["rule_id"], "RULE_PK_PAGE_BALANCE_DISCONTINUITY")
+        self.assertEqual(finding["discrepancy"], "PKR +30,000.00")
+
+    def test_seamless_carryforward_detects_tampered_first_row(self):
+        """Without explicit B/F line, an altered starting transaction on Page N must be flagged across boundary."""
+        from app.features.pipeline.tasks.ledger_state_machine import CrossPageLedgerStateMachine
+
+        sm = CrossPageLedgerStateMachine()
+        sm.start_page(1)
+        sm.process_opening_row(1, Decimal("100000.00"))
+        sm.end_page(1)  # Page 1 ends at 100,000
+
+        sm.start_page(2)
+        # Page 2 has NO B/F line. First tx is credit of 20k, but reports balance 200k (+80k jump)
+        rec, b, finding = sm.process_transaction(
+            2, "05/02/2026", "Transfer In", Decimal("200000.00"),
+            [(Decimal("20000.00"), (0,0,0,0), "20,000.00"), (Decimal("200000.00"), (0,0,0,0), "200,000.00")]
+        )
+        self.assertFalse(rec)
+        self.assertIsNotNone(finding)
+        self.assertEqual(finding["rule_id"], "RULE_PK_PAGE_BALANCE_DISCONTINUITY")
+        self.assertIn("PKR +80,000.00", finding["discrepancy"])
+
+    def test_header_opening_mismatch_detected(self):
+        """Mismatch between header stated opening and ledger first line must be caught."""
+        from app.features.pipeline.tasks.ledger_state_machine import CrossPageLedgerStateMachine
+
+        sm = CrossPageLedgerStateMachine(stated_opening=Decimal("500000.00"))
+        sm.start_page(1)
+        finding = sm.process_opening_row(1, Decimal("200000.00"))
+        self.assertIsNotNone(finding)
+        self.assertEqual(finding["rule_id"], "RULE_PK_OPENING_BALANCE_MISMATCH")
+        self.assertEqual(finding["discrepancy"], "PKR -300,000.00")
+
+    def test_finalize_closing_and_macro_summary_mismatch(self):
+        """Finalize must catch closing balance tampering and macro identity arithmetic violation."""
+        from app.features.pipeline.tasks.ledger_state_machine import CrossPageLedgerStateMachine
+
+        # Opening 100k, Cr 100k, Dr 20k -> expected closing 180k.
+        # But header states closing 300k.
+        sm = CrossPageLedgerStateMachine(
+            stated_opening=Decimal("100000.00"),
+            stated_closing=Decimal("300000.00"),
+            stated_credits=Decimal("100000.00"),
+            stated_debits=Decimal("20000.00"),
+        )
+        sm.start_page(1)
+        sm.process_opening_row(1, Decimal("100000.00"))
+        sm.process_transaction(
+            1, "01/01/2026", "Tx", Decimal("180000.00"),
+            [(Decimal("80000.00"), (0,0,0,0), "80,000.00"), (Decimal("180000.00"), (0,0,0,0), "180,000.00")]
+        )
+        sm.end_page(1)
+
+        findings = sm.finalize()
+        rule_ids = [f["rule_id"] for f in findings]
+        self.assertIn("RULE_PK_CLOSING_BALANCE_MISMATCH", rule_ids)
+        self.assertIn("RULE_PK_STATEMENT_SUMMARY_TAMPER", rule_ids)
+
+
+# ---------------------------------------------------------------------------
+# A3c — PK Calendar Upgrades & Channel Aware Non-Working Day Tests
+# ---------------------------------------------------------------------------
+
+class TestPKCalendarUpgrades(unittest.TestCase):
+    """Unit tests for SBP circular closing days, channel classification, and impossible future dates."""
+
+    def test_sbp_bank_holiday_jan_1(self):
+        """Jan 1 SBP Annual Accounts Closing must be detected as a bank holiday."""
+        from app.features.pipeline.tasks.pk_calendar import is_sbp_closing_day, is_bank_holiday
+
+        d = date(2026, 1, 1)
+        self.assertTrue(is_sbp_closing_day(d))
+        self.assertTrue(is_bank_holiday(d))
+
+    def test_sbp_bank_holiday_jul_1(self):
+        """Jul 1 SBP Mid-Year Closing must be detected as a bank holiday."""
+        from app.features.pipeline.tasks.pk_calendar import is_sbp_closing_day, is_bank_holiday
+
+        d = date(2025, 7, 1)
+        self.assertTrue(is_sbp_closing_day(d))
+        self.assertTrue(is_bank_holiday(d))
+
+    def test_channel_classification(self):
+        """Narration text must be correctly classified into DIGITAL vs OTC_CLEARING."""
+        from app.features.pipeline.tasks.pk_calendar import classify_transaction_channel, ChannelType
+
+        self.assertEqual(classify_transaction_channel("Raast P2P transfer to ALI"), ChannelType.DIGITAL)
+        self.assertEqual(classify_transaction_channel("ATM Cash W/D F-10 ISB"), ChannelType.DIGITAL)
+        self.assertEqual(classify_transaction_channel("IBFT Funds Transfer via App"), ChannelType.DIGITAL)
+        self.assertEqual(classify_transaction_channel("POS Purchase Shell F-7"), ChannelType.DIGITAL)
+
+        self.assertEqual(classify_transaction_channel("Cheque Clearing NIFT Outward"), ChannelType.OTC_CLEARING)
+        self.assertEqual(classify_transaction_channel("Counter Cash Deposit by bearer"), ChannelType.OTC_CLEARING)
+        self.assertEqual(classify_transaction_channel("Chq Deposit #884920"), ChannelType.OTC_CLEARING)
+
+    def test_digital_channel_allowed_on_sunday(self):
+        """Digital 24/7 channels (Raast/ATM) must NOT be flagged on non-working days."""
+        from app.features.pipeline.tasks.pk_calendar import evaluate_transaction_date
+
+        sunday = date(2026, 3, 29)
+        # Raast on Sunday -> No anomaly
+        anomaly = evaluate_transaction_date(sunday, narration="Raast instant transfer to merchant")
+        self.assertIsNone(anomaly)
+
+        # Cheque clearing on Sunday -> Flagged
+        anomaly_otc = evaluate_transaction_date(sunday, narration="NIFT Cheque Clearing Inward")
+        self.assertIsNotNone(anomaly_otc)
+        self.assertEqual(anomaly_otc["rule_id"], "RULE_PK_WEEKEND_CLEARING_ANOMALY")
+
+    def test_impossible_future_date_relative_to_statement_period(self):
+        """Transaction dated after statement_period_end must produce RULE_PK_FUTURE_DATE_TRANSACTION."""
+        from app.features.pipeline.tasks.pk_calendar import evaluate_transaction_date
+
+        period_end = date(2026, 1, 31)
+        tx_date = date(2026, 2, 15)  # 15 days after period ended
+
+        anomaly = evaluate_transaction_date(tx_date, statement_period_end=period_end)
+        self.assertIsNotNone(anomaly)
+        self.assertEqual(anomaly["rule_id"], "RULE_PK_FUTURE_DATE_TRANSACTION")
+        self.assertEqual(anomaly["severity"], "CRITICAL")
+        self.assertEqual(anomaly["risk_points"], 35)
+
+    def test_gazetted_islamic_holidays_lookup(self):
+        """Gazetted Islamic lunar holidays in lookup table must be recognized even offline."""
+        from app.features.pipeline.tasks.pk_calendar import is_bank_holiday
+
+        # 2026 Eid-ul-Fitr dates in lookup: 2026-03-20, 2026-03-21, 2026-03-22
+        self.assertTrue(is_bank_holiday(date(2026, 3, 20)))
+        self.assertTrue(is_bank_holiday(date(2026, 3, 21)))
+        # 2026 Ashura: 2026-06-25, 2026-06-26
+        self.assertTrue(is_bank_holiday(date(2026, 6, 25)))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -14,6 +14,8 @@ interface LedgerRow {
   recordedBalance: number;
   discrepancy: number;
   isTampered: boolean;
+  pageNumber?: number;
+  rowType?: string;
 }
 
 interface LedgerMathTableProps {
@@ -254,10 +256,27 @@ export function LedgerMathTable({
                       }`}
                     >
                       <td className="py-2.5 px-3 tabular-nums text-ink-900 whitespace-nowrap">
-                        {r.date}
+                        <div className="flex items-center gap-1.5">
+                          {r.pageNumber && (
+                            <span
+                              className="text-[9px] font-mono text-ink-500 border border-rule px-1 py-0.2 bg-paper-1"
+                              title={`Statement Page ${r.pageNumber}`}
+                            >
+                              P.{r.pageNumber}
+                            </span>
+                          )}
+                          <span>{r.date}</span>
+                        </div>
                       </td>
-                      <td className="py-2.5 px-3 max-w-[200px] truncate" title={r.particulars}>
-                        {r.particulars}
+                      <td className="py-2.5 px-3 max-w-[240px]" title={r.particulars}>
+                        <div className="flex items-center gap-1.5 truncate">
+                          <span className="truncate">{r.particulars}</span>
+                          {r.rowType && r.rowType !== "TRANSACTION" && (
+                            <span className="text-[8px] tracking-wider uppercase font-mono px-1 py-0.5 border border-rule text-ink-600 bg-paper-2 flex-shrink-0">
+                              {r.rowType.replace(/_/g, " ")}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-2.5 px-3 text-right tabular-nums text-ink-900">
                         {r.debit ? formatPKR(r.debit) : "—"}
