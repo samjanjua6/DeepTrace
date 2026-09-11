@@ -564,9 +564,36 @@ async def process_financial(
 
             stage_findings = []
 
-            for doc in documents:
-                if doc.mimeType != "application/pdf":
-                    continue
+            pdf_docs = [d for d in documents if d.mimeType == "application/pdf"]
+            if not pdf_docs:
+                # Standalone image or non-PDF document: complete Stage 6 cleanly as Not Applicable
+                duration_ms = int((time.perf_counter() - start_time) * 1000)
+                output_payload = {
+                    "findings_count": 0,
+                    "findings": [],
+                    "duration_ms": duration_ms,
+                    "reconciled": True,
+                    "stated_opening": None,
+                    "implied_opening": None,
+                    "opening_discrepancy": None,
+                    "stated_closing": None,
+                    "implied_closing": None,
+                    "closing_discrepancy": None,
+                    "iban": None,
+                    "rows": [],
+                }
+                await tx.pipelinestage.update(
+                    where={"id": pipeline_stage_id},
+                    data={
+                        "status": "COMPLETED",
+                        "durationMs": duration_ms,
+                        "completedAt": datetime.now(timezone.utc),
+                        "outputPayload": Json(output_payload),
+                    },
+                )
+                return output_payload
+
+            for doc in pdf_docs:
 
                 file_bytes = storage.get_file(settings.s3_bucket_documents, doc.storagePath)
                 if not file_bytes:

@@ -1,5 +1,6 @@
 import io
 import logging
+import re
 from datetime import datetime, timezone
 import time
 from typing import Any
@@ -13,9 +14,163 @@ from app.config import get_settings
 from app.core.celery_app import celery_app
 from app.core.storage import storage
 from app.db.client import db, set_org_context
+from app.features.pipeline.tasks.credential_verifier import extract_credential_urls, verify_coursera_credential
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+
+async def audit_credential_urls(
+    tx: Any,
+    doc_id: str,
+    pipeline_stage_id: str,
+    page_num: int,
+    page_text: str,
+    standard_words: list,
+    stage_findings: list,
+) -> None:
+    """
+    Audit extracted text for online credential & certificate verification URLs.
+    Validates against official issuer registries (Coursera, Udemy, edX).
+    Flags non-existent credential IDs or recipient identity mismatches.
+    """
+    if not page_text:
+        return
+
+    cred_urls = extract_credential_urls(page_text)
+    for cred in cred_urls:
+        provider = cred["provider"]
+        code = cred["code"]
+        matched_text = cred["matched_text"]
+        verification_url = cred["url"]
+
+        if provider == "Coursera":
+            is_valid, reason, details = verify_coursera_credential(code)
+
+            # Locate bounding box for the credential URL from word coordinates
+            bbox = None
+            if standard_words:
+                target_words = []
+                for w in standard_words:
+                    word_str = str(w[4] if len(w) > 4 else w.get("text", "") if isinstance(w, dict) else "").lower()
+                    if any(term in word_str for term in (code.lower(), "coursera", "verify")):
+                        target_words.append(w)
+                if target_words:
+                    try:
+                        x0 = min(w[0] if not isinstance(w, dict) else w["bbox"][0] for w in target_words)
+                        y0 = min(w[1] if not isinstance(w, dict) else w["bbox"][1] for w in target_words)
+                        x1 = max(w[2] if not isinstance(w, dict) else w["bbox"][2] for w in target_words)
+                        y1 = max(w[3] if not isinstance(w, dict) else w["bbox"][3] for w in target_words)
+                        bbox = {"x": float(x0), "y": float(y0), "width": float(max(10, x1 - x0)), "height": float(max(10, y1 - y0))}
+                    except Exception:
+                        bbox = None
+
+            if not is_valid:
+                finding = await tx.evidenceitem.create(
+                    data={
+                        "document": {"connect": {"id": doc_id}},
+                        "pipelineStage": {"connect": {"id": pipeline_stage_id}},
+                        "category": "OCR_CONFIDENCE_ANOMALY",
+                        "severity": "CRITICAL",
+                        "ruleId": "RULE_CREDENTIAL_REGISTRY_NOT_FOUND",
+                        "riskPoints": 50,
+                        "title": f"Academic Credential Registry Verification Failed ({provider} ID Not Found)",
+                        "description": (
+                            f"The document references an online verification link ({verification_url}) with certificate "
+                            f"identifier '{code}'. Real-time registry verification against {provider} returned: {reason}. "
+                            "Official certificates can always be validated on the issuer's public registry; a null record "
+                            "indicates the credential was forged or fabricated."
+                        ),
+                        "isDeterministic": True,
+                        "pageNumber": page_num,
+                        "expectedValue": f"Active credential record registered on {provider}",
+                        "actualValue": f"Registry failure: {reason}",
+                        "discrepancy": f"Credential code '{code}' does not exist on issuer platform",
+                        "technicalDetails": Json({
+                            "provider": provider,
+                            "code": code,
+                            "verification_url": verification_url,
+                            "error_reason": reason,
+                            "matched_text": matched_text,
+                        }),
+                    }
+                )
+                if bbox:
+                    await tx.boundingbox.create(
+                        data={
+                            "evidenceItem": {"connect": {"id": finding.id}},
+                            "pageNumber": page_num,
+                            "x": bbox["x"],
+                            "y": bbox["y"],
+                            "width": bbox["width"],
+                            "height": bbox["height"],
+                            "label": f"Invalid {provider} ID: {code}",
+                            "color": "#BA2518",
+                        }
+                    )
+                stage_findings.append({
+                    "id": finding.id,
+                    "rule_id": "RULE_CREDENTIAL_REGISTRY_NOT_FOUND",
+                    "severity": finding.severity,
+                    "title": finding.title,
+                })
+            else:
+                # Credential code exists, check if recipient name matches
+                if details and details.get("recipient_name"):
+                    reg_name = details["recipient_name"].strip()
+                    reg_norm = " ".join(reg_name.lower().split())
+                    doc_norm = " ".join(page_text.lower().split())
+                    reg_clean = re.sub(r"[^a-z0-9]", "", reg_norm)
+                    doc_clean = re.sub(r"[^a-z0-9]", "", doc_norm)
+
+                    if reg_clean and reg_clean not in doc_clean:
+                        finding = await tx.evidenceitem.create(
+                            data={
+                                "document": {"connect": {"id": doc_id}},
+                                "pipelineStage": {"connect": {"id": pipeline_stage_id}},
+                                "category": "OCR_CONFIDENCE_ANOMALY",
+                                "severity": "CRITICAL",
+                                "ruleId": "RULE_CREDENTIAL_RECIPIENT_MISMATCH",
+                                "riskPoints": 50,
+                                "title": f"Certificate Registry Recipient Identity Mismatch",
+                                "description": (
+                                    f"Credential identifier '{code}' is registered on {provider}, but the official registry records "
+                                    f"the recipient as '{reg_name}', whereas this name is not present on the submitted certificate. "
+                                    "This indicates credential hijacking where a genuine verification link was pasted onto an altered document."
+                                ),
+                                "isDeterministic": True,
+                                "pageNumber": page_num,
+                                "expectedValue": f"Certificate issued to '{reg_name}'",
+                                "actualValue": f"Issuer records recipient as '{reg_name}'",
+                                "discrepancy": f"Recipient on certificate does not match registered owner '{reg_name}'",
+                                "technicalDetails": Json({
+                                    "provider": provider,
+                                    "code": code,
+                                    "registered_recipient": reg_name,
+                                    "course_name": details.get("course_name"),
+                                    "verification_url": verification_url,
+                                }),
+                            }
+                        )
+                        if bbox:
+                            await tx.boundingbox.create(
+                                data={
+                                    "evidenceItem": {"connect": {"id": finding.id}},
+                                    "pageNumber": page_num,
+                                    "x": bbox["x"],
+                                    "y": bbox["y"],
+                                    "width": bbox["width"],
+                                    "height": bbox["height"],
+                                    "label": f"Recipient Mismatch (Issuer: {reg_name})",
+                                    "color": "#BA2518",
+                                }
+                            )
+                        stage_findings.append({
+                            "id": finding.id,
+                            "rule_id": "RULE_CREDENTIAL_RECIPIENT_MISMATCH",
+                            "severity": finding.severity,
+                            "title": finding.title,
+                        })
 
 
 async def process_ocr(
@@ -52,6 +207,7 @@ async def process_ocr(
 
             documents = await tx.document.find_many(where=where_doc)
             extracted_pages = []
+            stage_findings = []
 
             for doc in documents:
                 file_bytes = storage.get_file(settings.s3_bucket_documents, doc.storagePath)
@@ -146,6 +302,11 @@ async def process_ocr(
                             data=update_data,
                         )
 
+                        # Audit extracted text for credential registries (Coursera, Udemy, etc.)
+                        await audit_credential_urls(
+                            tx, doc.id, pipeline_stage_id, page_num, page_text, standard_words, stage_findings
+                        )
+
                         extracted_pages.append({
                             "document_id": doc.id,
                             "page_number": page_num,
@@ -208,6 +369,11 @@ async def process_ocr(
                         data=image_update_data,
                     )
 
+                    # Audit extracted text for credential registries (Coursera, Udemy, etc.)
+                    await audit_credential_urls(
+                        tx, doc.id, pipeline_stage_id, 1, page_text, standard_words, stage_findings
+                    )
+
                     extracted_pages.append({
                         "document_id": doc.id,
                         "page_number": 1,
@@ -223,6 +389,8 @@ async def process_ocr(
             output_payload = {
                 "total_pages_extracted": len(extracted_pages),
                 "pages": extracted_pages,
+                "findings_count": len(stage_findings),
+                "findings": stage_findings,
                 "duration_ms": duration_ms,
             }
 
