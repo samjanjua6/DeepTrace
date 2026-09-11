@@ -84,6 +84,10 @@ export function ForensicCanvas({
 
   const handlePointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return; // Left mouse only
+    // Capture pointer on the viewport container for fluid, uninterrupted dragging
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {}
     isMouseDownRef.current = true;
     hasDraggedRef.current = false;
     dragStartRef.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
@@ -94,7 +98,7 @@ export function ForensicCanvas({
     if (isMouseDownRef.current) {
       const dx = e.clientX - (dragStartRef.current.x + pan.x);
       const dy = e.clientY - (dragStartRef.current.y + pan.y);
-      if (Math.hypot(dx, dy) > 4) {
+      if (Math.hypot(dx, dy) > 3) {
         hasDraggedRef.current = true;
         setIsDragging(true);
       }
@@ -124,20 +128,30 @@ export function ForensicCanvas({
     }
   };
 
-  const handlePointerUp = () => {
-    // Intentional stationary click (dist <= 4px) pins baseline in ruler mode
-    if (isMouseDownRef.current && !hasDraggedRef.current && showRuler && mousePos) {
-      const y = mousePos.y;
-      if (y >= 0 && y <= heightPx) {
-        setPinnedBaselines((prev) => {
-          if (prev.length >= 6) return [...prev.slice(1), y];
-          return [...prev, y];
-        });
-      }
-    }
+  const handlePointerUp = (e: React.PointerEvent) => {
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
     isMouseDownRef.current = false;
     setIsDragging(false);
     hasDraggedRef.current = false;
+  };
+
+  // Pin baseline: triggered intentionally via double-click or HUD button (never accidental single-click drags)
+  const pinCurrentBaseline = () => {
+    if (!mousePos) return;
+    const y = mousePos.y;
+    if (y >= 0 && y <= heightPx) {
+      setPinnedBaselines((prev) => {
+        if (prev.length >= 6) return [...prev.slice(1), y];
+        return [...prev, y];
+      });
+    }
+  };
+
+  const handleSheetDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    pinCurrentBaseline();
   };
 
   // Center pan when active finding changes
@@ -193,7 +207,7 @@ export function ForensicCanvas({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
-        className={`flex-1 overflow-hidden relative flex items-center justify-center p-6 bg-[#EBE7DF] ${
+        className={`flex-1 overflow-hidden relative flex items-center justify-center p-6 bg-paper-1 ${
           isDragging
             ? "cursor-grabbing"
             : showRuler
@@ -203,14 +217,21 @@ export function ForensicCanvas({
       >
         {/* Floating Baseline Laser HUD (Institutional Theme) */}
         {showRuler && mousePos && (
-          <div className="absolute top-4 left-4 bg-paper-0/95 backdrop-blur-sm border border-rule px-3 py-1.5 font-mono text-[11px] text-ink-900 pointer-events-none flex items-center gap-2 shadow-sm select-none z-30">
+          <div className="absolute top-4 left-4 bg-paper-0/95 backdrop-blur-sm border border-rule px-3 py-1.5 font-mono text-[11px] text-ink-900 flex items-center gap-2 shadow-sm select-none z-30">
             <span className="w-1.5 h-1.5 bg-ink-900" />
             <span className="font-semibold uppercase tracking-wider text-ink-900">BASELINE GUIDE:</span>
             <span className="tabular-nums font-semibold">
               Y = {(mousePos.y * (72 / 150)).toFixed(1)} PT ({Math.round(mousePos.y)} PX)
             </span>
             <span className="text-ink-300">|</span>
-            <span className="text-ink-500 uppercase text-[10px]">CLICK TO PIN</span>
+            <button
+              type="button"
+              onClick={pinCurrentBaseline}
+              className="px-2 py-0.5 bg-ink-900 text-paper-0 text-[10px] uppercase font-bold hover:bg-ink-700 transition-colors cursor-pointer"
+            >
+              Pin Baseline
+            </button>
+            <span className="text-ink-400 text-[9px] uppercase hidden sm:inline">(or Double-Click Sheet)</span>
           </div>
         )}
 
@@ -225,6 +246,7 @@ export function ForensicCanvas({
         >
           <div
             ref={sheetRef}
+            onDoubleClick={handleSheetDoubleClick}
             style={{ width: `${widthPx * 0.65}px`, height: `${heightPx * 0.65}px` }}
             className="relative overflow-hidden bg-white"
           >
@@ -234,8 +256,9 @@ export function ForensicCanvas({
               <img
                 src={imageUrl}
                 alt={`Page ${currentPage}`}
+                draggable={false}
                 onError={() => setImgError(true)}
-                className="w-full h-full object-contain pointer-events-none"
+                className="w-full h-full object-contain pointer-events-none select-none"
               />
             ) : (
               /* High-End Vector Document Sheet Fallback */
@@ -280,7 +303,7 @@ export function ForensicCanvas({
             {showELA && (
               <div
                 style={{ opacity: elaOpacity }}
-                className="absolute inset-0 mix-blend-difference pointer-events-none bg-gradient-to-tr from-forensic-red/40 via-amber-400/20 to-transparent"
+                className="absolute inset-0 mix-blend-difference pointer-events-none bg-forensic-red/35"
               />
             )}
 

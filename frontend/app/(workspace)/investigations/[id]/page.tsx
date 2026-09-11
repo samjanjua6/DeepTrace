@@ -222,42 +222,52 @@ export default function InvestigationWorkspacePage() {
 
     let isMounted = true;
     let pollTimer: NodeJS.Timeout | null = null;
+    let hasLoadedPages = false;
 
     async function loadData(isInitial = false) {
       if (isInitial) setIsLoading(true);
+      let isStillRunning = false;
       try {
         await loginAnalyst().catch(() => {});
 
         // 1. Fetch Investigation
-        const inv = await getInvestigation(investigationId);
+        const inv = await getInvestigation(investigationId).catch(() => null);
         if (!isMounted) return;
-        setInvestigation(inv);
+        if (inv) setInvestigation(inv);
 
-        // 2. Fetch Documents & Pages
-        const docs = await getDocuments(investigationId);
-        if (!isMounted) return;
-        if (docs && docs.length > 0) {
-          const mainDoc = docs[0];
-          setDocumentType(mainDoc.documentType || "OTHER");
-
-          const docPages = await getDocumentPages(investigationId, mainDoc.id);
+        // 2. Fetch Documents & Pages (Fetched once on initial load or if empty)
+        if (!hasLoadedPages) {
+          const docs = await getDocuments(investigationId).catch(() => []);
           if (!isMounted) return;
-          if (docPages && docPages.length > 0) {
-            setPages(docPages);
+          if (docs && docs.length > 0) {
+            const mainDoc = docs[0];
+            setDocumentType(mainDoc.documentType || "OTHER");
+
+            const docPages = await getDocumentPages(investigationId, mainDoc.id).catch(() => []);
+            if (!isMounted) return;
+            if (docPages && docPages.length > 0) {
+              setPages(docPages);
+              hasLoadedPages = true;
+            }
           }
         }
 
-        // 3. Fetch Evidence
-        const ev = await getEvidence(investigationId);
+        // 3. Fetch Pipeline Status
+        const pRun = await getPipelineStatus(investigationId).catch(() => null);
         if (!isMounted) return;
-        setEvidence(ev || []);
+        if (pRun) setPipelineRun(pRun);
 
-        // 4. Fetch Risk Assessment
+        // 4. Fetch Evidence
+        const ev = await getEvidence(investigationId).catch(() => null);
+        if (!isMounted) return;
+        if (ev !== null) setEvidence(ev);
+
+        // 5. Fetch Risk Assessment
         const r = await getRiskAssessment(investigationId).catch(() => null);
         if (!isMounted) return;
         if (r) {
           setRisk(r);
-        } else {
+        } else if (pRun?.status === "COMPLETED" || (inv && inv.status !== "PROCESSING")) {
           setRisk({
             id: "clean",
             investigationId,
@@ -271,34 +281,32 @@ export default function InvestigationWorkspacePage() {
           });
         }
 
-        // 5. Fetch Pipeline Status
-        const pRun = await getPipelineStatus(investigationId).catch(() => null);
-        if (!isMounted) return;
-        if (pRun) setPipelineRun(pRun);
-
         // 6. Fetch Custody Log
         const custody = await getCustodyEvents(investigationId).catch(() => []);
         if (!isMounted) return;
-        setCustodyEvents(custody || []);
+        if (custody && custody.length > 0) setCustodyEvents(custody);
 
         // Polling decision:
-        // While pipeline is still running/queued or hasn't produced risk assessment yet,
+        // While pipeline is still running/queued or haven't reached terminal status,
         // poll every 2000ms until terminal status (COMPLETED or FAILED)
-        const isStillRunning =
+        isStillRunning =
           pRun?.status === "RUNNING" ||
           pRun?.status === "QUEUED" ||
+          inv?.status === "PROCESSING" ||
           (pRun?.status !== "COMPLETED" && pRun?.status !== "FAILED" && (!r || r.overallScore === 0));
 
+      } catch (err) {
+        console.error("Failed to load investigation data:", err);
+        // If an error occurred during active execution, keep polling with backoff
+        isStillRunning = true;
+      } finally {
+        if (isMounted && isInitial) {
+          setIsLoading(false);
+        }
         if (isStillRunning && isMounted) {
           pollTimer = setTimeout(() => {
             loadData(false);
           }, 2000);
-        }
-      } catch (err) {
-        console.error("Failed to load investigation data:", err);
-      } finally {
-        if (isMounted && isInitial) {
-          setIsLoading(false);
         }
       }
     }
@@ -317,22 +325,24 @@ export default function InvestigationWorkspacePage() {
     try {
       await triggerPipeline(investigationId);
 
-      // Poll pipeline until completed or terminal
+      // Poll pipeline until completed or terminal (up to 100 attempts * 1.5s = 150s for multi-page documents)
       let attempts = 0;
-      while (attempts < 25) {
+      while (attempts < 100) {
         await new Promise((res) => setTimeout(res, 1500));
         const status = await getPipelineStatus(investigationId).catch(() => null);
-        if (status?.status === "COMPLETED" || status?.status === "FAILED") {
+        if (status) {
           setPipelineRun(status);
-          break;
+          if (status.status === "COMPLETED" || status.status === "FAILED") {
+            break;
+          }
         }
         attempts++;
       }
 
       const [ev, r, docs, custody] = await Promise.all([
-        getEvidence(investigationId),
+        getEvidence(investigationId).catch(() => []),
         getRiskAssessment(investigationId).catch(() => null),
-        getDocuments(investigationId),
+        getDocuments(investigationId).catch(() => []),
         getCustodyEvents(investigationId).catch(() => []),
       ]);
 
@@ -371,8 +381,15 @@ export default function InvestigationWorkspacePage() {
         e.category === "MATH_RECONCILIATION_FAIL" ||
         (e.ruleId || "").includes("MATH") ||
         (e.ruleId || "").includes("BALANCE") ||
-        (e.ruleId || "").includes("LEDGER")
+        (e.ruleId || "").includes("LEDGER") ||
+        (e.ruleId || "").includes("HOLIDAY")
     );
+
+  const getStageStatus = (stageType: string) => {
+    if (isSample) return "COMPLETED";
+    const stage = pipelineRun?.stages?.find((s) => s.stageType === stageType);
+    return stage?.status || (pipelineRun ? "PENDING" : "COMPLETED");
+  };
 
   const stage6 = pipelineRun?.stages?.find(
     (s) => s.stageType === "FINANCIAL_VERIFICATION"
@@ -402,9 +419,58 @@ export default function InvestigationWorkspacePage() {
 
         {/* Column 2: Independently Scrollable Right Analytical Dossier (42% width) */}
         <div className="w-full lg:w-[42%] h-full overflow-y-auto bg-paper-0 p-6 space-y-6">
+          {/* Live Pipeline Execution Banner */}
+          {(isAnalyzing || pipelineRun?.status === "RUNNING" || investigation?.status === "PROCESSING") && (
+            <div className="bg-paper-1 border-2 border-forensic-amber/60 p-4 font-mono text-xs space-y-2 shadow-sm">
+              <div className="flex items-center justify-between text-forensic-amber font-bold uppercase tracking-wider">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-forensic-amber animate-ping" />
+                  <span>FORENSIC PIPELINE IN FLIGHT</span>
+                </div>
+                <span className="bg-forensic-amber text-paper-0 text-[10px] px-2 py-0.5 font-bold">
+                  {(() => {
+                    const active = pipelineRun?.stages?.find((s) => s.status === "RUNNING");
+                    return active ? `STAGE ${active.stageOrder}/8` : "PROCESSING";
+                  })()}
+                </span>
+              </div>
+              <p className="text-[11px] text-ink-700 leading-relaxed">
+                {(() => {
+                  const active = pipelineRun?.stages?.find((s) => s.status === "RUNNING");
+                  if (!active) return "Executing deterministic and neural forensic verification layers...";
+                  switch (active.stageType) {
+                    case "CUSTODY_LOCK":
+                      return "Stage 1/8: Registering immutable SHA-256 cryptographic custody fingerprint under ETO 2002...";
+                    case "PDF_STRUCTURE":
+                      return "Stage 2/8: Parsing cross-reference streams, %%EOF trailers, and modification timestamps...";
+                    case "FONT_GLYPH_ANALYSIS":
+                      return "Stage 3/8: Measuring character glyph baselines and PDF Type1/TrueType subset variances...";
+                    case "VISION_ELA":
+                      return `Stage 4/8: Running Computer Vision Multi-Scale ELA & TruFor CMFD neural scan across ${pages.length || 1} pages...`;
+                    case "OCR_EXTRACTION":
+                      return "Stage 5/8: Running semantic OCR and table geometry columnization...";
+                    case "FINANCIAL_VERIFICATION":
+                      return "Stage 6/8: Reconciling cross-page ledger state machine and bank calendar validation...";
+                    case "EVIDENCE_FUSION":
+                      return "Stage 7/8: Calibrating Bayesian evidence fusion matrix and deterministic overrides...";
+                    case "REPORT_GENERATION":
+                      return "Stage 8/8: Sealing court-admissible forensic docket and SHA-256 evidence chain...";
+                    default:
+                      return `Stage ${active.stageOrder}/8: Executing ${active.stageType}...`;
+                  }
+                })()}
+              </p>
+            </div>
+          )}
+
           {/* Calibrated Risk Gauge Block */}
           <RiskGaugeBlock
             assessment={risk}
+            isCalculating={
+              isAnalyzing ||
+              pipelineRun?.status === "RUNNING" ||
+              investigation?.status === "PROCESSING"
+            }
             onOpenOverride={isSample ? undefined : () => setIsOverrideOpen(true)}
           />
 
@@ -648,90 +714,142 @@ export default function InvestigationWorkspacePage() {
             <span className="font-semibold text-ink-900 uppercase tracking-wider block mb-2 text-[10px]">
               § 04 / 8-STAGE FORENSIC PIPELINE EXECUTION AUDIT
             </span>
-            <div className="space-y-1 text-[11px]">
-              <div className="flex justify-between text-forensic-green font-semibold">
+            <div className="space-y-1.5 text-[11px]">
+              {/* 1. Custody Lock */}
+              <div className="flex justify-between items-center font-semibold">
                 <span>1. Custody Fingerprint (SHA-256 Lock)</span>
-                <span>✓ VERIFIED</span>
+                {(() => {
+                  const st = getStageStatus("CUSTODY_LOCK");
+                  if (st === "PENDING") return <span className="text-ink-400 font-normal">○ PENDING</span>;
+                  if (st === "RUNNING") return <span className="text-forensic-amber animate-pulse">● HASHING...</span>;
+                  if (st === "FAILED") return <span className="text-forensic-red">✕ FAILED</span>;
+                  return <span className="text-forensic-green">✓ VERIFIED (ETO 2002)</span>;
+                })()}
               </div>
-              <div
-                className={`flex justify-between font-semibold ${
-                  evidence.some((e) => (e.ruleId || "").includes("PDF"))
-                    ? "text-forensic-amber"
-                    : "text-forensic-green"
-                }`}
-              >
+
+              {/* 2. PDF Structure */}
+              <div className="flex justify-between items-center font-semibold">
                 <span>2. Document Structure & Incremental %%EOF</span>
-                <span>
-                  {evidence.some((e) => (e.ruleId || "").includes("PDF"))
-                    ? "▲ REVISIONS FLAGGED"
-                    : "✓ CLEAN SINGLE REVISION"}
-                </span>
+                {(() => {
+                  const st = getStageStatus("PDF_STRUCTURE");
+                  if (st === "PENDING") return <span className="text-ink-400 font-normal">○ PENDING</span>;
+                  if (st === "RUNNING") return <span className="text-forensic-amber animate-pulse">● PARSING...</span>;
+                  if (st === "FAILED") return <span className="text-forensic-red">✕ FAILED</span>;
+                  const hasPdfAnom = evidence.some(
+                    (e) => (e.ruleId || "").includes("PDF") || (e.ruleId || "").includes("METADATA")
+                  );
+                  return (
+                    <span className={hasPdfAnom ? "text-forensic-amber" : "text-forensic-green"}>
+                      {hasPdfAnom ? "▲ REVISIONS / SKEW FLAGGED" : "✓ CLEAN SINGLE REVISION"}
+                    </span>
+                  );
+                })()}
               </div>
-              <div
-                className={`flex justify-between font-semibold ${
-                  evidence.some((e) => (e.ruleId || "").includes("FONT"))
-                    ? "text-forensic-red"
-                    : "text-forensic-green"
-                }`}
-              >
+
+              {/* 3. Font & Baseline */}
+              <div className="flex justify-between items-center font-semibold">
                 <span>3. Sub-Pixel Baseline Typography</span>
-                <span>
-                  {evidence.some((e) => (e.ruleId || "").includes("FONT"))
-                    ? "✕ BASELINE JITTER DETECTED"
-                    : "✓ 0.00 PT VARIANCE"}
-                </span>
+                {(() => {
+                  const st = getStageStatus("FONT_GLYPH_ANALYSIS");
+                  if (st === "PENDING") return <span className="text-ink-400 font-normal">○ PENDING</span>;
+                  if (st === "RUNNING") return <span className="text-forensic-amber animate-pulse">● MEASURING...</span>;
+                  if (st === "FAILED") return <span className="text-forensic-red">✕ FAILED</span>;
+                  const hasFontAnom = evidence.some((e) => (e.ruleId || "").includes("FONT"));
+                  return (
+                    <span className={hasFontAnom ? "text-forensic-red" : "text-forensic-green"}>
+                      {hasFontAnom ? "✕ BASELINE JITTER DETECTED" : "✓ 0.00 PT VARIANCE"}
+                    </span>
+                  );
+                })()}
               </div>
-              <div className="flex justify-between text-forensic-green font-semibold">
-                <span>4. Computer Vision Multi-Scale ELA</span>
-                <span>✓ CONTOUR SCAN COMPLETE</span>
+
+              {/* 4. Computer Vision Multi-Scale ELA & CMFD */}
+              <div className="flex justify-between items-center font-semibold">
+                <span>4. Computer Vision Multi-Scale ELA & CMFD</span>
+                {(() => {
+                  const st = getStageStatus("VISION_ELA");
+                  if (st === "PENDING") return <span className="text-ink-400 font-normal">○ PENDING</span>;
+                  if (st === "RUNNING") return <span className="text-forensic-amber animate-pulse">● NEURAL SCAN...</span>;
+                  if (st === "FAILED") return <span className="text-forensic-red">✕ FAILED</span>;
+                  const visualCount = evidence.filter(
+                    (e) =>
+                      (e.ruleId || "").includes("COPY_MOVE") ||
+                      (e.ruleId || "").includes("ELA") ||
+                      (e.ruleId || "").includes("TRUFOR") ||
+                      (e.category || "").includes("IMAGE")
+                  ).length;
+                  return (
+                    <span className={visualCount > 0 ? "text-forensic-red" : "text-forensic-green"}>
+                      {visualCount > 0 ? `✕ MANIPULATION DETECTED (${visualCount})` : "✓ CONTOUR SCAN COMPLETE"}
+                    </span>
+                  );
+                })()}
               </div>
-              <div className="flex justify-between text-forensic-green font-semibold">
+
+              {/* 5. Semantic OCR & Table Columnizer */}
+              <div className="flex justify-between items-center font-semibold">
                 <span>5. Semantic OCR & Table Columnizer</span>
-                <span>✓ COMPLETE</span>
+                {(() => {
+                  const st = getStageStatus("OCR_EXTRACTION");
+                  if (st === "PENDING") return <span className="text-ink-400 font-normal">○ PENDING</span>;
+                  if (st === "RUNNING") return <span className="text-forensic-amber animate-pulse">● EXTRACTING...</span>;
+                  if (st === "FAILED") return <span className="text-forensic-red">✕ FAILED</span>;
+                  return <span className="text-forensic-green">✓ TEXT & TABLES EXTRACTED</span>;
+                })()}
               </div>
-              <div
-                className={`flex justify-between font-semibold ${
-                  isFinancial
-                    ? evidence.some(
-                        (e) =>
-                          e.category === "MATHEMATICAL_MISMATCH" ||
-                          (e.ruleId || "").includes("MATH") ||
-                          (e.ruleId || "").includes("BALANCE") ||
-                          (e.ruleId || "").includes("RECONCILIATION")
-                      )
-                      ? "text-forensic-red"
-                      : "text-forensic-green"
-                    : "text-ink-500"
-                }`}
-              >
+
+              {/* 6. Deterministic Financial Math Reconciliation */}
+              <div className="flex justify-between items-center font-semibold">
                 <span>6. Deterministic Financial Math Reconciliation</span>
-                <span>
-                  {isFinancial
-                    ? evidence.some(
-                        (e) =>
-                          e.category === "MATHEMATICAL_MISMATCH" ||
-                          (e.ruleId || "").includes("MATH") ||
-                          (e.ruleId || "").includes("BALANCE") ||
-                          (e.ruleId || "").includes("RECONCILIATION")
-                      )
-                      ? "✕ RECONCILIATION MISMATCH"
-                      : "✓ RECONCILED"
-                    : "— NOT APPLICABLE"}
-                </span>
+                {(() => {
+                  if (!isFinancial) return <span className="text-ink-500 font-normal">— NOT APPLICABLE</span>;
+                  const st = getStageStatus("FINANCIAL_VERIFICATION");
+                  if (st === "PENDING") return <span className="text-ink-400 font-normal">○ PENDING</span>;
+                  if (st === "RUNNING") return <span className="text-forensic-amber animate-pulse">● RECONCILING...</span>;
+                  if (st === "FAILED") return <span className="text-forensic-red">✕ VERIFICATION FAILED</span>;
+                  const hasMathAnom = evidence.some(
+                    (e) =>
+                      e.category === "MATHEMATICAL_MISMATCH" ||
+                      e.category === "MATH_RECONCILIATION_FAIL" ||
+                      (e.ruleId || "").includes("MATH") ||
+                      (e.ruleId || "").includes("BALANCE") ||
+                      (e.ruleId || "").includes("LEDGER") ||
+                      (e.ruleId || "").includes("HOLIDAY")
+                  );
+                  return (
+                    <span className={hasMathAnom ? "text-forensic-red" : "text-forensic-green"}>
+                      {hasMathAnom ? "✕ RECONCILIATION MISMATCH" : "✓ RECONCILED"}
+                    </span>
+                  );
+                })()}
               </div>
-              <div
-                className={`flex justify-between font-semibold ${
-                  risk.overallScore > 30
-                    ? "text-forensic-red"
-                    : "text-forensic-green"
-                }`}
-              >
+
+              {/* 7. Multi-Signal Evidence Fusion */}
+              <div className="flex justify-between items-center font-semibold">
                 <span>7. Multi-Signal Evidence Fusion</span>
-                <span>{`SCORE: ${risk.overallScore} / 100`}</span>
+                {(() => {
+                  const st = getStageStatus("EVIDENCE_FUSION");
+                  if (st === "PENDING") return <span className="text-ink-400 font-normal">○ PENDING</span>;
+                  if (st === "RUNNING") return <span className="text-forensic-amber animate-pulse">● FUSING SIGNALS...</span>;
+                  if (st === "FAILED") return <span className="text-forensic-red">✕ FAILED</span>;
+                  return (
+                    <span className={risk.overallScore > 30 ? "text-forensic-red" : "text-forensic-green"}>
+                      {`SCORE: ${risk.overallScore} / 100`}
+                    </span>
+                  );
+                })()}
               </div>
-              <div className="flex justify-between text-ink-900 font-semibold">
+
+              {/* 8. Court-Admissible Dossier Generation */}
+              <div className="flex justify-between items-center font-semibold">
                 <span>8. Court-Admissible Dossier Generation</span>
-                <span>✓ SEALED</span>
+                {(() => {
+                  const st = getStageStatus("REPORT_GENERATION");
+                  if (st === "PENDING") return <span className="text-ink-400 font-normal">○ PENDING</span>;
+                  if (st === "RUNNING") return <span className="text-forensic-amber animate-pulse">● GENERATING...</span>;
+                  if (st === "FAILED") return <span className="text-forensic-red">✕ FAILED</span>;
+                  return <span className="text-ink-900">✓ SEALED</span>;
+                })()}
               </div>
             </div>
           </div>

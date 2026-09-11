@@ -104,11 +104,11 @@ export function BoundingBoxLayer({
           markerHeight="6"
           orient="auto-start-reverse"
         >
-          <path d="M 0 1 L 10 5 L 0 9 z" fill="#DC2626" />
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#BA2518" />
         </marker>
       </defs>
 
-      {/* Pinned Reference Baselines Layer */}
+      {/* Pinned Reference Baselines Layer (Institutional Archival Ink Rule) */}
       {showRuler &&
         pinnedBaselines.map((pinnedY, idx) => (
           <g key={`pinned-${idx}`} className="select-none pointer-events-none">
@@ -117,23 +117,23 @@ export function BoundingBoxLayer({
               y1={pinnedY}
               x2={canvasWidth}
               y2={pinnedY}
-              stroke="#1D4ED8"
+              stroke="#141413"
               strokeWidth={1.5}
-              strokeDasharray="8 4"
-              opacity="0.9"
+              strokeDasharray="6 3"
+              opacity="0.85"
             />
             <rect
               x={6}
               y={Math.max(4, pinnedY - 18)}
               width={125}
               height={16}
-              fill="#1D4ED8"
-              rx={2}
+              fill="#141413"
+              rx={1}
             />
             <text
               x={10}
               y={Math.max(4, pinnedY - 18) + 11}
-              fill="#FFFFFF"
+              fill="#FBF9F5"
               fontSize="9"
               fontFamily="monospace"
               fontWeight="bold"
@@ -218,7 +218,7 @@ export function BoundingBoxLayer({
                     <path
                       d={`M ${sx} ${sy} Q ${mx} ${my} ${dx} ${dy}`}
                       fill="none"
-                      stroke="#DC2626"
+                      stroke="#BA2518"
                       strokeWidth={isSelected ? 2.5 : 1.5}
                       strokeDasharray="6 3"
                       markerEnd="url(#arrow-cmfd)"
@@ -228,7 +228,7 @@ export function BoundingBoxLayer({
                       y={my - 12}
                       width={80}
                       height={16}
-                      fill="#DC2626"
+                      fill="#BA2518"
                       rx={2}
                     />
                     <text

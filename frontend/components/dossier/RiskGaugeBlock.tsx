@@ -6,11 +6,13 @@ import { RiskAssessment } from "@/lib/types/forensics";
 interface RiskGaugeBlockProps {
   assessment?: RiskAssessment;
   onOpenOverride?: () => void;
+  isCalculating?: boolean;
 }
 
 export function RiskGaugeBlock({
   assessment,
   onOpenOverride,
+  isCalculating = false,
 }: RiskGaugeBlockProps) {
   const score = assessment?.overallScore ?? 0;
   const tier = assessment?.riskTier ?? "LOW";
@@ -18,6 +20,9 @@ export function RiskGaugeBlock({
   const isOverridden = !!assessment?.overriddenScore;
 
   const getTierColor = (t: string) => {
+    if (isCalculating) {
+      return "text-ink-700 border-rule bg-paper-1 animate-pulse";
+    }
     switch (t) {
       case "CRITICAL":
         return "text-forensic-red border-forensic-red bg-forensic-red/10";
@@ -38,10 +43,20 @@ export function RiskGaugeBlock({
             § 01 / CALIBRATED FRAUD RISK METER
           </span>
           <div className="flex items-baseline gap-3">
-            <span className="font-serif text-5xl font-semibold tracking-tight text-ink-900 tabular-nums">
-              {score}
-            </span>
-            <span className="font-mono text-xs text-ink-500">/ 100</span>
+            {isCalculating ? (
+              <div className="flex items-center gap-2">
+                <span className="font-serif text-3xl font-semibold tracking-tight text-ink-700 animate-pulse">
+                  CALCULATING...
+                </span>
+              </div>
+            ) : (
+              <>
+                <span className="font-serif text-5xl font-semibold tracking-tight text-ink-900 tabular-nums">
+                  {score}
+                </span>
+                <span className="font-mono text-xs text-ink-500">/ 100</span>
+              </>
+            )}
           </div>
         </div>
 
@@ -51,9 +66,9 @@ export function RiskGaugeBlock({
               tier
             )}`}
           >
-            {tier} RISK
+            {isCalculating ? "● PROCESSING" : `${tier} RISK`}
           </span>
-          {isOverridden && (
+          {isOverridden && !isCalculating && (
             <span className="font-mono text-[9px] text-forensic-amber uppercase tracking-wider font-semibold">
               ● ANALYST OVERRIDE APPLIED
             </span>
@@ -64,18 +79,22 @@ export function RiskGaugeBlock({
       {/* Discrete 4-Tier Risk Notch Bar */}
       <div className="w-full mb-3">
         <div className="h-2 w-full bg-paper-2 border border-rule flex overflow-hidden">
-          <div
-            style={{ width: `${Math.min(100, Math.max(0, score))}%` }}
-            className={`h-full transition-all duration-300 ${
-              score >= 80
-                ? "bg-forensic-red"
-                : score >= 60
-                ? "bg-forensic-amber"
-                : score >= 30
-                ? "bg-amber-500"
-                : "bg-forensic-green"
-            }`}
-          />
+          {isCalculating ? (
+            <div className="h-full w-full bg-ink-900/30 animate-pulse" />
+          ) : (
+            <div
+              style={{ width: `${Math.min(100, Math.max(0, score))}%` }}
+              className={`h-full transition-all duration-300 ${
+                score >= 80
+                  ? "bg-forensic-red"
+                  : score >= 60
+                  ? "bg-forensic-amber"
+                  : score >= 30
+                  ? "bg-amber-500"
+                  : "bg-forensic-green"
+              }`}
+            />
+          )}
         </div>
         <div className="flex justify-between font-mono text-[9px] text-ink-500 mt-1 px-0.5">
           <span>0 (CLEAN)</span>
@@ -93,7 +112,7 @@ export function RiskGaugeBlock({
             REGULATORY ACTION DIRECTIVE:
           </span>
           <span className="font-semibold text-ink-900 tracking-wide">
-            {directive.replace(/_/g, " ")}
+            {isCalculating ? "PIPELINE EXECUTION IN PROGRESS" : directive.replace(/_/g, " ")}
           </span>
         </div>
 
