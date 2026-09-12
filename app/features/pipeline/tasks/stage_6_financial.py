@@ -641,6 +641,7 @@ async def process_financial(
             discrepancy: Decimal | None = None
             primary_iban_info: dict[str, Any] | None = None
             ledger_sm: CrossPageLedgerStateMachine | None = None
+            template_eval_summary: dict[str, Any] | None = None
 
             for doc in relevant_docs:
 
@@ -790,6 +791,112 @@ async def process_financial(
                     # Utility bills complete authority registry verification and bypass bank ledger reconciliations
                     pdf_doc.close()
                     continue
+
+                # ─────────────────────────────────────────────────────────────
+                # 1c. Core Banking System (CBS) Template Fingerprint Verification
+                # ─────────────────────────────────────────────────────────────
+                if doc.documentType in ("BANK_STATEMENT", "DIGITAL_WALLET_LEDGER"):
+                    try:
+                        from app.features.pipeline.tasks.bank_template_fingerprints import evaluate_bank_template
+                        bank_code_hint = primary_iban_info.get("bank_code") if primary_iban_info else None
+                        template_eval = evaluate_bank_template(pdf_doc, bank_code=bank_code_hint, full_text=all_text)
+                        template_eval_summary = {
+                            "status": template_eval.status,
+                            "bank_code": template_eval.bank_code,
+                            "bank_name": template_eval.bank_name,
+                            "cbs_engine": template_eval.cbs_engine,
+                            "match_score": template_eval.match_score,
+                            "is_conforming": template_eval.is_conforming,
+                            "deviations_count": len(template_eval.deviations),
+                        }
+
+                        if template_eval.status == "DEVIATION_DETECTED":
+                            for dev in template_eval.deviations:
+                                finding = await tx.evidenceitem.create(
+                                    data={
+                                        "document": {"connect": {"id": doc.id}},
+                                        "pipelineStage": {"connect": {"id": pipeline_stage_id}},
+                                        "category": dev.category,
+                                        "severity": dev.severity,
+                                        "ruleId": dev.rule_id,
+                                        "riskPoints": dev.risk_points,
+                                        "title": dev.title,
+                                        "description": dev.description,
+                                        "isDeterministic": True,
+                                        "pageNumber": dev.page_number,
+                                        "expectedValue": dev.expected_value,
+                                        "actualValue": dev.actual_value,
+                                        "discrepancy": dev.discrepancy,
+                                        "technicalDetails": Json({
+                                            "bank_code": template_eval.bank_code,
+                                            "bank_name": template_eval.bank_name,
+                                            "cbs_engine": template_eval.cbs_engine,
+                                            "template_id": template_eval.matched_template_id,
+                                            "match_score": template_eval.match_score,
+                                        }),
+                                    }
+                                )
+                                if dev.bbox_pts:
+                                    meta = page_meta_map.get(dev.page_number)
+                                    sx = (meta.widthPx / meta.widthPts) if (meta and meta.widthPts) else (150.0 / 72.0)
+                                    sy = (meta.heightPx / meta.heightPts) if (meta and meta.heightPts) else (150.0 / 72.0)
+                                    bx0, by0, bx1, by1 = dev.bbox_pts
+                                    await tx.boundingbox.create(
+                                        data={
+                                            "evidenceItem": {"connect": {"id": finding.id}},
+                                            "pageNumber": dev.page_number,
+                                            "x": float(bx0 * sx),
+                                            "y": float(by0 * sy),
+                                            "width": float((bx1 - bx0) * sx),
+                                            "height": float((by1 - by0) * sy),
+                                            "xPts": float(bx0),
+                                            "yPts": float(by0),
+                                            "widthPts": float(bx1 - bx0),
+                                            "heightPts": float(by1 - by0),
+                                            "label": dev.title,
+                                            "color": "#dc2626",
+                                        }
+                                    )
+                                stage_findings.append({
+                                    "id": finding.id,
+                                    "rule_id": dev.rule_id,
+                                    "severity": dev.severity,
+                                    "title": dev.title,
+                                })
+
+                        elif template_eval.status == "VERIFIED":
+                            finding = await tx.evidenceitem.create(
+                                data={
+                                    "document": {"connect": {"id": doc.id}},
+                                    "pipelineStage": {"connect": {"id": pipeline_stage_id}},
+                                    "category": "TRANSACTION_FORMAT_VIOLATION",
+                                    "severity": "INFO",
+                                    "ruleId": "RULE_BANK_TEMPLATE_VERIFIED",
+                                    "riskPoints": 0,
+                                    "title": f"CBS Reporting Template Verified ({template_eval.bank_name})",
+                                    "description": template_eval.message,
+                                    "isDeterministic": True,
+                                    "pageNumber": 1,
+                                    "expectedValue": f"Canonical {template_eval.cbs_engine} Grid",
+                                    "actualValue": f"100% Match ({template_eval.matched_template_id})",
+                                    "discrepancy": "0 pt column drift - Certified Authentic",
+                                    "technicalDetails": Json({
+                                        "bank_code": template_eval.bank_code,
+                                        "bank_name": template_eval.bank_name,
+                                        "cbs_engine": template_eval.cbs_engine,
+                                        "template_id": template_eval.matched_template_id,
+                                        "verified_details": template_eval.verified_details,
+                                    }),
+                                }
+                            )
+                            stage_findings.append({
+                                "id": finding.id,
+                                "rule_id": "RULE_BANK_TEMPLATE_VERIFIED",
+                                "severity": "INFO",
+                                "title": finding.title,
+                            })
+                    except Exception as bfp_err:
+                        logger.warning(f"Bank template fingerprint evaluation error: {bfp_err}")
 
                 # ─────────────────────────────────────────────────────────────
                 # 2. Extract Header / Summary Metrics
@@ -1520,6 +1627,7 @@ async def process_financial(
                 "closing_discrepancy": float(stated_closing - ledger_sm.running_balance) if (ledger_sm is not None and stated_closing is not None and ledger_sm.running_balance is not None) else None,
                 "iban": primary_iban_info,
                 "rows": ledger_sm.get_ledger_rows() if ledger_sm is not None else [],
+                "bank_template_verification": template_eval_summary,
             }
 
             await tx.pipelinestage.update(

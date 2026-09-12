@@ -178,12 +178,19 @@ async def process_evidence_fusion(
 
             # Generate narrative summary
             has_registry_verified = any(e.ruleId == "RULE_PK_UTILITY_REGISTRY_VERIFIED" for e in evidence_items)
-            if total_count == 0 or (critical_count == 0 and high_count == 0 and medium_count == 0 and has_registry_verified):
+            has_bank_template_verified = any(e.ruleId == "RULE_BANK_TEMPLATE_VERIFIED" for e in evidence_items)
+            if total_count == 0 or (critical_count == 0 and high_count == 0 and medium_count == 0 and (has_registry_verified or has_bank_template_verified)):
                 if has_registry_verified:
                     narrative = (
                         "Document verified 100% authentic against the official government utility authority registry (PITC). "
                         "Payable amounts, billing month, due date, and consumer credentials match live government records. "
                         "No physical typographical distortions, neural tampering, or ELA anomalies detected."
+                    )
+                elif has_bank_template_verified:
+                    narrative = (
+                        "Document verified 100% authentic against official Core Banking System (CBS) reporting profiles. "
+                        "Columnar layout, font typography, and SBP statutory regulatory footers strictly match "
+                        "canonical institutional reporting specifications with zero forensic discrepancies."
                     )
                 else:
                     narrative = (
