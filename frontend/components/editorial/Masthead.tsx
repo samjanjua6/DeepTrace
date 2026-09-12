@@ -128,6 +128,30 @@ export function Masthead({
                 <span>•</span>
                 <span>RUNNING BALANCE RECONCILIATION: ACTIVE</span>
               </>
+            ) : documentType === "UTILITY_BILL" ? (
+              <>
+                <span>UTILITY TARIFF AUDIT: ENFORCED</span>
+                <span>•</span>
+                <span>K-ELECTRIC / BILLING RECONCILIATION: ACTIVE</span>
+              </>
+            ) : documentType === "SALARY_SLIP" ? (
+              <>
+                <span>EMPLOYMENT PAYROLL AUDIT: ENFORCED</span>
+                <span>•</span>
+                <span>DUAL-COLUMN EARNINGS/DEDUCTIONS: ACTIVE</span>
+              </>
+            ) : documentType === "TAX_CERTIFICATE" ? (
+              <>
+                <span>FBR CPR PAYMENT RECEIPT: ENFORCED</span>
+                <span>•</span>
+                <span>NTN TAX REGISTER: ACTIVE</span>
+              </>
+            ) : documentType === "IDENTITY_DOCUMENT" ? (
+              <>
+                <span>NADRA CNIC CREDENTIAL: ENFORCED</span>
+                <span>•</span>
+                <span>ISO/IEC 7810 ID-1 CARD GEOMETRY: ACTIVE</span>
+              </>
             ) : (
               <>
                 <span>NIST SP 800-86 AUDIT: ENFORCED</span>

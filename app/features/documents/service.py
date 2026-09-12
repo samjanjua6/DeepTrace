@@ -18,8 +18,8 @@ settings = get_settings()
 HTTP_422 = getattr(status, "HTTP_422_UNPROCESSABLE_CONTENT", 422)
 
 VALID_DOCUMENT_TYPES = {
-    "BANK_STATEMENT", "SALARY_SLIP", "UTILITY_BILL", "TAX_CHALLAN",
-    "INVOICE", "CNIC", "OTHER"
+    "BANK_STATEMENT", "SALARY_SLIP", "UTILITY_BILL", "TAX_CERTIFICATE",
+    "IDENTITY_DOCUMENT", "COMMERCIAL_INVOICE", "DIGITAL_WALLET_LEDGER", "OTHER"
 }
 
 
@@ -38,9 +38,10 @@ async def upload_document(
     2. Check for duplicate upload (investigationId + sha256Hash).
     3. Detect password-encryption (reject if locked).
     4. Compute SHA-256 + MD5 cryptographic custody hashes.
-    5. Save working copy + immutable custody clone.
-    6. Render multi-res page images (150 DPI canvas + 72 DPI thumbnail).
-    7. Atomically create Document, DocumentPage, and CustodyEvent records.
+    5. Fast-path multi-modal document classification triage (Stage 0).
+    6. Save working copy + immutable custody clone.
+    7. Render multi-res page images (150 DPI canvas + 72 DPI thumbnail).
+    8. Atomically create Document, DocumentPage, and CustodyEvent records.
     """
     # 1. Size check (Max 50MB)
     max_size = 50 * 1024 * 1024
@@ -63,9 +64,25 @@ async def upload_document(
     md5 = security.compute_md5(data)
 
     # Normalize document type
-    norm_doc_type = document_type.strip().upper()
-    if norm_doc_type not in VALID_DOCUMENT_TYPES:
+    raw_type = (document_type or "OTHER").strip().upper()
+    if raw_type == "CNIC":
+        norm_doc_type = "IDENTITY_DOCUMENT"
+    elif raw_type in ("TAX_CHALLAN", "FBR_CHALLAN"):
+        norm_doc_type = "TAX_CERTIFICATE"
+    elif raw_type in VALID_DOCUMENT_TYPES:
+        norm_doc_type = raw_type
+    else:
         norm_doc_type = "OTHER"
+
+    # Fast-path multi-modal auto-classification (Stage 0 triage)
+    if norm_doc_type in ("OTHER", "AUTO", "AUTO_DETECT"):
+        try:
+            from app.features.pipeline.tasks.document_classifier import document_classifier
+            cls_res = document_classifier.classify_document(data, mime)
+            if cls_res and cls_res.document_type in VALID_DOCUMENT_TYPES:
+                norm_doc_type = cls_res.document_type
+        except Exception:
+            pass
 
     doc_uuid = str(uuid.uuid4())
     primary_key = f"documents/{investigation.id}/{doc_uuid}/{filename}"

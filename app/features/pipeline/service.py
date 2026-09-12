@@ -75,6 +75,19 @@ async def run_pipeline_inline(
         )
         stage_map = {s.stageOrder: s for s in stages}
 
+    # Stage 0: Automated Multi-Modal Document Classification & Layout Triage
+    try:
+        logger.info(f"Executing Stage 0: DOCUMENT_CLASSIFICATION for run {pipeline_run_id}")
+        from app.features.pipeline.tasks.stage_0_classifier import process_document_classification
+        await process_document_classification(
+            pipeline_run_id=pipeline_run_id,
+            org_id=org_id,
+            investigation_id=investigation_id,
+            document_id=document_id,
+        )
+    except Exception as cls_exc:
+        logger.warning(f"Stage 0 document classification encountered an error (proceeding): {cls_exc}", exc_info=True)
+
     failed = False
     failure_reason = None
 

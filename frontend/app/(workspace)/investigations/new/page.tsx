@@ -15,9 +15,9 @@ import { Upload, ShieldCheck, FileText, CheckCircle2 } from "lucide-react";
 
 export default function NewCaseIntakePage() {
   const router = useRouter();
-  const [documentType, setDocumentType] = useState<string>("OTHER");
+  const [documentType, setDocumentType] = useState<string>("AUTO");
   const [title, setTitle] = useState<string>(
-    "BISE Examination Certificate / Academic Result Verification"
+    "Automated Forensic Docket (Stage 0 Multi-Modal Classifier)"
   );
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -27,7 +27,9 @@ export default function NewCaseIntakePage() {
 
   const handleDocTypeChange = (newType: string) => {
     setDocumentType(newType);
-    if (newType === "OTHER") {
+    if (newType === "AUTO") {
+      setTitle("Automated Forensic Docket (Stage 0 Multi-Modal Classifier)");
+    } else if (newType === "OTHER") {
       setTitle("BISE Examination Certificate / Academic Result Verification");
     } else if (newType === "BANK_STATEMENT") {
       setTitle("Bank Statement & Financial Ledger Forensic Audit");
@@ -142,6 +144,7 @@ export default function NewCaseIntakePage() {
               onChange={(e) => handleDocTypeChange(e.target.value)}
               className="w-full bg-paper-1 border border-rule px-4 py-3 text-sm text-ink-900 font-mono focus:outline-none focus:border-ink-900 cursor-pointer"
             >
+              <option value="AUTO">⚡ Auto-Detect via Stage 0 Classifier (Bank, Salary, K-Electric, FBR, CNIC)</option>
               <option value="OTHER">Academic & Educational (Matric / Inter / University Degree / BISE)</option>
               <option value="BANK_STATEMENT">Bank Statement & Financial Ledger (Lakh/Crore & IBAN)</option>
               <option value="SALARY_SLIP">Salary Slip & Employment Certificate</option>

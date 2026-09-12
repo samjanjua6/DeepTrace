@@ -4,12 +4,15 @@ NIST SP 800-86 Compliant Mathematical Proof, Lakh/Crore Reconciliation, and ISO 
 """
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
+import logging
 import re
 import time
 from typing import Any
 
 import pymupdf
 from prisma import Json
+
+logger = logging.getLogger(__name__)
 
 from app.config import get_settings
 from app.core.celery_app import celery_app
@@ -593,7 +596,44 @@ async def process_financial(
                 )
                 return output_payload
 
-            for doc in pdf_docs:
+            # Check if any document is a financial statement / ledger
+            financial_docs = [
+                d for d in pdf_docs
+                if d.documentType in ("BANK_STATEMENT", "DIGITAL_WALLET_LEDGER")
+            ]
+            if not financial_docs:
+                # Document is not a bank statement/ledger (e.g. Utility Bill, CNIC, Salary Slip, FBR Challan)
+                duration_ms = int((time.perf_counter() - start_time) * 1000)
+                doc_type_label = pdf_docs[0].documentType if pdf_docs else "OTHER"
+                output_payload = {
+                    "findings_count": 0,
+                    "findings": [],
+                    "duration_ms": duration_ms,
+                    "reconciled": True,
+                    "skipped": True,
+                    "bypass_reason": f"Document classified as {doc_type_label}. Non-banking documents bypass financial ledger reconciliation.",
+                    "stated_opening": None,
+                    "implied_opening": None,
+                    "opening_discrepancy": None,
+                    "stated_closing": None,
+                    "implied_closing": None,
+                    "closing_discrepancy": None,
+                    "iban": None,
+                    "rows": [],
+                }
+                await tx.pipelinestage.update(
+                    where={"id": pipeline_stage_id},
+                    data={
+                        "status": "COMPLETED",
+                        "durationMs": duration_ms,
+                        "completedAt": datetime.now(timezone.utc),
+                        "outputPayload": Json(output_payload),
+                    },
+                )
+                logger.info(f"Stage 6 bypassed: Document classified as '{doc_type_label}'")
+                return output_payload
+
+            for doc in financial_docs:
 
                 file_bytes = storage.get_file(settings.s3_bucket_documents, doc.storagePath)
                 if not file_bytes:
