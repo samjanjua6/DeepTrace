@@ -271,6 +271,10 @@ def classify_transaction_channel(narration: str) -> str:
         "p2p", "digital", "interbank", "paypak",
         "visa", "mastercard", "fee", "tax", "wht", "fed", "sms",
         "profit", "withholding", "excise", "mobile banking", "internet banking",
+        "money transferred", "money received", "transfer to", "received from",
+        "bill paid", "bill payment", "prepaid", "postpaid", "topup", "top-up",
+        "stan", "easypaisa", "jazzcash", "nayapay", "sadapay", "upaisa", "finja",
+        "zong", "jazz", "telenor", "ufone", "remittance", "e-banking", "app",
     ]) or re.search(r"\bft\b|\bft[/\s-]", low):
         return ChannelType.DIGITAL
 

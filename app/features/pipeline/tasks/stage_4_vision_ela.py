@@ -67,6 +67,18 @@ async def process_vision_ela(
             stage_findings = []
 
             for doc in documents:
+                # Open native PDF stream if available to extract vector text masks for CMFD
+                pdf_doc = None
+                if doc.storagePath and doc.storagePath.lower().endswith(".pdf"):
+                    try:
+                        raw_pdf_bytes = storage.get_file(settings.s3_bucket_documents, doc.storagePath)
+                        if raw_pdf_bytes:
+                            import pymupdf
+                            pdf_doc = pymupdf.open(stream=raw_pdf_bytes, filetype="pdf")
+                    except Exception as _pdf_err:
+                        import logging as _l
+                        _l.getLogger(__name__).debug("Unable to open PDF stream for vector text masking: %s", _pdf_err)
+
                 for page in (doc.pages or []):
                     # Fetch rendered page image from storage
                     if not page.renderedImagePath:
@@ -443,7 +455,26 @@ async def process_vision_ela(
                             gray_cmfd = cv2.cvtColor(np.array(orig_cmfd), cv2.COLOR_RGB2GRAY)
                             scale_to_pts_cmfd = (page.widthPts / page.widthPx) if (page.widthPx and page.widthPts) else (72.0 / 150.0)
 
-                            cmfd_matches = detect_copy_move(gray_cmfd, min_match_count=16, min_confidence=0.25)
+                            # Build native vector text exclusion mask if processing a vector PDF
+                            cmfd_mask = None
+                            if pdf_doc is not None and (page.pageNumber - 1) < len(pdf_doc):
+                                pdf_p = pdf_doc[page.pageNumber - 1]
+                                text_blocks = pdf_p.get_text("blocks")
+                                # If the page contains native digital vector text, mask those text blocks
+                                # so that repeated transactions/narration in statements do not trigger false copy-move alerts.
+                                if any(b[6] == 0 for b in text_blocks):
+                                    cmfd_mask = np.full((gray_cmfd.shape[0], gray_cmfd.shape[1]), 255, dtype=np.uint8)
+                                    sx = gray_cmfd.shape[1] / max(1.0, float(pdf_p.rect.width))
+                                    sy = gray_cmfd.shape[0] / max(1.0, float(pdf_p.rect.height))
+                                    for b in text_blocks:
+                                        if b[6] == 0:  # Text block
+                                            bx0 = max(0, int(b[0] * sx) - 2)
+                                            by0 = max(0, int(b[1] * sy) - 2)
+                                            bx1 = min(gray_cmfd.shape[1], int(b[2] * sx) + 2)
+                                            by1 = min(gray_cmfd.shape[0], int(b[3] * sy) + 2)
+                                            cmfd_mask[by0:by1, bx0:bx1] = 0
+
+                            cmfd_matches = detect_copy_move(gray_cmfd, min_match_count=16, min_confidence=0.25, mask=cmfd_mask)
                             for match in cmfd_matches:
                                 cmfd_finding = await tx.evidenceitem.create(
                                     data={
@@ -519,6 +550,11 @@ async def process_vision_ela(
                     except Exception as cmfd_err:
                         import logging as _lc
                         _lc.getLogger(__name__).debug("CMFD non-fatal error on page %d: %s", page.pageNumber, cmfd_err)
+                if pdf_doc is not None:
+                    try:
+                        pdf_doc.close()
+                    except Exception:
+                        pass
 
             duration_ms = int((time.perf_counter() - start_time) * 1000)
             output_payload = {

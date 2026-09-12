@@ -105,8 +105,60 @@ class BankTemplateEvaluationResult:
 # ─────────────────────────────────────────────────────────────────────────────
 
 CANONICAL_BANK_PROFILES: dict[str, list[BankTemplateProfile]] = {
-    # 1. Meezan Bank Limited (MEZN) - Temenos T24 / JasperReports
+    # 1. Meezan Bank Limited (MEZN)
     "MEZN": [
+        # 1a. Meezan Bank Mobile Application & Internet Banking e-Statement
+        BankTemplateProfile(
+            bank_code="MEZN",
+            template_id="MEZN_MOBILE_APP_V1",
+            bank_name="Meezan Bank Limited",
+            cbs_engine="Meezan Digital App / Internet Banking",
+            description="Meezan Bank official mobile application / internet banking e-statement",
+            header_anchors=["booking date", "available balance"],
+            columns=[
+                ColumnGridDef(
+                    name="date",
+                    aliases=["booking date", "date"],
+                    expected_x_min=30.0,
+                    expected_x_max=115.0,
+                    tolerance_pts=25.0,
+                ),
+                ColumnGridDef(
+                    name="description",
+                    aliases=["description", "narration", "particulars"],
+                    expected_x_min=120.0,
+                    expected_x_max=290.0,
+                    tolerance_pts=30.0,
+                ),
+                ColumnGridDef(
+                    name="credit",
+                    aliases=["credit", "deposit", "cr"],
+                    expected_x_min=275.0,
+                    expected_x_max=365.0,
+                    tolerance_pts=25.0,
+                ),
+                ColumnGridDef(
+                    name="debit",
+                    aliases=["debit", "withdrawal", "dr"],
+                    expected_x_min=375.0,
+                    expected_x_max=465.0,
+                    tolerance_pts=25.0,
+                ),
+                ColumnGridDef(
+                    name="balance",
+                    aliases=["available balance", "balance", "bal"],
+                    expected_x_min=470.0,
+                    expected_x_max=575.0,
+                    tolerance_pts=25.0,
+                ),
+            ],
+            font_profile=FontProfileDef(
+                allowed_font_families=["helvetica", "arial", "tahoma", "times", "segoe", "calibri"],
+                prohibited_font_families=["comic", "papyrus", "impact", "lobster", "brush script"],
+            ),
+            statutory_footers=None,  # Digital customer mobile app exports do not require branch counter physical footers
+        ),
+        # 1b. Meezan Bank Core Banking (Temenos T24 / JasperReports Branch e-Statement)
         BankTemplateProfile(
             bank_code="MEZN",
             template_id="MEZN_JASPER_A4_V1",
@@ -449,6 +501,13 @@ CANONICAL_BANK_PROFILES: dict[str, list[BankTemplateProfile]] = {
 }
 
 
+def _match_column_alias(alias: str, word: str) -> bool:
+    """Match a column alias against a word token with boundary protection for short codes (cr, dr, bal)."""
+    if len(alias) <= 3:
+        return word == alias or bool(re.search(r"\b" + re.escape(alias) + r"\b", word))
+    return alias in word
+
+
 def resolve_bank_code_from_text(text: str) -> Optional[str]:
     """Identify Pakistani bank code from document text or SBP IBAN."""
     # 1. IBAN extraction (PK + 2 check digits + 4-char SBP bank code)
@@ -511,12 +570,15 @@ def evaluate_bank_template(
         )
 
     profiles = CANONICAL_BANK_PROFILES[code]
-    # For now, evaluate against primary canonical profile (or select best matching header)
-    selected_profile = profiles[0]
+    # Select the profile with the highest anchor matches in the document
+    best_profile = profiles[0]
+    best_score = -1
     for p in profiles:
-        if any(h in full_text.lower() for h in p.header_anchors):
-            selected_profile = p
-            break
+        score = sum(1 for h in p.header_anchors if h in full_text.lower())
+        if score > best_score:
+            best_score = score
+            best_profile = p
+    selected_profile = best_profile
 
     deviations: list[TemplateDeviation] = []
     verified_metrics: dict[str, Any] = {
@@ -619,7 +681,7 @@ def evaluate_bank_template(
                     col_word = None
                     for w_item in l_words:
                         w_text = w_item[4].lower()
-                        if any(alias in w_text for alias in col_def.aliases):
+                        if any(_match_column_alias(alias, w_text) for alias in col_def.aliases):
                             col_word = w_item
                             break
 

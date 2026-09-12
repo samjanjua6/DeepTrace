@@ -157,6 +157,7 @@ def detect_copy_move(
     min_match_count: int = 8,
     nfeatures: int = 3500,
     min_confidence: float = 0.25,
+    mask: Optional[np.ndarray] = None,
 ) -> list[CopyMoveMatch]:
     """
     Detect copy-move forgery in a grayscale page image.
@@ -174,6 +175,8 @@ def detect_copy_move(
         min_match_count: Minimum number of RANSAC inliers per cluster to report a forgery.
         nfeatures:       Maximum keypoints to extract.
         min_confidence:  Minimum ratio of inliers to cluster candidate matches.
+        mask:            Optional uint8 binary mask (255=search, 0=ignore). Used to exclude
+                         native vector text regions in digital PDFs from false alarms.
 
     Returns:
         List of :class:`CopyMoveMatch`, empty if no forgery detected or on error.
@@ -191,7 +194,7 @@ def detect_copy_move(
         if hasattr(cv2, "SIFT_create"):
             try:
                 sift = cv2.SIFT_create(nfeatures=nfeatures)
-                kps, descs = sift.detectAndCompute(img_gray, None)
+                kps, descs = sift.detectAndCompute(img_gray, mask)
                 norm_type = cv2.NORM_L2
             except Exception as e:
                 logger.debug("cmfd_engine: SIFT failed (%s), falling back to ORB.", e)
@@ -199,7 +202,7 @@ def detect_copy_move(
         if descs is None:
             method_name = "orb_ransac_4d"
             orb = cv2.ORB_create(nfeatures=nfeatures)
-            kps, descs = orb.detectAndCompute(img_gray, None)
+            kps, descs = orb.detectAndCompute(img_gray, mask)
             norm_type = cv2.NORM_HAMMING
 
         if descs is None or len(kps) < min_match_count * 2:
