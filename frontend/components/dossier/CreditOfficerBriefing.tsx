@@ -301,6 +301,41 @@ Forensic validation confirms 100% document authenticity across all pages. All tr
         </div>
       </div>
 
+      {/* ETO 2002 Section 29 Digital Signature Compliance Strip */}
+      {evidenceItems.some(
+        (e) =>
+          (e.ruleId || "").includes("SIGNATURE_INVALIDATED") ||
+          (e.ruleId || "").includes("SIGNATURE_POST_SIGNING")
+      ) && (
+        <div className="px-4 py-2 bg-forensic-red/15 border-b border-forensic-red/30 flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-forensic-red">
+          <div className="flex items-center gap-2 font-bold uppercase tracking-wider">
+            <span>⚖️ ETO 2002 §29 STATUTORY PRESUMPTION REBUTTED</span>
+          </div>
+          <span className="text-[11px] font-sans">
+            {activeLang === "ur"
+              ? "ڈیجیٹل سرٹیفکیٹ تصدیق ناکام — دستخط کے بعد بائٹس تبدیل ہونے کا قطعی حسابی ثبوت"
+              : "Digital Certificate Invalidated — Cryptographic Byte-Range Mismatch Proves Post-Signing Alteration"}
+          </span>
+        </div>
+      )}
+      {evidenceItems.some((e) => (e.ruleId || "").includes("SIGNATURE_VALID")) &&
+        !evidenceItems.some(
+          (e) =>
+            (e.ruleId || "").includes("SIGNATURE_INVALIDATED") ||
+            (e.ruleId || "").includes("SIGNATURE_POST_SIGNING")
+        ) && (
+          <div className="px-4 py-2 bg-emerald-500/15 border-b border-emerald-500/30 flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-emerald-800">
+            <div className="flex items-center gap-2 font-bold uppercase tracking-wider">
+              <span>⚖️ ETO 2002 §29 STATUTORY PRESUMPTION SATISFIED</span>
+            </div>
+            <span className="text-[11px] font-sans">
+              {activeLang === "ur"
+                ? "مصدقہ این آئی ایف ٹی (NIFT) ڈیجیٹل سرٹیفکیٹ کی تصدیق مکمل — صفر ردوبدل"
+                : "Accredited Digital Certificate Validated — Complete Document Integrity Preserved"}
+            </span>
+          </div>
+        )}
+
       {/* Main Briefing Body */}
       <div className="p-5">
         <div

@@ -33,11 +33,20 @@ class StructuralForensicAgent(BaseForensicAgent):
         citations = [c for c in citations if c]
 
         key_indicators = []
+        has_signature_invalidated = any("SIGNATURE_INVALIDATED" in c for c in citations)
+        has_signature_post_mod = any("SIGNATURE_POST_SIGNING" in c for c in citations)
+        has_signature_stripped = any("SIGNATURE_STRIPPED" in c for c in citations)
         has_incremental_save = any("INCREMENTAL_SAVE" in c for c in citations)
         has_producer_tamper = any("PRODUCER" in c for c in citations)
         has_timestamp_divergence = any("TIMESTAMP" in c for c in citations)
         has_font_jitter = any("FONT" in c for c in citations)
 
+        if has_signature_invalidated:
+            key_indicators.append("X.509 digital signature invalidated: cryptographic byte-range hash mismatch (ETO 2002 §29 violation).")
+        if has_signature_post_mod:
+            key_indicators.append("Unauthorized incremental content appended after digital signature affixation.")
+        if has_signature_stripped:
+            key_indicators.append("Mandatory digital signature stripped from official bank statement template.")
         if has_incremental_save:
             key_indicators.append("Post-creation incremental revision / trailer update detected.")
         if has_producer_tamper:

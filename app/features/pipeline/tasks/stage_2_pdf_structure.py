@@ -16,6 +16,7 @@ from app.config import get_settings
 from app.core.celery_app import celery_app
 from app.core.storage import storage
 from app.db.client import db, set_org_context
+from app.features.pipeline.tasks.pdf_signature_forensics import inspect_pdf_signatures
 
 settings = get_settings()
 
@@ -103,6 +104,7 @@ async def process_pdf_structure(
                 raise ValueError(f"No documents found for investigation '{investigation_id}'")
 
             stage_findings = []
+            digital_signatures_summary = None
 
             for doc in documents:
                 file_bytes = storage.get_file(settings.s3_bucket_documents, doc.storagePath)
@@ -240,6 +242,60 @@ async def process_pdf_structure(
                                     "severity": finding.severity,
                                     "title": finding.title,
                                 })
+
+                        # 4. Digital Signature & X.509 PKI Forensics (ETO 2002 §3 & §29)
+                        sig_analysis = inspect_pdf_signatures(file_bytes, pdf_doc)
+                        digital_signatures_summary = {
+                            "has_signatures": sig_analysis["has_signatures"],
+                            "signature_count": sig_analysis["signature_count"],
+                            "overall_status": sig_analysis["overall_status"],
+                            "eto_2002_compliance": sig_analysis["eto_2002_compliance"],
+                            "signatures": sig_analysis["signatures"],
+                        }
+
+                        for sf in sig_analysis.get("findings", []):
+                            sig_finding = await tx.evidenceitem.create(
+                                data={
+                                    "document": {"connect": {"id": doc.id}},
+                                    "pipelineStage": {"connect": {"id": pipeline_stage_id}},
+                                    "category": sf.get("category", "PDF_OBJECT_ANOMALY"),
+                                    "severity": sf["severity"],
+                                    "ruleId": sf["rule_id"],
+                                    "riskPoints": sf["risk_points"],
+                                    "title": sf["title"],
+                                    "description": sf["description"],
+                                    "isDeterministic": True,
+                                    "pageNumber": 1,
+                                    "expectedValue": sf.get("expected_value"),
+                                    "actualValue": sf.get("actual_value"),
+                                    "discrepancy": sf.get("discrepancy"),
+                                    "technicalDetails": Json(sf.get("technical_details", {})),
+                                }
+                            )
+                            if sf["severity"] == "CRITICAL":
+                                page_rec = await tx.documentpage.find_first(
+                                    where={"documentId": doc.id, "pageNumber": 1}
+                                )
+                                page_w = float(page_rec.widthPx) if page_rec and page_rec.widthPx else 612.0
+                                page_h = float(page_rec.heightPx) if page_rec and page_rec.heightPx else 792.0
+                                await tx.boundingbox.create(
+                                    data={
+                                        "evidenceItem": {"connect": {"id": sig_finding.id}},
+                                        "pageNumber": 1,
+                                        "x": 10.0,
+                                        "y": 10.0,
+                                        "width": max(10.0, page_w - 20.0),
+                                        "height": max(10.0, page_h - 20.0),
+                                        "label": "Invalidated X.509 PKI Signature (ETO 2002 §29)",
+                                        "color": "#BA2518",
+                                    }
+                                )
+                            stage_findings.append({
+                                "id": sig_finding.id,
+                                "rule_id": sf["rule_id"],
+                                "severity": sig_finding.severity,
+                                "title": sig_finding.title,
+                            })
 
                         pdf_doc.close()
 
@@ -405,6 +461,7 @@ async def process_pdf_structure(
             output_payload = {
                 "findings_count": len(stage_findings),
                 "findings": stage_findings,
+                "digital_signatures": digital_signatures_summary,
                 "duration_ms": duration_ms,
             }
 

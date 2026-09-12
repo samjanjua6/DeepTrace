@@ -228,12 +228,12 @@ async def generate_report(db: Prisma, investigation_id: str, options: dict | Non
 
     reg_sections = [
         (
-            "1. Electronic Transactions Ordinance 2002 (ETO 2002) — Legal Admissibility",
+            "1. Electronic Transactions Ordinance 2002 (ETO 2002) — Legal Admissibility & §29 Digital Signatures",
             (
-                "Under Sections 3, 4, 8, and 9 of the Electronic Transactions Ordinance 2002, electronic documents "
-                "and digital records carry full legal validity and admissibility before courts of law, provided their "
-                "integrity is cryptographically assured through uncompromised hash verification (SHA-256) and an "
-                "unbroken chain of custody. DeepTrace maintains automated cryptographic cloning upon ingestion."
+                "Under Sections 3, 4, 8, 9, and 29 of the Electronic Transactions Ordinance 2002 (ETO 2002), electronic "
+                "documents and digital certificates certified by an accredited Certification Authority (e.g., NIFT / ECAC) "
+                "carry statutory presumption of integrity and authenticity. If post-signing byte alteration occurs, "
+                "the cryptographic digest mismatch mathematically rebuts the presumption of authenticity under Section 29."
             ),
         ),
         (

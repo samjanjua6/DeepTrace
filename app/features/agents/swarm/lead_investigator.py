@@ -143,20 +143,31 @@ def _build_structured_credit_briefing_items(
         summary_en = " ".join(parts_en)
 
         # Format authentic Urdu item summary
-        parts_ur = [f"صفحہ {page_num}، قطار {row_num}: {title}۔"]
-        if expected_val and actual_val:
-            diff_str = f" ({discrepancy} کا فرق)" if discrepancy else ""
-            parts_ur.append(f"درج شدہ رقم {actual_val} ہے جبکہ درست متوقع رقم {expected_val} تھی{diff_str}۔")
-        elif discrepancy:
-            parts_ur.append(f"مالیاتی فرق: {discrepancy}۔")
+        is_sig_invalidated = "SIGNATURE_INVALIDATED" in (it.get("ruleId") or "")
+        is_sig_mod = "SIGNATURE_POST_SIGNING" in (it.get("ruleId") or "")
+        is_sig_stripped = "SIGNATURE_STRIPPED" in (it.get("ruleId") or "")
 
-        if font_detected and expected_font:
-            parts_ur.append(f"دستاویز کے مستند فونٹ {expected_font} کے برعکس {font_detected} فونٹ پایا گیا۔")
-        elif font_detected:
-            parts_ur.append(f"تبدیل شدہ فونٹ: {font_detected}۔")
+        if is_sig_invalidated:
+            parts_ur = [f"صفحہ {page_num}: ڈیجیٹل دستخط اور سرٹیفکیٹ کی تصدیق ناکام (ETO 2002 کی خلاف ورزی)۔ فائل پر بینک کا ڈیجیٹل سرٹیفکیٹ موجود ہے مگر حسابی ردوبدل کی وجہ سے ہیش میش نہیں ہوا۔"]
+        elif is_sig_mod:
+            parts_ur = [f"صفحہ {page_num}: ڈیجیٹل تصدیق کے بعد غیر مجاز تبدیلی۔ دستخط کے بعد فائل میں اضافی بائٹس داخل کیے گئے ہیں۔"]
+        elif is_sig_stripped:
+            parts_ur = [f"صفحہ {page_num}: بینک کے اصل ٹیمپلیٹ سے لازمی ڈیجیٹل سرٹیفکیٹ مٹایا گیا ہے۔"]
+        else:
+            parts_ur = [f"صفحہ {page_num}، قطار {row_num}: {title}۔"]
+            if expected_val and actual_val:
+                diff_str = f" ({discrepancy} کا فرق)" if discrepancy else ""
+                parts_ur.append(f"درج شدہ رقم {actual_val} ہے جبکہ درست متوقع رقم {expected_val} تھی{diff_str}۔")
+            elif discrepancy:
+                parts_ur.append(f"مالیاتی فرق: {discrepancy}۔")
 
-        if visual_cue:
-            parts_ur.append("تصویری معائنہ: کمپریشن تضاد (ELA Anomaly) واضح ہے۔")
+            if font_detected and expected_font:
+                parts_ur.append(f"دستاویز کے مستند فونٹ {expected_font} کے برعکس {font_detected} فونٹ پایا گیا۔")
+            elif font_detected:
+                parts_ur.append(f"تبدیل شدہ فونٹ: {font_detected}۔")
+
+            if visual_cue:
+                parts_ur.append("تصویری معائنہ: کمپریشن تضاد (ELA Anomaly) واضح ہے۔")
 
         summary_ur = " ".join(parts_ur)
 
@@ -408,9 +419,18 @@ class LeadInvestigatorAgent(BaseForensicAgent):
                     "Structural-Visual Concurrence: External editor signatures concur with pixel-level re-compression boundaries."
                 )
 
-            # Look for same-page correlations
+            # Digital signature invalidation cross-correlation
             manifest = state.get("manifest", self.evidence_manifest)
             ev_items = manifest.get("evidence_items", [])
+            has_sig_invalidation = any(
+                "SIGNATURE_INVALIDATED" in (it.get("ruleId") or "")
+                for it in ev_items
+            )
+            if has_sig_invalidation and has_financial:
+                correlations.append(
+                    "Cryptographic-Arithmetic Breach (ETO 2002 §29): X.509 digital certificate was cryptographically invalidated "
+                    "by post-signing byte modifications that altered the bank ledger running balance."
+                )
             pages_with_font = {
                 it.get("pageNumber") or it.get("page_number")
                 for it in ev_items

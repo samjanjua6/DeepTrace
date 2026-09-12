@@ -878,17 +878,29 @@ export default function InvestigationWorkspacePage() {
                 })()}
               </div>
 
-              {/* 2. PDF Structure */}
+              {/* 2. PDF Structure & Digital Signatures */}
               <div className="flex justify-between items-center font-semibold">
-                <span>2. Document Structure & Incremental %%EOF</span>
+                <span>2. Structure, Incremental %%EOF & ETO 2002 Signatures</span>
                 {(() => {
                   const st = getStageStatus("PDF_STRUCTURE");
                   if (st === "PENDING") return <span className="text-ink-400 font-normal">○ PENDING</span>;
                   if (st === "RUNNING") return <span className="text-forensic-amber animate-pulse">● PARSING...</span>;
                   if (st === "FAILED") return <span className="text-forensic-red">✕ FAILED</span>;
+                  const hasSigInvalid = evidence.some(
+                    (e) => (e.ruleId || "").includes("SIGNATURE_INVALIDATED") || (e.ruleId || "").includes("SIGNATURE_POST_SIGNING")
+                  );
+                  const hasSigValid = evidence.some(
+                    (e) => (e.ruleId || "").includes("SIGNATURE_VALID")
+                  );
                   const hasPdfAnom = evidence.some(
                     (e) => (e.ruleId || "").includes("PDF") || (e.ruleId || "").includes("METADATA")
                   );
+                  if (hasSigInvalid) {
+                    return <span className="text-forensic-red font-bold">✕ SIGNATURE INVALIDATED (ETO 2002 §29)</span>;
+                  }
+                  if (hasSigValid) {
+                    return <span className="text-forensic-green font-bold">✓ PKI SIGNATURE VERIFIED (ETO 2002 §29)</span>;
+                  }
                   return (
                     <span className={hasPdfAnom ? "text-forensic-amber" : "text-forensic-green"}>
                       {hasPdfAnom ? "▲ REVISIONS / SKEW FLAGGED" : "✓ CLEAN SINGLE REVISION"}
