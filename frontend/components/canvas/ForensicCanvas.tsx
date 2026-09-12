@@ -10,6 +10,7 @@ interface ForensicCanvasProps {
   evidence: EvidenceItem[];
   activeEvidenceId: string | null;
   onSelectEvidence: (id: string | null) => void;
+  focusedPageNumber?: number | null;
 }
 
 export function ForensicCanvas({
@@ -17,8 +18,17 @@ export function ForensicCanvas({
   evidence,
   activeEvidenceId,
   onSelectEvidence,
+  focusedPageNumber,
 }: ForensicCanvasProps) {
   const [currentPage, setCurrentPage] = useState<number>(1);
+
+  // Sync with external focusedPageNumber (e.g. from ledger row selection)
+  useEffect(() => {
+    if (focusedPageNumber && focusedPageNumber !== currentPage) {
+      setCurrentPage(focusedPageNumber);
+    }
+  }, [focusedPageNumber]);
+
   const [zoom, setZoom] = useState<number>(1.0);
   const [showELA, setShowELA] = useState<boolean>(false);
   const [elaOpacity, setElaOpacity] = useState<number>(0.45);

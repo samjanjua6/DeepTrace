@@ -6,6 +6,7 @@ import { Masthead } from "@/components/editorial/Masthead";
 import { ForensicCanvas } from "@/components/canvas/ForensicCanvas";
 import { RiskGaugeBlock } from "@/components/dossier/RiskGaugeBlock";
 import { LedgerMathTable } from "@/components/dossier/LedgerMathTable";
+import { SplitLedgerEvidenceViewer } from "@/components/dossier/SplitLedgerEvidenceViewer";
 import { AnomalyCard } from "@/components/dossier/AnomalyCard";
 import { IBANChecksumCard } from "@/components/dossier/IBANChecksumCard";
 import { AnalystOverrideModal } from "@/components/dossier/AnalystOverrideModal";
@@ -37,6 +38,8 @@ import {
   Layers,
   Sparkles,
   Info,
+  Columns,
+  FileText,
 } from "lucide-react";
 import { formatDatePKT } from "@/lib/formatters";
 
@@ -205,6 +208,9 @@ export default function InvestigationWorkspacePage() {
   const [activeEvidenceId, setActiveEvidenceId] = useState<string | null>(null);
   const [isOverrideOpen, setIsOverrideOpen] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>("findings");
+  const [viewMode, setViewMode] = useState<"split" | "dossier">("split");
+  const [focusedPageNumber, setFocusedPageNumber] = useState<number | null>(null);
+  const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(!isSample);
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [pipelineRun, setPipelineRun] = useState<PipelineRun | null>(null);
@@ -405,20 +411,123 @@ export default function InvestigationWorkspacePage() {
         documentType={documentType}
       />
 
+      {/* Workbench Sub-Header Ribbon with View Switcher */}
+      <div className="bg-paper-1 border-b border-rule px-4 py-2 flex items-center justify-between font-mono text-xs select-none">
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] uppercase tracking-wider font-semibold text-ink-600 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-forensic-teal" />
+            WORKBENCH VIEW
+          </span>
+          <span className="text-rule">|</span>
+          <span className="text-[11px] text-ink-700">
+            {documentType === "BANK_STATEMENT"
+              ? "Pakistani Core Banking & Ledger Verification Workspace"
+              : `Forensic Document Examination (${documentType})`}
+          </span>
+          {isFinancial && (
+            <span className="bg-paper-0 border border-forensic-teal/40 text-forensic-teal text-[10px] px-2 py-0.5 font-bold uppercase tracking-wider">
+              LEDGER ENGINE ACTIVE
+            </span>
+          )}
+        </div>
+
+        {/* View Mode Toggle Controls */}
+        <div className="flex items-center gap-1 bg-paper-0 border border-rule p-0.5">
+          {isFinancial && (
+            <button
+              onClick={() => setViewMode("split")}
+              className={`flex items-center gap-1.5 px-3 py-1 text-[11px] uppercase font-bold transition-all ${
+                viewMode === "split"
+                  ? "bg-ink-900 text-paper-0 shadow-sm"
+                  : "text-ink-600 hover:text-ink-900 hover:bg-paper-1"
+              }`}
+              title="Interactive Side-by-Side PDF Canvas & Mathematical Ledger"
+            >
+              <Columns className="w-3.5 h-3.5" />
+              <span>Split Evidence Workbench</span>
+            </button>
+          )}
+          <button
+            onClick={() => setViewMode("dossier")}
+            className={`flex items-center gap-1.5 px-3 py-1 text-[11px] uppercase font-bold transition-all ${
+              viewMode === "dossier" || !isFinancial
+                ? "bg-ink-900 text-paper-0 shadow-sm"
+                : "text-ink-600 hover:text-ink-900 hover:bg-paper-1"
+            }`}
+            title="Complete Forensic Findings, Custody Chain & Pipeline Telemetry"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Full Audit Dossier</span>
+          </button>
+        </div>
+      </div>
+
       {/* Asymmetric 2-Column Split Workbench */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Column 1: Sticky Left Forensic Canvas (58% width) */}
-        <div className="w-full lg:w-[58%] h-full flex flex-col relative border-r border-rule">
+        {/* Column 1: Sticky Left Forensic Canvas */}
+        <div
+          className={`w-full ${
+            viewMode === "split" && isFinancial ? "lg:w-[50%]" : "lg:w-[58%]"
+          } h-full flex flex-col relative border-r border-rule`}
+        >
           <ForensicCanvas
             pages={pages}
             evidence={evidence}
             activeEvidenceId={activeEvidenceId}
-            onSelectEvidence={setActiveEvidenceId}
+            onSelectEvidence={(id) => {
+              setActiveEvidenceId(id);
+              if (id) {
+                const ev = evidence.find((e) => e.id === id);
+                if (ev && ev.pageNumber) {
+                  setFocusedPageNumber(ev.pageNumber);
+                }
+              }
+            }}
+            focusedPageNumber={focusedPageNumber}
           />
         </div>
 
-        {/* Column 2: Independently Scrollable Right Analytical Dossier (42% width) */}
-        <div className="w-full lg:w-[42%] h-full overflow-y-auto bg-paper-0 p-6 space-y-6">
+        {/* Column 2: Right Interactive Pane (Split Ledger or Full Dossier) */}
+        {viewMode === "split" && isFinancial ? (
+          <div className="w-full lg:w-[50%] h-full flex flex-col overflow-hidden bg-paper-0">
+            <SplitLedgerEvidenceViewer
+              rows={financialData?.rows}
+              evidence={evidence}
+              financialData={financialData}
+              activeEvidenceId={activeEvidenceId}
+              selectedRowIndex={selectedRowIndex}
+              onSelectRow={(row, index) => {
+                setSelectedRowIndex(index);
+                if (row.pageNumber) {
+                  setFocusedPageNumber(row.pageNumber);
+                }
+                if (row.isTampered) {
+                  const mathEv = evidence.find(
+                    (e) =>
+                      (e.category === "MATH_RECONCILIATION_FAIL" ||
+                        e.category === "MATHEMATICAL_MISMATCH" ||
+                        (e.ruleId || "").includes("MATH")) &&
+                      (!row.pageNumber || e.pageNumber === row.pageNumber)
+                  );
+                  if (mathEv) {
+                    setActiveEvidenceId(mathEv.id);
+                  }
+                }
+              }}
+              onSelectEvidence={(evId) => {
+                setActiveEvidenceId(evId);
+                const ev = evidence.find((e) => e.id === evId);
+                if (ev && ev.pageNumber) {
+                  setFocusedPageNumber(ev.pageNumber);
+                }
+              }}
+              onFocusCanvas={(pageNumber) => {
+                setFocusedPageNumber(pageNumber);
+              }}
+            />
+          </div>
+        ) : (
+          <div className="w-full lg:w-[42%] h-full overflow-y-auto bg-paper-0 p-6 space-y-6">
           {/* Live Pipeline Execution Banner */}
           {(isAnalyzing || pipelineRun?.status === "RUNNING" || investigation?.status === "PROCESSING") && (
             <div className="bg-paper-1 border-2 border-forensic-amber/60 p-4 font-mono text-xs space-y-2 shadow-sm">
@@ -886,6 +995,7 @@ export default function InvestigationWorkspacePage() {
             </div>
           </div>
         </div>
+        )}
       </div>
 
       {/* Analyst Override Modal */}

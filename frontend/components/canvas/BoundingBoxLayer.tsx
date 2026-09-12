@@ -279,6 +279,23 @@ export function BoundingBoxLayer({
                     className="transition-all duration-150"
                   />
 
+                  {/* Active Selection Glow Ring */}
+                  {isSelected && (
+                    <rect
+                      x={x - 4}
+                      y={y - 4}
+                      width={w + 8}
+                      height={h + 8}
+                      fill="none"
+                      stroke="#BA2518"
+                      strokeWidth={1.5}
+                      strokeDasharray="4 2"
+                      opacity={0.85}
+                      className="animate-pulse"
+                    />
+                  )}
+
+
                   {/* Corner Crosshairs */}
                   <line
                     x1={x - 4}
