@@ -210,7 +210,7 @@ Forensic validation confirms 100% document authenticity across all pages. All tr
       {/* Header Bar */}
       <div className="bg-ink-900 text-paper-0 px-4 py-3 flex flex-wrap items-center justify-between gap-3 border-b border-ink-900">
         <div className="flex items-center gap-2.5">
-          <div className="p-1.5 bg-paper-0/10 rounded-sm">
+          <div className="p-1.5 bg-paper-0/10 border border-paper-0/20">
             <Scale className="w-4 h-4 text-forensic-amber" />
           </div>
           <div>
@@ -218,7 +218,7 @@ Forensic validation confirms 100% document authenticity across all pages. All tr
               <span className="font-serif text-sm font-bold tracking-tight uppercase">
                 Lead Investigator Agent — Credit Officer Briefing
               </span>
-              <span className="text-[10px] bg-paper-0/20 text-paper-0 px-2 py-0.5 rounded font-mono font-medium">
+              <span className="text-[10px] bg-paper-0/20 text-paper-0 px-2 py-0.5 border border-paper-0/30 font-mono font-medium">
                 {providerLabel}
               </span>
             </div>
@@ -230,10 +230,10 @@ Forensic validation confirms 100% document authenticity across all pages. All tr
 
         {/* Controls: Language switcher & Copy button */}
         <div className="flex items-center gap-2">
-          <div className="inline-flex border border-paper-0/30 rounded p-0.5 bg-paper-0/10 font-sans text-xs">
+          <div className="inline-flex border border-paper-0/30 p-0.5 bg-paper-0/10 font-sans text-xs">
             <button
               onClick={() => setActiveLang("en")}
-              className={`px-2.5 py-1 rounded transition-colors font-medium ${
+              className={`px-2.5 py-1 transition-colors font-medium ${
                 activeLang === "en"
                   ? "bg-paper-0 text-ink-900 font-bold"
                   : "text-paper-0 hover:text-white"
@@ -243,7 +243,7 @@ Forensic validation confirms 100% document authenticity across all pages. All tr
             </button>
             <button
               onClick={() => setActiveLang("ur")}
-              className={`px-3 py-1 rounded transition-colors font-medium ${
+              className={`px-3 py-1 transition-colors font-medium ${
                 activeLang === "ur"
                   ? "bg-paper-0 text-ink-900 font-bold"
                   : "text-paper-0 hover:text-white"
@@ -255,7 +255,7 @@ Forensic validation confirms 100% document authenticity across all pages. All tr
 
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-semibold bg-paper-0 text-ink-900 hover:bg-paper-1 rounded transition-colors border border-paper-0"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-semibold bg-paper-0 text-ink-900 hover:bg-paper-1 transition-colors border border-paper-0"
             title="Copy executive summary directly to credit memo clipboard"
           >
             {copied ? (
@@ -305,7 +305,7 @@ Forensic validation confirms 100% document authenticity across all pages. All tr
       <div className="p-5">
         <div
           dir={activeLang === "ur" ? "rtl" : "ltr"}
-          className={`p-4 rounded border border-rule bg-paper-1/60 leading-relaxed font-sans text-sm whitespace-pre-line ${
+          className={`p-4 border border-rule bg-paper-1/60 leading-relaxed font-sans text-sm whitespace-pre-line ${
             activeLang === "ur"
               ? "font-serif text-right text-base leading-loose text-ink-900"
               : "text-ink-800"
@@ -337,7 +337,7 @@ Forensic validation confirms 100% document authenticity across all pages. All tr
                 >
                   <div className="flex-1 space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="px-1.5 py-0.5 text-[10px] font-bold bg-ink-900 text-paper-0 rounded-sm">
+                      <span className="px-1.5 py-0.5 text-[10px] font-bold bg-ink-900 text-paper-0">
                         P.{item.page_number} R.{item.row_number}
                       </span>
                       <span className="font-serif text-sm font-semibold text-ink-900">
@@ -369,17 +369,17 @@ Forensic validation confirms 100% document authenticity across all pages. All tr
                       item.visual_cue) && (
                       <div className="flex flex-wrap items-center gap-2 pt-1 text-[10px] text-ink-600">
                         {item.expected_value && (
-                          <span className="bg-paper-1 border border-rule px-2 py-0.5 rounded">
+                          <span className="bg-paper-1 border border-rule px-2 py-0.5">
                             Expected: <strong className="text-ink-900">{item.expected_value}</strong> | Recorded: <strong className="text-ink-900">{item.actual_value}</strong>
                           </span>
                         )}
                         {item.font_detected && (
-                          <span className="bg-amber-500/10 border border-amber-500/30 text-amber-800 px-2 py-0.5 rounded font-mono">
+                          <span className="bg-amber-500/10 border border-amber-500/30 text-amber-800 px-2 py-0.5 font-mono">
                             Font: <strong>{item.font_detected}</strong> vs {item.expected_font || "Original"}
                           </span>
                         )}
                         {item.visual_cue && (
-                          <span className="bg-blue-500/10 border border-blue-500/30 text-blue-800 px-2 py-0.5 rounded">
+                          <span className="bg-blue-500/10 border border-blue-500/30 text-blue-800 px-2 py-0.5">
                             Visual: {item.visual_cue}
                           </span>
                         )}
