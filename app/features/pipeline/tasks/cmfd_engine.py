@@ -305,6 +305,14 @@ def detect_copy_move(
                 # Mean displacement for this localized component
                 dx_mean = float(np.mean([d.pt[0] - s.pt[0] for s, d in zip(comp_src, comp_dst)]))
                 dy_mean = float(np.mean([d.pt[1] - s.pt[1] for s, d in zip(comp_src, comp_dst)]))
+
+                # 8. Intra-Line Monoline Glyph Repetition Suppression:
+                # Reject matches where both regions lie along the exact same horizontal baseline (abs(dy) <= 6 px),
+                # have single-character typographical height (max(src_h, dst_h) <= 48 px), and small area (< 3200 px²).
+                # These represent recurring identical characters (e.g. 'mm', 'll', '00') within authentic font typography.
+                if abs(dy_mean) <= 6.0 and max(src_bbox[3], dst_bbox[3]) <= 48 and min_box_area < 3200:
+                    continue
+
                 comp_confidence = len(comp) / max(len(cluster), 1)
 
                 results.append(
