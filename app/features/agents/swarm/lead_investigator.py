@@ -15,7 +15,14 @@ import re
 from typing import Any, Dict, List, Optional, Tuple, TypedDict
 
 import httpx
-from langgraph.graph import StateGraph, START, END
+try:
+    from langgraph.graph import StateGraph, START, END
+    HAS_LANGGRAPH = True
+except ImportError:
+    HAS_LANGGRAPH = False
+    StateGraph = None
+    START = "START"
+    END = "END"
 
 from app.config import get_settings
 from app.features.agents.swarm.base_agent import BaseForensicAgent

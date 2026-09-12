@@ -6,6 +6,7 @@ from typing import AsyncGenerator
 from prisma import Prisma
 
 from app.config import get_settings
+from app.db.client import set_org_context
 from app.features.agents import schemas
 from app.features.agents.swarm.lead_investigator import LeadInvestigatorAgent
 
@@ -76,6 +77,7 @@ async def _build_evidence_manifest(db: Prisma, investigation_id: str) -> dict:
     return {
         "investigation": {
             "id": inv.id,
+            "organizationId": getattr(inv, "organizationId", None),
             "caseNumber": inv.caseNumber,
             "title": inv.title,
             "status": inv.status,
@@ -112,67 +114,71 @@ async def run_interactive_qa(
     manifest = await _build_evidence_manifest(db, investigation_id)
     lead_agent = LeadInvestigatorAgent(manifest)
 
-    # Check or create interactive QA agent session
-    session = await db.agentsession.find_first(
-        where={"investigationId": investigation_id, "agentRole": "INTERACTIVE_QA"},
-        order={"createdAt": "desc"},
-    )
-    if not session:
-        provider = "groq" if (settings.groq_api_key or os.environ.get("GROQ_API_KEY")) else ("gemini" if settings.google_gemini_api_key else "deeptrace-rules")
-        model = settings.groq_model_primary if (settings.groq_api_key or os.environ.get("GROQ_API_KEY")) else ("gemini-2.0-flash" if settings.google_gemini_api_key else "lead-investigator-v1")
-        session = await db.agentsession.create(
-            data={
-                "investigationId": investigation_id,
-                "agentRole": "INTERACTIVE_QA",
-                "modelProvider": provider,
-                "modelName": model,
-                "status": "active",
-            }
-        )
-
-    # Determine message sequence orders
-    existing_messages_count = await db.agentmessage.count(
-        where={"agentSessionId": session.id}
-    )
-    user_seq = existing_messages_count + 1
-    asst_seq = existing_messages_count + 2
-
-    # Save User message
-    await db.agentmessage.create(
-        data={
-            "agentSessionId": session.id,
-            "role": "USER",
-            "content": question,
-            "sequenceOrder": user_seq,
-        }
-    )
-
     # Generate answer using LeadInvestigatorAgent (bound to verified evidence)
     answer_dict = await lead_agent.answer_query(question)
     answer_text = answer_dict["answer"]
     evidence_refs = answer_dict.get("evidence_references", [])
     tokens_used = answer_dict.get("tokens_used", 100)
 
-    # Save Assistant response
-    await db.agentmessage.create(
-        data={
-            "agentSessionId": session.id,
-            "role": "ASSISTANT",
-            "content": answer_text,
-            "tokensIn": len(question.split()),
-            "tokensOut": tokens_used,
-            "sequenceOrder": asst_seq,
-        }
-    )
+    # Safely persist session & messages within tenant RLS context
+    session_id = f"sess-{investigation_id}"
+    org_id = manifest.get("investigation", {}).get("organizationId")
 
-    # Update session token usage
-    await db.agentsession.update(
-        where={"id": session.id},
-        data={
-            "totalTokensIn": session.totalTokensIn + len(question.split()),
-            "totalTokensOut": session.totalTokensOut + tokens_used,
-        },
-    )
+    async def _save_messages(target_db):
+        sess = await target_db.agentsession.find_first(
+            where={"investigationId": investigation_id, "agentRole": "INTERACTIVE_QA"},
+            order={"createdAt": "desc"},
+        )
+        if not sess:
+            provider = "groq" if (settings.groq_api_key or os.environ.get("GROQ_API_KEY")) else ("gemini" if settings.google_gemini_api_key else "deeptrace-rules")
+            model = settings.groq_model_primary if (settings.groq_api_key or os.environ.get("GROQ_API_KEY")) else ("gemini-2.0-flash" if settings.google_gemini_api_key else "lead-investigator-v1")
+            sess = await target_db.agentsession.create(
+                data={
+                    "investigationId": investigation_id,
+                    "agentRole": "INTERACTIVE_QA",
+                    "modelProvider": provider,
+                    "modelName": model,
+                    "status": "active",
+                }
+            )
+
+        count = await target_db.agentmessage.count(where={"agentSessionId": sess.id})
+        await target_db.agentmessage.create(
+            data={
+                "agentSessionId": sess.id,
+                "role": "USER",
+                "content": question,
+                "sequenceOrder": count + 1,
+            }
+        )
+        await target_db.agentmessage.create(
+            data={
+                "agentSessionId": sess.id,
+                "role": "ASSISTANT",
+                "content": answer_text,
+                "tokensIn": len(question.split()),
+                "tokensOut": tokens_used,
+                "sequenceOrder": count + 2,
+            }
+        )
+        await target_db.agentsession.update(
+            where={"id": sess.id},
+            data={
+                "totalTokensIn": sess.totalTokensIn + len(question.split()),
+                "totalTokensOut": sess.totalTokensOut + tokens_used,
+            },
+        )
+        return sess.id
+
+    try:
+        if org_id and not getattr(db, "_tx_id", None):
+            async with set_org_context(org_id) as tx:
+                session_id = await _save_messages(tx)
+        else:
+            session_id = await _save_messages(db)
+    except Exception as exc:
+        logger.warning("Could not persist interactive QA messages for investigation %s: %s", investigation_id, exc)
+
 
     if stream:
         async def stream_generator() -> AsyncGenerator[str, None]:
@@ -238,29 +244,42 @@ async def run_lead_investigator_analysis(
     lead_agent = LeadInvestigatorAgent(manifest)
     res = await lead_agent.analyze()
 
-    session = await db.agentsession.find_first(
-        where={"investigationId": investigation_id, "agentRole": "LEAD_INVESTIGATOR"},
-        order={"createdAt": "desc"},
-    )
-    if not session:
-        await db.agentsession.create(
-            data={
-                "investigationId": investigation_id,
-                "agentRole": "LEAD_INVESTIGATOR",
-                "modelProvider": res.get("model_provider", "deeptrace-deterministic"),
-                "modelName": res.get("model_name", "lead-investigator-v1"),
-                "status": "completed",
-            }
+    org_id = manifest.get("investigation", {}).get("organizationId")
+
+    async def _save_lead_session(target_db):
+        sess = await target_db.agentsession.find_first(
+            where={"investigationId": investigation_id, "agentRole": "LEAD_INVESTIGATOR"},
+            order={"createdAt": "desc"},
         )
-    else:
-        await db.agentsession.update(
-            where={"id": session.id},
-            data={
-                "modelProvider": res.get("model_provider"),
-                "modelName": res.get("model_name"),
-                "status": "completed",
-            },
-        )
+        if not sess:
+            await target_db.agentsession.create(
+                data={
+                    "investigationId": investigation_id,
+                    "agentRole": "LEAD_INVESTIGATOR",
+                    "modelProvider": res.get("model_provider", "deeptrace-deterministic"),
+                    "modelName": res.get("model_name", "lead-investigator-v1"),
+                    "status": "completed",
+                }
+            )
+        else:
+            await target_db.agentsession.update(
+                where={"id": sess.id},
+                data={
+                    "modelProvider": res.get("model_provider"),
+                    "modelName": res.get("model_name"),
+                    "status": "completed",
+                },
+            )
+
+    try:
+        if org_id and not getattr(db, "_tx_id", None):
+            async with set_org_context(org_id) as tx:
+                await _save_lead_session(tx)
+        else:
+            await _save_lead_session(db)
+    except Exception as exc:
+        logger.warning("Could not persist lead investigator session for %s: %s", investigation_id, exc)
+
 
     briefing_items = [
         schemas.CreditBriefingItem(
