@@ -440,3 +440,18 @@ export async function overrideRiskScore(
   if (!res.ok) throw new Error("Failed to override risk score");
   return res.json();
 }
+
+export async function getLeadInvestigatorAnalysis(
+  investigationId: string
+): Promise<any> {
+  await ensureAuth().catch(() => {});
+  const res = await fetch(
+    `${API_BASE}/investigations/${investigationId}/analysis`,
+    {
+      headers: getAuthHeaders(),
+    }
+  );
+  if (!res.ok) throw new Error("Failed to fetch Lead Investigator analysis");
+  return res.json();
+}
+

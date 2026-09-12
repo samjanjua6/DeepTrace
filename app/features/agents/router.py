@@ -47,3 +47,19 @@ async def list_agent_sessions(
         from app.db.client import db as global_db
         db = global_db
     return await service.get_agent_sessions(db, investigation.id)
+
+
+@router.get(
+    "/{investigation_id}/analysis",
+    response_model=schemas.LeadInvestigatorAnalysisResponse,
+    summary="Get Lead Investigator forensic analysis including bilingual English and Urdu credit briefings",
+)
+async def get_investigation_analysis(
+    investigation=Depends(get_investigation),
+    db: Annotated[Prisma, Depends(get_db_dep)] = None,
+):
+    if db is None:
+        from app.db.client import db as global_db
+        db = global_db
+    return await service.run_lead_investigator_analysis(db, investigation.id)
+

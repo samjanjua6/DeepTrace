@@ -63,6 +63,10 @@ class Settings(BaseSettings):
         return v
 
     # ── LLM Providers ────────────────────────────────────────────────────────
+    groq_api_key: str | None = None
+    groq_model_primary: str = "gpt-oss-120b"
+    groq_model_fallback: str = "gpt-oss-20b"
+    groq_api_base_url: str = "https://api.groq.com/openai/v1"
     google_gemini_api_key: str | None = None
     anthropic_api_key: str | None = None
 

@@ -26,3 +26,40 @@ class AgentSessionResponse(BaseModel):
     status: str
     started_at: datetime
     completed_at: datetime | None
+
+
+class CreditBriefingItem(BaseModel):
+    page_number: int | None = None
+    row_number: int | None = None
+    title: str
+    transaction_label: str | None = None
+    expected_value: str | None = None
+    actual_value: str | None = None
+    discrepancy: str | None = None
+    font_detected: str | None = None
+    expected_font: str | None = None
+    visual_cue: str | None = None
+    summary_en: str
+    summary_ur: str
+    severity: str = "MEDIUM"
+    rule_id: str | None = None
+    evidence_id: str | None = None
+
+
+class LeadInvestigatorAnalysisResponse(BaseModel):
+    investigation_id: str
+    overall_score: int
+    risk_tier: str
+    action_directive: str
+    confidence_score: float
+    anomalies_detected: int
+    model_provider: str
+    model_name: str
+    english_summary: str
+    urdu_summary: str
+    narrative: str
+    cross_signal_correlations: list[str] = []
+    credit_briefing_items: list[CreditBriefingItem] = []
+    evidence_citations: list[str] = []
+    specialist_reports: dict = {}
+

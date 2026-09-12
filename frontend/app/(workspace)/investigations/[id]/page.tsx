@@ -10,6 +10,7 @@ import { SplitLedgerEvidenceViewer } from "@/components/dossier/SplitLedgerEvide
 import { AnomalyCard } from "@/components/dossier/AnomalyCard";
 import { IBANChecksumCard } from "@/components/dossier/IBANChecksumCard";
 import { AnalystOverrideModal } from "@/components/dossier/AnalystOverrideModal";
+import { CreditOfficerBriefing } from "@/components/dossier/CreditOfficerBriefing";
 import {
   Investigation,
   DocumentPage,
@@ -613,6 +614,15 @@ export default function InvestigationWorkspacePage() {
               investigation?.status === "PROCESSING"
             }
             onOpenOverride={isSample ? undefined : () => setIsOverrideOpen(true)}
+          />
+
+          {/* Autonomous Lead Investigator Agent — Bilingual Credit Officer Briefing */}
+          <CreditOfficerBriefing
+            investigationId={investigationId}
+            overallScore={risk?.overallScore ?? 0}
+            riskTier={risk?.riskTier ?? "LOW"}
+            actionDirective={risk?.actionDirective ?? "STRAIGHT_THROUGH_APPROVAL"}
+            evidenceItems={evidence}
           />
 
           {/* Action Ribbon & Dynamic Domain-Aware Tabs */}

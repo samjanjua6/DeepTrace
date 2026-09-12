@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 from typing import AsyncGenerator
 from prisma import Prisma
 
@@ -117,12 +118,14 @@ async def run_interactive_qa(
         order={"createdAt": "desc"},
     )
     if not session:
+        provider = "groq" if (settings.groq_api_key or os.environ.get("GROQ_API_KEY")) else ("gemini" if settings.google_gemini_api_key else "deeptrace-rules")
+        model = settings.groq_model_primary if (settings.groq_api_key or os.environ.get("GROQ_API_KEY")) else ("gemini-2.0-flash" if settings.google_gemini_api_key else "lead-investigator-v1")
         session = await db.agentsession.create(
             data={
                 "investigationId": investigation_id,
                 "agentRole": "INTERACTIVE_QA",
-                "modelProvider": "gemini" if settings.google_gemini_api_key else "deeptrace-rules",
-                "modelName": "gemini-2.0-flash" if settings.google_gemini_api_key else "lead-investigator-v1",
+                "modelProvider": provider,
+                "modelName": model,
                 "status": "active",
             }
         )
@@ -221,3 +224,80 @@ async def get_agent_sessions(db: Prisma, investigation_id: str) -> list[schemas.
         )
         for s in sessions
     ]
+
+
+async def run_lead_investigator_analysis(
+    db: Prisma,
+    investigation_id: str,
+) -> schemas.LeadInvestigatorAnalysisResponse:
+    """
+    Compile verified evidence manifest, run the LangGraph Lead Investigator Agent,
+    and return bilingual English and Urdu briefings for credit officers.
+    """
+    manifest = await _build_evidence_manifest(db, investigation_id)
+    lead_agent = LeadInvestigatorAgent(manifest)
+    res = await lead_agent.analyze()
+
+    session = await db.agentsession.find_first(
+        where={"investigationId": investigation_id, "agentRole": "LEAD_INVESTIGATOR"},
+        order={"createdAt": "desc"},
+    )
+    if not session:
+        await db.agentsession.create(
+            data={
+                "investigationId": investigation_id,
+                "agentRole": "LEAD_INVESTIGATOR",
+                "modelProvider": res.get("model_provider", "deeptrace-deterministic"),
+                "modelName": res.get("model_name", "lead-investigator-v1"),
+                "status": "completed",
+            }
+        )
+    else:
+        await db.agentsession.update(
+            where={"id": session.id},
+            data={
+                "modelProvider": res.get("model_provider"),
+                "modelName": res.get("model_name"),
+                "status": "completed",
+            },
+        )
+
+    briefing_items = [
+        schemas.CreditBriefingItem(
+            page_number=b.get("page_number"),
+            row_number=b.get("row_number"),
+            title=b.get("title", ""),
+            transaction_label=b.get("transaction_label"),
+            expected_value=b.get("expected_value"),
+            actual_value=b.get("actual_value"),
+            discrepancy=b.get("discrepancy"),
+            font_detected=b.get("font_detected"),
+            expected_font=b.get("expected_font"),
+            visual_cue=b.get("visual_cue"),
+            summary_en=b.get("summary_en", ""),
+            summary_ur=b.get("summary_ur", ""),
+            severity=b.get("severity", "MEDIUM"),
+            rule_id=b.get("rule_id"),
+            evidence_id=b.get("evidence_id"),
+        )
+        for b in res.get("credit_briefing_items", [])
+    ]
+
+    return schemas.LeadInvestigatorAnalysisResponse(
+        investigation_id=investigation_id,
+        overall_score=res.get("overall_score", 0),
+        risk_tier=res.get("risk_tier", "LOW"),
+        action_directive=res.get("action_directive", "STRAIGHT_THROUGH_APPROVAL"),
+        confidence_score=res.get("confidence_score", 0.95),
+        anomalies_detected=res.get("anomalies_detected", 0),
+        model_provider=res.get("model_provider", "groq"),
+        model_name=res.get("model_name", "gpt-oss-120b"),
+        english_summary=res.get("english_summary", ""),
+        urdu_summary=res.get("urdu_summary", ""),
+        narrative=res.get("narrative", ""),
+        cross_signal_correlations=res.get("cross_signal_correlations", []),
+        credit_briefing_items=briefing_items,
+        evidence_citations=res.get("evidence_citations", []),
+        specialist_reports=res.get("specialist_reports", {}),
+    )
+
