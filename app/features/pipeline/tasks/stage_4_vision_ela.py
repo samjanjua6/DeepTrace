@@ -183,6 +183,11 @@ async def process_vision_ela(
                                 am = cv2.resize(am, (width, height), interpolation=cv2.INTER_LINEAR)
                             hotspots = (am > 0.45) & non_edge_mask
                             is_trufor_active = True
+                        elif trufor_result is not None and trufor_result.detection == "authentic" and trufor_result.score >= 0.70:
+                            # TruFor neural engine explicitly verified the page as authentic.
+                            # Suppress classic ELA difference hotspotting to avoid false positives on vector emblems / lines.
+                            hotspots = np.zeros((height, width), dtype=bool)
+                            is_trufor_active = False
                         else:
                             # Fallback: classic JPEG ELA hotspot mask
                             hotspots = (diff_gray > threshold) & non_edge_mask
@@ -209,6 +214,7 @@ async def process_vision_ela(
 
                         # Filter candidate components
                         candidate_components = []
+                        min_area = 200 if doc.mimeType == "application/pdf" else 40
                         for c in contours:
                             carea = cv2.contourArea(c)
                             cx, cy, cw, ch = cv2.boundingRect(c)
@@ -219,7 +225,7 @@ async def process_vision_ela(
 
                             # Ensure component is dense, localized, and not whole-page runaway noise
                             if (
-                                carea >= 40
+                                carea >= min_area
                                 and density >= 0.12
                                 and 0.08 <= aspect_ratio <= 12.0
                                 and cw < (0.40 * width)

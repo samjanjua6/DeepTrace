@@ -62,6 +62,16 @@ KE_CONSUMER_REGEX = re.compile(
     r"\b(0[4-9]\d{9,12}|\d{10,13})\b"
 )
 
+# WAPDA / DISCO 14-digit Reference Number (e.g. 16 12632 1059202 U or 16126321059202)
+WAPDA_DISCO_REF_REGEX = re.compile(
+    r"\b(\d{2}\s?\d{5}\s?\d{7}[a-zA-Z]?|\d{14}[a-zA-Z]?)\b"
+)
+
+# 10-digit DISCO Consumer ID
+DISCO_CONSUMER_REGEX = re.compile(
+    r"\b(\d{10})\b"
+)
+
 # Pay Period Month / Year: e.g. Jan 2026, September 2025, 04/2026
 PAY_PERIOD_REGEX = re.compile(
     r"\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)[ -/]\d{2,4}\b",
@@ -129,8 +139,28 @@ UTILITY_BILL_ANCHORS = {
     "electricity duty": 3.5, "sales tax": 2.0, "tv fee": 3.0,
     "total current bill": 3.5, "arrears": 2.5, "late payment surcharge": 4.0,
     "payable within due date": 4.5, "payable after due date": 4.5, "due date": 3.0,
-    "lesco": 4.0, "sngpl": 4.0, "ssgc": 4.0, "iesco": 4.0, "fesco": 4.0,
-    "mepco": 4.0, "pesco": 4.0, "wasa": 3.5, "sui northern": 4.0, "sui southern": 4.0,
+    # All 10 Pakistani DISCOs & Energy Companies
+    "gepco": 5.0, "gujranwala electric": 5.0, "gujranwala electric power company": 5.0,
+    "lesco": 5.0, "lahore electric": 5.0, "lahore electric supply company": 5.0,
+    "fesco": 5.0, "faisalabad electric": 5.0, "faisalabad electric supply company": 5.0,
+    "mepco": 5.0, "multan electric": 5.0, "multan electric power company": 5.0,
+    "iesco": 5.0, "islamabad electric": 5.0, "islamabad electric supply company": 5.0,
+    "pesco": 5.0, "peshawar electric": 5.0, "peshawar electric supply company": 5.0,
+    "hesco": 5.0, "hyderabad electric": 5.0, "hyderabad electric supply company": 5.0,
+    "qesco": 5.0, "quetta electric": 5.0, "quetta electric supply company": 5.0,
+    "sepco": 5.0, "sukkur electric": 5.0, "sukkur electric power company": 5.0,
+    "tesco": 5.0, "tribal electric": 5.0, "tribal electric supply company": 5.0,
+    "wapda": 4.5, "water and power development authority": 4.5, "pitc": 4.5,
+    "power information technology company": 4.5,
+    # Gas, Water & Telecom
+    "sngpl": 4.5, "sui northern gas pipelines": 4.5, "sui northern": 4.5,
+    "ssgc": 4.5, "sui southern gas company": 4.5, "sui southern": 4.5,
+    "wasa": 4.0, "water and sanitation agency": 4.0,
+    "ptcl": 4.5, "pakistan telecommunication company": 4.5, "nayatel": 4.0, "stormfiber": 4.0,
+    # Urdu Institutional Phrases
+    "لیسکو": 5.0, "گیپکو": 5.0, "فیسکو": 5.0, "میپکو": 5.0, "آئیسکو": 5.0,
+    "پیسکو": 5.0, "حیسکو": 5.0, "کیسکو": 5.0, "سیپکو": 5.0, "ٹیسکو": 5.0,
+    "کے الیکٹرک": 5.0, "واپڈا": 4.5, "بل بجلی": 4.5, "صارف نمبر": 4.0, "ریفرنس نمبر": 4.0,
 }
 
 TAX_CERTIFICATE_ANCHORS = {
@@ -502,19 +532,40 @@ class DocumentClassifier:
             salary_score += 6.0
         raw_logits["SALARY_SLIP"] = salary_score
 
-        # --- C. Utility Bill (K-Electric) Scoring ---
+        # --- C. Utility Bill (K-Electric, DISCOs, Gas, Water) Scoring ---
         util_score, util_matches = self.score_anchors(text_lower, tokens, UTILITY_BILL_ANCHORS)
         all_matched["UTILITY_BILL"] = util_matches
-        if any(w in text_lower for w in ("consumer", "account", "k-electric", "kelectric")):
-            if KE_CONSUMER_REGEX.search(full_text):
-                util_score += 12.0
-                all_matched["UTILITY_BILL"].append({
-                    "anchor": "KE_CONSUMER_NUMBER_PATTERN",
-                    "count": 1,
-                    "weight": 12.0,
-                    "zone": "META",
-                    "contribution": 12.0,
-                })
+
+        # Check WAPDA / DISCO 14-digit reference number (e.g. 16 12632 1059202 U)
+        disco_ref_match = WAPDA_DISCO_REF_REGEX.search(full_text)
+        if disco_ref_match:
+            util_score += 15.0
+            all_matched["UTILITY_BILL"].append({
+                "anchor": f"DISCO_REFERENCE_NUMBER:{disco_ref_match.group(1)}",
+                "count": 1,
+                "weight": 15.0,
+                "zone": "META",
+                "contribution": 15.0,
+            })
+        elif KE_CONSUMER_REGEX.search(full_text) and any(w in text_lower for w in ("consumer", "account", "k-electric", "kelectric")):
+            util_score += 12.0
+            all_matched["UTILITY_BILL"].append({
+                "anchor": "KE_CONSUMER_NUMBER_PATTERN",
+                "count": 1,
+                "weight": 12.0,
+                "zone": "META",
+                "contribution": 12.0,
+            })
+
+        if DISCO_CONSUMER_REGEX.search(full_text) and any(w in text_lower for w in ("consumer", "customer", "bill", "meter")):
+            util_score += 8.0
+            all_matched["UTILITY_BILL"].append({
+                "anchor": "DISCO_CONSUMER_ID",
+                "count": 1,
+                "weight": 8.0,
+                "zone": "META",
+                "contribution": 8.0,
+            })
         if vis_features.get("has_barcode_qr"):
             util_score += 8.0
             all_matched["UTILITY_BILL"].append({

@@ -597,12 +597,12 @@ async def process_financial(
                 return output_payload
 
             # Check if any document is a financial statement / ledger
-            financial_docs = [
+            relevant_docs = [
                 d for d in pdf_docs
-                if d.documentType in ("BANK_STATEMENT", "DIGITAL_WALLET_LEDGER")
+                if d.documentType in ("BANK_STATEMENT", "DIGITAL_WALLET_LEDGER", "UTILITY_BILL")
             ]
-            if not financial_docs:
-                # Document is not a bank statement/ledger (e.g. Utility Bill, CNIC, Salary Slip, FBR Challan)
+            if not relevant_docs:
+                # Document is not a bank statement/ledger/utility bill (e.g. CNIC, Salary Slip, FBR Challan)
                 duration_ms = int((time.perf_counter() - start_time) * 1000)
                 doc_type_label = pdf_docs[0].documentType if pdf_docs else "OTHER"
                 output_payload = {
@@ -611,7 +611,7 @@ async def process_financial(
                     "duration_ms": duration_ms,
                     "reconciled": True,
                     "skipped": True,
-                    "bypass_reason": f"Document classified as {doc_type_label}. Non-banking documents bypass financial ledger reconciliation.",
+                    "bypass_reason": f"Document classified as {doc_type_label}. Non-financial documents bypass ledger reconciliation.",
                     "stated_opening": None,
                     "implied_opening": None,
                     "opening_discrepancy": None,
@@ -633,7 +633,16 @@ async def process_financial(
                 logger.info(f"Stage 6 bypassed: Document classified as '{doc_type_label}'")
                 return output_payload
 
-            for doc in financial_docs:
+            stated_opening: Decimal | None = None
+            stated_closing: Decimal | None = None
+            stated_credits: Decimal | None = None
+            stated_debits: Decimal | None = None
+            expected_closing: Decimal | None = None
+            discrepancy: Decimal | None = None
+            primary_iban_info: dict[str, Any] | None = None
+            ledger_sm: CrossPageLedgerStateMachine | None = None
+
+            for doc in relevant_docs:
 
                 file_bytes = storage.get_file(settings.s3_bucket_documents, doc.storagePath)
                 if not file_bytes:
@@ -654,7 +663,6 @@ async def process_financial(
                     all_text = "\n".join([(pm.ocrText or "") for pm in page_meta_map.values() if pm])
 
                 # Check IBANs
-                primary_iban_info: dict[str, Any] | None = None
                 iban_matches = PK_IBAN_REGEX.findall(all_text)
                 for raw_iban in set(iban_matches):
                     is_valid, reason, bank_name = validate_pk_iban(raw_iban)
@@ -703,6 +711,85 @@ async def process_financial(
                             "severity": finding.severity,
                             "title": finding.title,
                         })
+
+                # ─────────────────────────────────────────────────────────────
+                # 1b. Pakistani Utility Bill Online Registry Verification (DISCOs)
+                # ─────────────────────────────────────────────────────────────
+                if doc.documentType == "UTILITY_BILL":
+                    try:
+                        from app.features.pipeline.tasks.pk_utility_verifier import verify_utility_bill_registry
+                        util_res = await verify_utility_bill_registry(all_text)
+                        if util_res.status == "MISMATCH":
+                            finding = await tx.evidenceitem.create(
+                                data={
+                                    "document": {"connect": {"id": doc.id}},
+                                    "pipelineStage": {"connect": {"id": pipeline_stage_id}},
+                                    "category": "UTILITY_BILL_ANOMALY",
+                                    "severity": "CRITICAL",
+                                    "ruleId": "RULE_PK_UTILITY_REGISTRY_MISMATCH",
+                                    "riskPoints": 40,
+                                    "title": f"Live Utility Authority Registry Discrepancy ({util_res.disco.upper() if util_res.disco else 'DISCO'})",
+                                    "description": util_res.message,
+                                    "isDeterministic": True,
+                                    "pageNumber": 1,
+                                    "expectedValue": f"Official PITC/DISCO Registry: {util_res.live_record.get('payable_within_due_date') if util_res.live_record else 'N/A'}",
+                                    "actualValue": "Document stated figures",
+                                    "discrepancy": "; ".join(util_res.discrepancies or []),
+                                    "technicalDetails": Json({
+                                        "status": util_res.status,
+                                        "disco": util_res.disco,
+                                        "reference_number": util_res.reference_number,
+                                        "portal_url": util_res.portal_url,
+                                        "live_record": util_res.live_record,
+                                        "matches": util_res.matches,
+                                        "discrepancies": util_res.discrepancies,
+                                    }),
+                                }
+                            )
+                            stage_findings.append({
+                                "id": finding.id,
+                                "rule_id": "RULE_PK_UTILITY_REGISTRY_MISMATCH",
+                                "severity": finding.severity,
+                                "title": finding.title,
+                            })
+                        elif util_res.status == "MATCH":
+                            finding = await tx.evidenceitem.create(
+                                data={
+                                    "document": {"connect": {"id": doc.id}},
+                                    "pipelineStage": {"connect": {"id": pipeline_stage_id}},
+                                    "category": "UTILITY_BILL_ANOMALY",
+                                    "severity": "INFO",
+                                    "ruleId": "RULE_PK_UTILITY_REGISTRY_VERIFIED",
+                                    "riskPoints": 0,
+                                    "title": f"Official Authority Registry Verified ({util_res.disco.upper() if util_res.disco else 'DISCO'})",
+                                    "description": util_res.message,
+                                    "isDeterministic": True,
+                                    "pageNumber": 1,
+                                    "expectedValue": "Official PITC Live Record",
+                                    "actualValue": f"Ref {util_res.reference_number}: Rs. {util_res.live_record.get('payable_within_due_date') if util_res.live_record else ''} (Matches 100%)",
+                                    "discrepancy": "0 discrepancy - Verified Authentic",
+                                    "technicalDetails": Json({
+                                        "status": util_res.status,
+                                        "disco": util_res.disco,
+                                        "reference_number": util_res.reference_number,
+                                        "portal_url": util_res.portal_url,
+                                        "live_record": util_res.live_record,
+                                        "matches": util_res.matches,
+                                    }),
+                                }
+                            )
+                            stage_findings.append({
+                                "id": finding.id,
+                                "rule_id": "RULE_PK_UTILITY_REGISTRY_VERIFIED",
+                                "severity": "INFO",
+                                "title": finding.title,
+                            })
+                    except Exception as util_err:
+                        logger.warning(f"Utility registry verification error: {util_err}")
+
+                    # Utility bills complete authority registry verification and bypass bank ledger reconciliations
+                    pdf_doc.close()
+                    continue
 
                 # ─────────────────────────────────────────────────────────────
                 # 2. Extract Header / Summary Metrics
@@ -1411,6 +1498,7 @@ async def process_financial(
                 pdf_doc.close()
 
             duration_ms = int((time.perf_counter() - start_time) * 1000)
+            has_bank_statement = any(d.documentType in ("BANK_STATEMENT", "DIGITAL_WALLET_LEDGER") for d in pdf_docs)
             output_payload = {
                 "findings_count": len(stage_findings),
                 "findings": stage_findings,
@@ -1419,14 +1507,19 @@ async def process_financial(
                     "MISMATCH" in f.get("rule_id", "") or "RECONCILIATION_FAIL" in f.get("rule_id", "")
                     for f in stage_findings
                 ),
+                "skipped": not has_bank_statement,
+                "bypass_reason": (
+                    f"Document classified as {pdf_docs[0].documentType if pdf_docs else 'UTILITY_BILL'}. "
+                    "Non-financial documents bypass ledger reconciliation."
+                ) if not has_bank_statement else None,
                 "stated_opening": float(stated_opening) if stated_opening is not None else None,
-                "implied_opening": float(ledger_sm.implied_opening) if ledger_sm.implied_opening is not None else (float(stated_opening) if stated_opening is not None else None),
-                "opening_discrepancy": float(stated_opening - ledger_sm.implied_opening) if (stated_opening is not None and ledger_sm.implied_opening is not None) else None,
+                "implied_opening": float(ledger_sm.implied_opening) if (ledger_sm is not None and ledger_sm.implied_opening is not None) else (float(stated_opening) if stated_opening is not None else None),
+                "opening_discrepancy": float(stated_opening - ledger_sm.implied_opening) if (ledger_sm is not None and stated_opening is not None and ledger_sm.implied_opening is not None) else None,
                 "stated_closing": float(stated_closing) if stated_closing is not None else None,
-                "implied_closing": float(ledger_sm.running_balance) if ledger_sm.running_balance is not None else None,
-                "closing_discrepancy": float(stated_closing - ledger_sm.running_balance) if (stated_closing is not None and ledger_sm.running_balance is not None) else None,
+                "implied_closing": float(ledger_sm.running_balance) if (ledger_sm is not None and ledger_sm.running_balance is not None) else None,
+                "closing_discrepancy": float(stated_closing - ledger_sm.running_balance) if (ledger_sm is not None and stated_closing is not None and ledger_sm.running_balance is not None) else None,
                 "iban": primary_iban_info,
-                "rows": ledger_sm.get_ledger_rows(),
+                "rows": ledger_sm.get_ledger_rows() if ledger_sm is not None else [],
             }
 
             await tx.pipelinestage.update(

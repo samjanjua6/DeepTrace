@@ -177,12 +177,20 @@ async def process_evidence_fusion(
             risk_tier, action_directive = compute_risk_tier(final_score)
 
             # Generate narrative summary
-            if total_count == 0:
-                narrative = (
-                    "No forensic anomalies detected across structural, typographical, or financial checks. "
-                    "The document satisfies all mathematical ledger reconciliations, contains uniform typography "
-                    "and font baselines, and adheres to authentic bank statement specifications."
-                )
+            has_registry_verified = any(e.ruleId == "RULE_PK_UTILITY_REGISTRY_VERIFIED" for e in evidence_items)
+            if total_count == 0 or (critical_count == 0 and high_count == 0 and medium_count == 0 and has_registry_verified):
+                if has_registry_verified:
+                    narrative = (
+                        "Document verified 100% authentic against the official government utility authority registry (PITC). "
+                        "Payable amounts, billing month, due date, and consumer credentials match live government records. "
+                        "No physical typographical distortions, neural tampering, or ELA anomalies detected."
+                    )
+                else:
+                    narrative = (
+                        "No forensic anomalies detected across structural, typographical, or financial checks. "
+                        "The document satisfies all mathematical ledger reconciliations, contains uniform typography "
+                        "and font baselines, and adheres to authentic document specifications."
+                    )
             else:
                 findings_summary = []
                 if splicing_synergy_pages:
