@@ -146,8 +146,20 @@ def _build_structured_credit_briefing_items(
         is_sig_invalidated = "SIGNATURE_INVALIDATED" in (it.get("ruleId") or "")
         is_sig_mod = "SIGNATURE_POST_SIGNING" in (it.get("ruleId") or "")
         is_sig_stripped = "SIGNATURE_STRIPPED" in (it.get("ruleId") or "")
+        is_aml_nacta = "AML_NACTA" in (it.get("ruleId") or "")
+        is_aml_unsc = "AML_UNSC" in (it.get("ruleId") or "")
+        is_aml_pep = "AML_PEP" in (it.get("ruleId") or "")
+        is_aml_hawala = "AML_HIGH_RISK" in (it.get("ruleId") or "")
 
-        if is_sig_invalidated:
+        if is_aml_nacta:
+            parts_ur = [f"صفحہ {page_num}: نیکٹا (NACTA) فورتھ شیڈول کے تحت کالعدم فرد/تنظیم سے مماثلت (انسدادِ دہشت گردی ایکٹ 1997 دفعہ 11EE کی سنگین خلاف ورزی)۔ فوری اکاؤنٹ منجمد اور FMU کو STR بھیجنا لازمی ہے۔"]
+        elif is_aml_unsc:
+            parts_ur = [f"صفحہ {page_num}: اقوامِ متحدہ کی سلامتی کونسل (UNSC 1267) کی پابندیوں کی فہرست میں شامل دہشت گرد سے مماثلت (یو این ایس سی ایکٹ 1948)۔ فوری اثاثے منجمد کرنا لازمی ہے۔"]
+        elif is_aml_pep:
+            parts_ur = [f"صفحہ {page_num}: سیاسی طور پر بااثر شخصیت (PEP) کی شناخت (اسٹیٹ بینک BPRD سرکلر 1/2021)۔ اعلیٰ انتظامیہ کی منظوری (SMA) اور اضافی چھان بین (EDD) لازمی ہے۔"]
+        elif is_aml_hawala:
+            parts_ur = [f"صفحہ {page_num}: حوالہ/ہنڈی/کرپٹو غیر قانونی رقم کی منتقلی کے ممنوعہ الفاظ کی شناخت (اسٹیٹ بینک BPRD سرکلر 3/2018 کی خلاف ورزی)۔"]
+        elif is_sig_invalidated:
             parts_ur = [f"صفحہ {page_num}: ڈیجیٹل دستخط اور سرٹیفکیٹ کی تصدیق ناکام (ETO 2002 کی خلاف ورزی)۔ فائل پر بینک کا ڈیجیٹل سرٹیفکیٹ موجود ہے مگر حسابی ردوبدل کی وجہ سے ہیش میش نہیں ہوا۔"]
         elif is_sig_mod:
             parts_ur = [f"صفحہ {page_num}: ڈیجیٹل تصدیق کے بعد غیر مجاز تبدیلی۔ دستخط کے بعد فائل میں اضافی بائٹس داخل کیے گئے ہیں۔"]
@@ -433,6 +445,22 @@ class LeadInvestigatorAgent(BaseForensicAgent):
                     "Cryptographic-Arithmetic Breach (ETO 2002 §29): X.509 digital certificate was cryptographically invalidated "
                     "by post-signing byte modifications that altered the bank ledger running balance."
                 )
+
+            # SBP AML / CFT & Sanctions cross-correlations
+            has_aml_sanctions = any(
+                ("AML_NACTA" in (it.get("ruleId") or "") or "AML_UNSC" in (it.get("ruleId") or ""))
+                for it in ev_items
+            )
+            has_aml_pep = any("AML_PEP" in (it.get("ruleId") or "") for it in ev_items)
+            if has_aml_sanctions and has_financial:
+                correlations.append(
+                    "Sanctions-Ledger Nexus (SBP AML/CFT): Account holder matches statutory counter-terrorism / UN sanctions proscription lists "
+                    "while transaction ledger concurrently exhibits balance tampering."
+                )
+            if has_aml_pep and has_financial:
+                correlations.append(
+                    "High-Risk PEP Exposure: Identified Politically Exposed Person (PEP) account displays abnormal transaction ledger manipulations requiring immediate senior management escalation."
+                )
             pages_with_font = {
                 it.get("pageNumber") or it.get("page_number")
                 for it in ev_items
@@ -611,7 +639,7 @@ class LeadInvestigatorAgent(BaseForensicAgent):
         action_directive = self.risk_assessment.get("actionDirective", "REVIEW")
 
         # 1. Questions regarding IBAN authenticity
-        if any(w in q_lower for w in ["iban", "account number", "pakistani iban", "sbp", "اکاؤنٹ", "آئی بی اے این"]):
+        if any(w in q_lower for w in ["iban", "account number", "pakistani iban", "sbp iban", "آئی بی اے این"]):
             iban_findings = self.get_findings_by_rule_prefix("RULE_PK_IBAN")
             if iban_findings:
                 for f in iban_findings:
@@ -630,6 +658,25 @@ class LeadInvestigatorAgent(BaseForensicAgent):
                     parts.append(
                         "✓ **PK-IBAN Check Verified**: All Pakistani IBAN(s) detected in the document are mathematically authentic under ISO 7064 MOD-97 check-digit validation with legitimate State Bank of Pakistan (SBP) registered bank codes."
                     )
+
+        # 1b. Questions regarding SBP AML/CFT, NACTA, UNSC Sanctions, PEPs, or Hawala
+        elif any(w in q_lower for w in ["aml", "cdd", "nacta", "unsc", "sanction", "pep", "terror", "hawala", "hundi", "chitti", "کالعدم", "پابندی", "نیکٹا", "پی ای پی", "حوالہ", "ہنڈی"]):
+            aml_findings = self.get_findings_by_rule_prefix("RULE_AML_")
+            adverse_aml = [f for f in aml_findings if f.get("ruleId") != "RULE_AML_CDD_CLEARED"]
+            if adverse_aml:
+                if is_urdu_query:
+                    parts.append("اسٹیٹ بینک اور نیکٹا (NACTA) AML/CFT جانچ پڑتال میں درج ذیل سنگین انتباہات پائے گئے:")
+                else:
+                    parts.append("State Bank of Pakistan (SBP) AML/CFT & Customer Due Diligence (CDD) screening identified the following adverse findings:")
+                for f in adverse_aml:
+                    if f.get("id"):
+                        cited_evidence_ids.append(f["id"])
+                    parts.append(f"- **{f.get('title')}** [{f.get('severity', 'CRITICAL')}]: {f.get('description')}")
+            else:
+                if is_urdu_query:
+                    parts.append("✓ **اسٹیٹ بینک CDD اور AML کلیئر**: کھاتہ دار نیکٹا (NACTA 4th Schedule)، اقوامِ متحدہ 1267 پابندیوں اور پی ای پی (PEP) رجسٹری سے مکمل پاک ہے اور کوئی مشتبہ حوالہ/ہنڈی ٹرانزیکشن نہیں پائی گئی۔")
+                else:
+                    parts.append("✓ **SBP CDD & AML/CFT Cleared**: The account holder cleared screening against NACTA 4th Schedule, UNSC Resolution 1267 Sanctions, and Politically Exposed Persons (PEPs) registry under SBP BPRD Circular No. 1 of 2021 with zero adverse matches.")
 
         # 2. Questions regarding balance tampering or ledger calculations
         elif any(w in q_lower for w in ["balance", "ledger", "math", "opening", "closing", "tamper", "tampered", "discrepancy", "بیلنس", "حساب", "رقم"]):

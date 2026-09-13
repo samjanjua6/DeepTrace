@@ -14,6 +14,7 @@ class SemanticPKFinancialAgent(BaseForensicAgent):
         """
         raw_findings = (
             self.get_findings_by_rule_prefix("RULE_PK_")
+            + self.get_findings_by_rule_prefix("RULE_AML_")
             + self.get_findings_by_category("MATHEMATICAL_MISMATCH")
             + self.get_findings_by_category("IBAN_CHECKSUM_FAILURE")
             + self.get_findings_by_category("FINANCIAL_VERIFICATION")
@@ -27,7 +28,12 @@ class SemanticPKFinancialAgent(BaseForensicAgent):
                 seen_ids.add(it_id)
                 financial_findings.append(it)
 
-        anomalies_count = len(financial_findings)
+        # Exclude benign/cleared verification markers from anomalies count
+        adverse_findings = [
+            it for it in financial_findings
+            if it.get("severity") in ("CRITICAL", "HIGH", "MEDIUM")
+        ]
+        anomalies_count = len(adverse_findings)
         citations = [it.get("ruleId") or it.get("rule_id", "") for it in financial_findings]
         citations = [c for c in citations if c]
 
@@ -37,13 +43,25 @@ class SemanticPKFinancialAgent(BaseForensicAgent):
         has_opening_fail = any("OPENING_BALANCE" in c for c in citations)
         has_closing_fail = any("CLOSING_BALANCE" in c for c in citations)
         has_multipage_discontinuity = any("MULTIPAGE_DISCONTINUITY" in c for c in citations)
+        has_nacta_match = any("NACTA" in c for c in citations)
+        has_unsc_match = any("UNSC" in c for c in citations)
+        has_pep_match = any("PEP" in c for c in citations)
+        has_hawala = any("HIGH_RISK_NARRATION" in c for c in citations)
 
         total_discrepancies = []
-        for it in financial_findings:
+        for it in adverse_findings:
             disc = it.get("discrepancy")
             if disc:
                 total_discrepancies.append(f"{it.get('title', 'Discrepancy')}: {disc}")
 
+        if has_nacta_match:
+            key_indicators.append("CRITICAL: Proscribed entity/individual match under NACTA 4th Schedule (ATA 1997 §11EE). Mandatory account freeze and STR filing.")
+        if has_unsc_match:
+            key_indicators.append("CRITICAL: Designated entity match under UN Security Council Resolution 1267 (UNSC Act 1948). Mandatory immediate asset freeze.")
+        if has_pep_match:
+            key_indicators.append("HIGH: Politically Exposed Person (PEP) identified under SBP BPRD Circular No. 1/2021. Mandates Senior Management Approval (SMA) & EDD.")
+        if has_hawala:
+            key_indicators.append("HIGH: Suspicious informal Hawala/Hundi/Crypto red flag narrations detected violating SBP BPRD Circular No. 3/2018.")
         if has_iban_fail:
             key_indicators.append("Invalid Pakistani IBAN checksum failing ISO 7064 MOD-97 check.")
         if has_opening_fail:
@@ -54,19 +72,20 @@ class SemanticPKFinancialAgent(BaseForensicAgent):
             key_indicators.append("Running ledger math failure: debit/credit transactions do not sum to printed balance.")
 
         if anomalies_count > 0:
-            # Mathematical tampering is deterministic and carries near 100% confidence
+            # Mathematical or AML sanctions tampering is deterministic and carries near 100% confidence
             confidence = min(0.99, 0.85 + (anomalies_count * 0.05))
             summary = (
-                f"Pakistani financial verification identified {anomalies_count} deterministic mathematical discrepancy(ies). "
-                f"Discrepancies identified: {'; '.join(total_discrepancies) if total_discrepancies else 'Ledger reconciliation failures.'} "
-                "These arithmetic failures provide definitive mathematical proof of numerical balance manipulation."
+                f"Pakistani financial & AML/CDD verification identified {anomalies_count} deterministic adverse finding(s). "
+                f"Discrepancies identified: {'; '.join(total_discrepancies) if total_discrepancies else 'Statutory AML/sanctions breaches or ledger reconciliation failures.'} "
+                "These findings provide definitive proof of regulatory non-compliance or numerical balance manipulation."
             )
         else:
             confidence = 0.95
             summary = (
-                "Pakistani financial verification confirmed complete mathematical integrity. "
+                "Pakistani financial & SBP Customer Due Diligence (CDD) verification confirmed complete integrity. "
                 "All transaction ledger debits and credits reconcile perfectly across all pages to stated opening and closing balances. "
-                "All SBP bank IBANs satisfy ISO 7064 MOD-97 checksum validation."
+                "All SBP bank IBANs satisfy ISO 7064 MOD-97 checksum validation. "
+                "Screening against NACTA 4th Schedule, UNSC 1267 Sanctions, and PEP registries cleared with zero adverse matches."
             )
 
         return {

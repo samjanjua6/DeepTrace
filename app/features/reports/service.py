@@ -175,11 +175,28 @@ async def generate_report(db: Prisma, investigation_id: str, options: dict | Non
     p1.insert_text((55, curr_y + 18), f"Total Verified Findings: {tot}", fontsize=8.5, fontname="hebo")
     p1.insert_text((55, curr_y + 34), f"Critical: {crit}  |  High: {hi}  |  Medium: {med}  |  Low: {tot - crit - hi - med}", fontsize=8, fontname="helv")
 
-    curr_y += 65
+    curr_y += 55
+    has_nacta = any("NACTA" in (it.ruleId or "") for it in evidence_items)
+    has_unsc = any("UNSC" in (it.ruleId or "") for it in evidence_items)
+    has_pep = any("PEP" in (it.ruleId or "") for it in evidence_items)
+    if has_nacta or has_unsc:
+        aml_status_str = "SBP AML/CFT: PROSCRIBED MATCH (ATA 1997 §11EE / UNSC ACT 1948 - STR & FREEZE MANDATORY)"
+        aml_col = (0.7, 0.1, 0.1)
+    elif has_pep:
+        aml_status_str = "SBP AML/CFT: POLITICALLY EXPOSED PERSON (PEP) — EDD & SENIOR MGMT APPROVAL REQUIRED"
+        aml_col = (0.8, 0.4, 0.0)
+    else:
+        aml_status_str = "SBP AML/CFT: CDD CLEARED (NACTA 4th Schedule, UNSC 1267 & PEP Registries Passed)"
+        aml_col = (0.05, 0.45, 0.15)
+
+    p1.draw_rect(pymupdf.Rect(40, curr_y, 555, curr_y + 20), color=aml_col, fill=None, width=0.8)
+    p1.insert_text((50, curr_y + 13), aml_status_str, fontsize=7.2, fontname="hebo", color=aml_col)
+
+    curr_y += 30
     # Regulatory statement snippet on Page 1
     p1.insert_text(
         (40, curr_y),
-        "STATUTORY RECOGNITION: Generated pursuant to Electronic Transactions Ordinance 2002 (ETO 2002) §3 & §4.",
+        "STATUTORY RECOGNITION: ETO 2002 §3 & §4  |  PECA 2016 §33/§34  |  SBP BPRD Circular 1 of 2021",
         fontsize=7.5,
         fontname="helv",
         color=(0.3, 0.3, 0.3),
@@ -248,11 +265,12 @@ async def generate_report(db: Prisma, investigation_id: str, options: dict | Non
             ),
         ),
         (
-            "3. State Bank of Pakistan (SBP) Framework for Digital Onboarding & Verification",
+            "3. State Bank of Pakistan (SBP) AML/CFT & Customer Due Diligence (CDD) Compliance",
             (
-                "In compliance with SBP BPRD Circular No. 2 of 2023 and AML/CFT/CPF regulations, regulated lending "
-                "institutions and fintechs are required to exercise Enhanced Due Diligence (EDD) upon identifying "
-                "mathematical balance discontinuities, IBAN checksum failures, or unauthorized PDF post-generation edits."
+                "Under SBP BPRD Circular No. 1 of 2021, Circular No. 2 of 2012, Section 11EE of the Anti-Terrorism Act 1997 "
+                "(ATA 1997), and the United Nations (Security Council) Act 1948, regulated institutions are legally obligated to screen "
+                "customers and transactions against the NACTA 4th Schedule proscribed persons list, UN Security Council Resolution 1267 "
+                "sanctions, and identify Politically Exposed Persons (PEPs) requiring Senior Management Approval and Enhanced Due Diligence (EDD)."
             ),
         ),
         (

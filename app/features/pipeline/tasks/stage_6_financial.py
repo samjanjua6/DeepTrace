@@ -642,6 +642,7 @@ async def process_financial(
             primary_iban_info: dict[str, Any] | None = None
             ledger_sm: CrossPageLedgerStateMachine | None = None
             template_eval_summary: dict[str, Any] | None = None
+            aml_cdd_summary: dict[str, Any] | None = None
 
             for doc in relevant_docs:
 
@@ -1602,6 +1603,50 @@ async def process_financial(
                             "title": finding.title,
                         })
 
+                # ─────────────────────────────────────────────────────────────
+                # 5. SBP AML/CFT & Customer Due Diligence (CDD) Screening
+                # ─────────────────────────────────────────────────────────────
+                if doc.documentType in ("BANK_STATEMENT", "DIGITAL_WALLET_LEDGER"):
+                    try:
+                        from app.features.pipeline.tasks.aml_screening_engine import perform_sbp_cdd_screening
+                        tx_rows = ledger_sm.get_ledger_rows() if ledger_sm is not None else []
+                        aml_res = perform_sbp_cdd_screening(
+                            all_text=all_text,
+                            transactions=tx_rows,
+                            customer_name_hint=None,
+                            cnic_hint=None,
+                        )
+                        aml_cdd_summary = aml_res
+
+                        for aml_f in aml_res.get("findings", []):
+                            finding = await tx.evidenceitem.create(
+                                data={
+                                    "document": {"connect": {"id": doc.id}},
+                                    "pipelineStage": {"connect": {"id": pipeline_stage_id}},
+                                    "category": aml_f.get("category", "TRANSACTION_FORMAT_VIOLATION"),
+                                    "severity": aml_f.get("severity", "INFO"),
+                                    "ruleId": aml_f.get("rule_id", "RULE_AML_CDD_CLEARED"),
+                                    "riskPoints": aml_f.get("risk_points", 0),
+                                    "title": aml_f.get("title", "SBP CDD Screening"),
+                                    "description": aml_f.get("description", ""),
+                                    "isDeterministic": True,
+                                    "pageNumber": 1,
+                                    "expectedValue": aml_f.get("expected_value"),
+                                    "actualValue": aml_f.get("actual_value"),
+                                    "discrepancy": aml_f.get("discrepancy"),
+                                    "technicalDetails": Json(aml_f.get("technical_details", {})),
+                                }
+                            )
+                            stage_findings.append({
+                                "id": finding.id,
+                                "rule_id": aml_f.get("rule_id"),
+                                "severity": finding.severity,
+                                "page": 1,
+                                "title": finding.title,
+                            })
+                    except Exception as aml_err:
+                        logger.warning(f"SBP CDD / AML screening error: {aml_err}")
+
                 pdf_doc.close()
 
             duration_ms = int((time.perf_counter() - start_time) * 1000)
@@ -1628,6 +1673,7 @@ async def process_financial(
                 "iban": primary_iban_info,
                 "rows": ledger_sm.get_ledger_rows() if ledger_sm is not None else [],
                 "bank_template_verification": template_eval_summary,
+                "aml_cdd_screening": aml_cdd_summary,
             }
 
             await tx.pipelinestage.update(

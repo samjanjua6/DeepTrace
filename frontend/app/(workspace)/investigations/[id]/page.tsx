@@ -9,6 +9,7 @@ import { LedgerMathTable } from "@/components/dossier/LedgerMathTable";
 import { SplitLedgerEvidenceViewer } from "@/components/dossier/SplitLedgerEvidenceViewer";
 import { AnomalyCard } from "@/components/dossier/AnomalyCard";
 import { IBANChecksumCard } from "@/components/dossier/IBANChecksumCard";
+import { SBPAmlCddCard } from "@/components/dossier/SBPAmlCddCard";
 import { AnalystOverrideModal } from "@/components/dossier/AnalystOverrideModal";
 import { CreditOfficerBriefing } from "@/components/dossier/CreditOfficerBriefing";
 import {
@@ -661,7 +662,7 @@ export default function InvestigationWorkspacePage() {
                         : "bg-paper-1 text-ink-700 border-rule hover:bg-paper-2"
                     }`}
                   >
-                    SBP IBAN
+                    SBP IBAN & AML
                   </button>
                 </>
               )}
@@ -808,7 +809,7 @@ export default function InvestigationWorkspacePage() {
             </div>
           )}
 
-          {/* Tab 3: SBP IBAN Checksum (Only for Bank Statements) */}
+          {/* Tab 3: SBP IBAN Checksum & AML/CDD Audit (Only for Bank Statements) */}
           {activeTab === "iban" && isFinancial && (
             <div className="space-y-4">
               <IBANChecksumCard
@@ -819,6 +820,10 @@ export default function InvestigationWorkspacePage() {
                 checkDigits={financialData?.iban?.check_digits}
                 bankCode={financialData?.iban?.bank_code}
                 validationReason={financialData?.iban?.validation_reason}
+                evidence={evidence}
+              />
+              <SBPAmlCddCard
+                screening={financialData?.aml_cdd_screening}
                 evidence={evidence}
               />
             </div>
@@ -1043,15 +1048,25 @@ export default function InvestigationWorkspacePage() {
                 })()}
               </div>
 
-              {/* 6. Deterministic Financial Math Reconciliation */}
+              {/* 6. Deterministic Financial Math & SBP CDD Audit */}
               <div className="flex justify-between items-center font-semibold">
-                <span>6. Deterministic Financial Math Reconciliation</span>
+                <span>6. Deterministic Financial Math & SBP CDD Audit</span>
                 {(() => {
                   if (!isFinancial) return <span className="text-ink-500 font-normal">— NOT APPLICABLE</span>;
                   const st = getStageStatus("FINANCIAL_VERIFICATION");
                   if (st === "PENDING") return <span className="text-ink-400 font-normal">○ PENDING</span>;
                   if (st === "RUNNING") return <span className="text-forensic-amber animate-pulse">● RECONCILING...</span>;
                   if (st === "FAILED") return <span className="text-forensic-red">✕ VERIFICATION FAILED</span>;
+                  const hasNactaOrUnsc = evidence.some(
+                    (e) => (e.ruleId || "").includes("AML_NACTA") || (e.ruleId || "").includes("AML_UNSC")
+                  );
+                  if (hasNactaOrUnsc) {
+                    return <span className="text-forensic-red font-bold">✕ PROSCRIBED MATCH (NACTA / UNSC)</span>;
+                  }
+                  const hasPep = evidence.some((e) => (e.ruleId || "").includes("AML_PEP"));
+                  if (hasPep) {
+                    return <span className="text-amber-800 font-bold">▲ PEP IDENTIFIED (EDD REQUIRED)</span>;
+                  }
                   const hasMathAnom = evidence.some(
                     (e) =>
                       e.category === "MATHEMATICAL_MISMATCH" ||
@@ -1063,7 +1078,7 @@ export default function InvestigationWorkspacePage() {
                   );
                   return (
                     <span className={hasMathAnom ? "text-forensic-red" : "text-forensic-green"}>
-                      {hasMathAnom ? "✕ RECONCILIATION MISMATCH" : "✓ RECONCILED"}
+                      {hasMathAnom ? "✕ RECONCILIATION MISMATCH" : "✓ RECONCILED & CDD CLEARED"}
                     </span>
                   );
                 })()}
