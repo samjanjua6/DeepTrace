@@ -170,12 +170,33 @@ export interface Investigation {
   riskAssessment?: RiskAssessment;
 }
 
+export interface RFC3161Seal {
+  status: string;
+  verified: boolean;
+  tsa_provider: string;
+  is_pakistan_accredited?: boolean;
+  gen_time: string;
+  serial_number: string;
+  digest_algorithm?: string;
+  message_imprint?: string;
+  token_storage_path?: string;
+  token_b64?: string;
+  legal_framework?: string;
+  is_offline_local_seal?: boolean;
+}
+
 export interface CustodyEvent {
   id: string;
   investigationId: string;
   eventType: string;
+  description?: string;
+  sha256Hash?: string;
   actor: string;
   ipAddress?: string;
   payload?: Record<string, any>;
+  metadata?: {
+    rfc3161?: RFC3161Seal;
+    [key: string]: any;
+  };
   timestamp: string;
 }

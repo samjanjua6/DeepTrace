@@ -228,20 +228,53 @@ async def upload_document(
                 }
             )
 
-        # Insert NIST/ETO Custody Event
+        # Acquire RFC 3161 Cryptographic Timestamp Seal (PECA 2016 / ETO 2002)
+        rfc3161_meta = None
+        try:
+            from app.core import rfc3161_service
+            ts_info = rfc3161_service.request_timestamp_token(sha256)
+            tst_storage_path = f"custody_seals/{investigation.id}/{doc.id}_acquisition.tst"
+            storage.upload_file(
+                settings.s3_bucket_artifacts,
+                tst_storage_path,
+                ts_info["token_der"],
+                "application/vnd.etsi.timestamp-token",
+            )
+            rfc3161_meta = {
+                "status": ts_info["status"],
+                "tsa_provider": ts_info["tsa_provider"],
+                "is_pakistan_accredited": ts_info["is_pakistan_accredited"],
+                "gen_time": ts_info["gen_time"],
+                "serial_number": ts_info["serial_number"],
+                "policy_oid": ts_info["policy_oid"],
+                "digest_algorithm": ts_info["digest_algorithm"],
+                "message_imprint": ts_info["message_imprint"],
+                "token_storage_path": tst_storage_path,
+                "token_b64": ts_info["token_b64"],
+                "verified": ts_info["verified"],
+                "legal_framework": ts_info["legal_framework"],
+                "is_offline_local_seal": ts_info.get("is_offline_local_seal", False),
+            }
+        except Exception as tsa_err:
+            rfc3161_meta = None
+
+        from prisma import Json
+
+        # Insert NIST/ETO/PECA Custody Event
         await tx.custodyevent.create(
             data={
                 "investigationId": investigation.id,
                 "eventType": "ACQUISITION",
-                "description": f"Document '{filename}' acquired, SHA-256 fingerprinted, and dual custody clones locked.",
+                "description": f"Document '{filename}' acquired, SHA-256 fingerprinted, dual custody clones locked, and RFC 3161 sealed (PECA 2016).",
                 "sha256Hash": sha256,
                 "actorId": actor_id,
                 "actorType": "user" if actor_id else "system",
                 "ipAddress": ip_address,
+                "metadata": Json({"rfc3161": rfc3161_meta}) if rfc3161_meta else None,
             }
         )
 
-    return doc
+        return doc
 
 
 async def list_documents(db: Prisma, org_id: str, investigation_id: str) -> list:

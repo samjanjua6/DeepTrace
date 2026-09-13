@@ -98,7 +98,103 @@ async def get_custody_log(
     investigation=Depends(get_investigation),
     db: Annotated[Prisma, Depends(get_db_dep)] = None
 ):
-    """Return chronological chain-of-custody log (NIST SP 800-86 / ETO 2002)."""
+    """Return chronological chain-of-custody log (NIST SP 800-86 / ETO 2002 / PECA 2016)."""
     return await service.get_custody_chain(db, investigation.organizationId, investigation.id)
+
+
+@router.get("/{investigation_id}/custody/{event_id}/rfc3161-token",
+            summary="Download RFC 3161 TimeStampToken (.tst) binary for court submission")
+async def download_rfc3161_token(
+    event_id: str,
+    investigation=Depends(get_investigation),
+    db: Annotated[Prisma, Depends(get_db_dep)] = None,
+):
+    """Download RFC 3161 TimeStampToken (.tst) binary for court submission under PECA 2016."""
+    from fastapi import HTTPException, Response
+    import base64
+
+    event = await db.custodyevent.find_first(
+        where={"id": event_id, "investigationId": investigation.id}
+    )
+    if not event:
+        raise HTTPException(status_code=404, detail="Custody event not found")
+
+    meta = event.metadata if isinstance(event.metadata, dict) else {}
+    rfc_info = meta.get("rfc3161")
+    if not rfc_info:
+        raise HTTPException(status_code=404, detail="No RFC 3161 timestamp seal attached to this custody event")
+
+    tst_bytes = None
+    if rfc_info.get("token_b64"):
+        tst_bytes = base64.b64decode(rfc_info["token_b64"])
+    elif rfc_info.get("token_storage_path"):
+        from app.config import get_settings
+        from app.core import storage
+        settings = get_settings()
+        tst_bytes = storage.get_file(settings.s3_bucket_artifacts, rfc_info["token_storage_path"])
+
+    if not tst_bytes:
+        raise HTTPException(status_code=404, detail="RFC 3161 binary token not found in storage")
+
+    return Response(
+        content=tst_bytes,
+        media_type="application/vnd.etsi.timestamp-token",
+        headers={
+            "Content-Disposition": f'attachment; filename="deeptrace_rfc3161_{event.id}.tst"'
+        },
+    )
+
+
+@router.get("/{investigation_id}/custody/{event_id}/rfc3161-verify",
+            response_model=schemas.RFC3161VerificationResponse,
+            summary="Verify RFC 3161 TimeStampToken cryptographically against evidence hash")
+async def verify_rfc3161_token(
+    event_id: str,
+    investigation=Depends(get_investigation),
+    db: Annotated[Prisma, Depends(get_db_dep)] = None,
+):
+    """Verify an RFC 3161 TimeStampToken cryptographically against the evidence SHA-256 hash."""
+    from fastapi import HTTPException
+    import base64
+
+    event = await db.custodyevent.find_first(
+        where={"id": event_id, "investigationId": investigation.id}
+    )
+    if not event or not event.sha256Hash:
+        raise HTTPException(status_code=404, detail="Custody event or evidence hash not found")
+
+    meta = event.metadata if isinstance(event.metadata, dict) else {}
+    rfc_info = meta.get("rfc3161")
+    if not rfc_info:
+        raise HTTPException(status_code=404, detail="No RFC 3161 timestamp seal attached to this custody event")
+
+    tst_bytes = None
+    if rfc_info.get("token_b64"):
+        tst_bytes = base64.b64decode(rfc_info["token_b64"])
+    elif rfc_info.get("token_storage_path"):
+        from app.config import get_settings
+        from app.core import storage
+        settings = get_settings()
+        tst_bytes = storage.get_file(settings.s3_bucket_artifacts, rfc_info["token_storage_path"])
+
+    if not tst_bytes:
+        raise HTTPException(status_code=404, detail="RFC 3161 binary token not found")
+
+    from app.core import rfc3161_service
+    verified_data = rfc3161_service.verify_timestamp_token_bytes(tst_bytes, event.sha256Hash)
+
+    return schemas.RFC3161VerificationResponse(
+        event_id=event.id,
+        status=verified_data["status"],
+        verified=verified_data["verified"],
+        tsa_provider=verified_data["tsa_provider"],
+        is_pakistan_accredited=verified_data["is_pakistan_accredited"],
+        gen_time=verified_data["gen_time"],
+        serial_number=verified_data["serial_number"],
+        digest_algorithm=verified_data["digest_algorithm"],
+        message_imprint=verified_data["message_imprint"],
+        legal_framework=verified_data["legal_framework"],
+        tsa_certificate=verified_data.get("tsa_certificate"),
+    )
 
 

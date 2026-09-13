@@ -59,7 +59,22 @@ class CustodyEventResponse(BaseModel):
     sha256_hash: str | None = Field(default=None, validation_alias=AliasChoices("sha256_hash", "sha256Hash"))
     actor_type: str = Field(default="system", validation_alias=AliasChoices("actor_type", "actorType"))
     actor_id: str | None = Field(default=None, validation_alias=AliasChoices("actor_id", "actorId"))
+    metadata: dict | None = None
     timestamp: datetime = Field(validation_alias=AliasChoices("timestamp", "created_at", "createdAt"))
+
+
+class RFC3161VerificationResponse(BaseModel):
+    event_id: str
+    status: str
+    verified: bool
+    tsa_provider: str
+    is_pakistan_accredited: bool
+    gen_time: str
+    serial_number: str
+    digest_algorithm: str
+    message_imprint: str
+    legal_framework: str
+    tsa_certificate: dict | None = None
 
 
 class DocumentDetailResponse(DocumentResponse):

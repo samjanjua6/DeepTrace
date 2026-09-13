@@ -267,11 +267,44 @@ export async function getCustodyEvents(
     id: e.id,
     investigationId: e.investigation_id || e.investigationId || investigationId,
     eventType: e.event_type || e.eventType || "",
-    actor: e.actor || "",
+    description: e.description || "",
+    sha256Hash: e.sha256_hash || e.sha256Hash,
+    actor: e.actor_id || e.actorId || e.actor || e.actor_type || "system",
     ipAddress: e.ip_address || e.ipAddress,
-    payload: e.payload,
+    payload: e.metadata || e.payload,
+    metadata: e.metadata || e.payload,
     timestamp: e.timestamp || e.created_at || new Date().toISOString(),
   }));
+}
+
+export async function downloadRFC3161Token(
+  investigationId: string,
+  eventId: string
+): Promise<Blob> {
+  await ensureAuth().catch(() => {});
+  const res = await fetch(
+    `${API_BASE}/investigations/${investigationId}/custody/${eventId}/rfc3161-token`,
+    {
+      headers: getAuthHeaders(),
+    }
+  );
+  if (!res.ok) throw new Error("Failed to download RFC 3161 token");
+  return await res.blob();
+}
+
+export async function verifyRFC3161Token(
+  investigationId: string,
+  eventId: string
+): Promise<any> {
+  await ensureAuth().catch(() => {});
+  const res = await fetch(
+    `${API_BASE}/investigations/${investigationId}/custody/${eventId}/rfc3161-verify`,
+    {
+      headers: getAuthHeaders(),
+    }
+  );
+  if (!res.ok) throw new Error("Failed to verify RFC 3161 token");
+  return await res.json();
 }
 
 // ── Pipeline Orchestration ────────────────────────────────────────────────────

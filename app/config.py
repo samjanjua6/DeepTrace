@@ -70,10 +70,12 @@ class Settings(BaseSettings):
     google_gemini_api_key: str | None = None
     anthropic_api_key: str | None = None
 
-    # ── Langfuse Observability ───────────────────────────────────────────────
-    langfuse_public_key: str | None = None
-    langfuse_secret_key: str | None = None
-    langfuse_host: str = "https://cloud.langfuse.com"
+    # ── RFC 3161 Time Stamping Authority (PECA 2016 / ETO 2002) ──────────────
+    tsa_enabled: bool = True
+    tsa_primary_url: str = "http://timestamp.digicert.com"
+    tsa_fallback_urls: list[str] = ["https://freetsa.org/tsr", "http://timestamp.sectigo.com"]
+    tsa_timeout_seconds: float = 3.5
+    tsa_allow_offline_fallback: bool = True
 
     # ── Feature Flags ────────────────────────────────────────────────────────
     @property

@@ -78,13 +78,55 @@ async def process_custody_lock(
                         doc.mimeType,
                     )
 
-                # 4. Append Verification CustodyEvent
+                # 4. Acquire RFC 3161 Cryptographic Timestamp Seal (PECA 2016 / ETO 2002)
+                tst_storage_path = None
+                rfc3161_meta = None
+                try:
+                    from app.core import rfc3161_service
+                    ts_info = rfc3161_service.request_timestamp_token(current_sha256)
+                    tst_storage_path = f"custody_seals/{investigation_id}/{doc.id}_rfc3161.tst"
+                    storage.upload_file(
+                        settings.s3_bucket_artifacts,
+                        tst_storage_path,
+                        ts_info["token_der"],
+                        "application/vnd.etsi.timestamp-token",
+                    )
+                    rfc3161_meta = {
+                        "status": ts_info["status"],
+                        "tsa_provider": ts_info["tsa_provider"],
+                        "is_pakistan_accredited": ts_info["is_pakistan_accredited"],
+                        "gen_time": ts_info["gen_time"],
+                        "serial_number": ts_info["serial_number"],
+                        "policy_oid": ts_info["policy_oid"],
+                        "digest_algorithm": ts_info["digest_algorithm"],
+                        "message_imprint": ts_info["message_imprint"],
+                        "token_storage_path": tst_storage_path,
+                        "token_b64": ts_info["token_b64"],
+                        "verified": ts_info["verified"],
+                        "legal_framework": ts_info["legal_framework"],
+                        "is_offline_local_seal": ts_info.get("is_offline_local_seal", False),
+                    }
+                except Exception as tsa_err:
+                    rfc3161_meta = {
+                        "status": "UNAVAILABLE",
+                        "error": str(tsa_err),
+                    }
+
+                # 5. Append Verification CustodyEvent with RFC 3161 Seal
+                custody_desc = (
+                    f"Cryptographic integrity verified and RFC 3161 Timestamp Seal registered from '{rfc3161_meta.get('tsa_provider', 'Local TSA')}' (PECA 2016 §33/§34)."
+                    if rfc3161_meta and rfc3161_meta.get("status") == "SEALED"
+                    else "Cryptographic integrity verified prior to forensic pipeline execution."
+                )
                 await tx.custodyevent.create(
                     data={
                         "investigation": {"connect": {"id": investigation_id}},
-                        "eventType": "VERIFICATION",
+                        "eventType": "CUSTODY_SEAL_RFC3161" if rfc3161_meta and rfc3161_meta.get("status") == "SEALED" else "VERIFICATION",
                         "sha256Hash": current_sha256,
-                        "description": "Cryptographic integrity verified prior to forensic pipeline execution.",
+                        "description": custody_desc,
+                        "actorType": "system",
+                        "actorId": "deeptrace-rfc3161-tsa",
+                        "metadata": Json({"rfc3161": rfc3161_meta}) if rfc3161_meta else None,
                     }
                 )
 
@@ -93,6 +135,7 @@ async def process_custody_lock(
                     "sha256_hash": current_sha256,
                     "size_bytes": len(file_bytes),
                     "custody_status": "LOCKED_AND_VERIFIED",
+                    "rfc3161_seal": rfc3161_meta,
                 })
 
             duration_ms = int((time.perf_counter() - start_time) * 1000)

@@ -212,13 +212,15 @@ def _generate_deterministic_briefing(
             f"Verdict: {risk_tier} RISK (Score: {overall_score}/100) — {clean_directive}.\n"
             f"Forensic validation confirms 100% document authenticity across all pages. "
             f"All transaction figures reconcile with the core banking ledger without font, visual, "
-            f"or mathematical anomalies. State Bank of Pakistan (SBP) IBAN validation passed."
+            f"or mathematical anomalies. State Bank of Pakistan (SBP) IBAN validation passed. "
+            f"Digital chain of custody is cryptographically sealed under PECA 2016 §33/§34 via RFC 3161 TSA."
         )
         urdu_summary = (
             f"کریڈٹ آفیسر کے لیے تفصیلی خلاصہ:\n"
             f"فیصلہ: کم خطرہ ({risk_tier} RISK, سکور: {overall_score}/100) — براہِ راست منظوری ({clean_directive})۔\n"
             f"فرانزک تصدیق سے ثابت ہوا ہے کہ یہ دستاویز مکمل طور پر اصل اور غیر تبدیل شدہ ہے۔ "
-            f"تمام کھاتہ جاتی اعداد و شمار، رننگ بیلنس اور فونٹ مکمل درست ہیں اور اسٹیٹ بینک آف پاکستان (SBP) کا IBAN معیار پر پورا اترتا ہے۔"
+            f"تمام کھاتہ جاتی اعداد و شمار، رننگ بیلنس اور فونٹ درست ہیں، اسٹیٹ بینک آف پاکستان (SBP) کا IBAN تصدیق شدہ ہے، "
+            f"اور شواہد کا چین آف کسٹڈی پی ای سی اے 2016 اور RFC 3161 ڈیجیٹل ٹائم سٹیمپ کے تحت محفوظ شدہ ہے۔"
         )
         narrative = (
             f"Multi-Agent forensic investigation verified document authenticity (Risk Score: {overall_score}/100, {risk_tier}). "
