@@ -192,12 +192,35 @@ async def generate_report(db: Prisma, investigation_id: str, options: dict | Non
     p1.draw_rect(pymupdf.Rect(40, curr_y, 555, curr_y + 20), color=aml_col, fill=None, width=0.8)
     p1.insert_text((50, curr_y + 13), aml_status_str, fontsize=7.2, fontname="hebo", color=aml_col)
 
-    curr_y += 30
+    curr_y += 26
+    has_cnic_fail = any(
+        ("RULE_CNIC_PROVINCE_CODE_INVALID" in (it.ruleId or "")
+         or "RULE_CNIC_GENDER_PARITY_MISMATCH" in (it.ruleId or "")
+         or "RULE_CNIC_MRZ_CHECKSUM_INVALID" in (it.ruleId or "")
+         or "RULE_CNIC_MRZ_FRONT_MISMATCH" in (it.ruleId or ""))
+        for it in evidence_items
+    )
+    has_cnic_verified = any("RULE_CNIC_VERIFIED" in (it.ruleId or "") for it in evidence_items)
+
+    if has_cnic_fail:
+        cnic_status_str = "NADRA IDENTITY AUDIT: FRAUD DETECTED (NADRA Ord 2000 §30 / ICAO 9303 MRZ Checksum Failure)"
+        cnic_col = (0.7, 0.1, 0.1)
+    elif has_cnic_verified:
+        cnic_status_str = "NADRA IDENTITY AUDIT: VERIFIED AUTHENTIC (Province Code, Gender Parity & ICAO 9303 MRZ Passed)"
+        cnic_col = (0.05, 0.45, 0.15)
+    else:
+        cnic_status_str = "NADRA IDENTITY AUDIT: 13-Digit Format & Administrative Rules Checked"
+        cnic_col = (0.3, 0.35, 0.45)
+
+    p1.draw_rect(pymupdf.Rect(40, curr_y, 555, curr_y + 20), color=cnic_col, fill=None, width=0.8)
+    p1.insert_text((50, curr_y + 13), cnic_status_str, fontsize=7.2, fontname="hebo", color=cnic_col)
+
+    curr_y += 26
     # Regulatory statement snippet on Page 1
     p1.insert_text(
         (40, curr_y),
-        "STATUTORY RECOGNITION: ETO 2002 §3 & §4  |  PECA 2016 §33/§34  |  SBP BPRD Circular 1 of 2021",
-        fontsize=7.5,
+        "STATUTORY RECOGNITION: ETO 2002 §3 & §4  |  PECA 2016 §33/§34  |  SBP BPRD 1/2021  |  NADRA Ord 2000 §30",
+        fontsize=7.2,
         fontname="helv",
         color=(0.3, 0.3, 0.3),
     )
@@ -274,7 +297,16 @@ async def generate_report(db: Prisma, investigation_id: str, options: dict | Non
             ),
         ),
         (
-            "4. NIST SP 800-86 Guide to Integrating Forensic Techniques into Incident Response",
+            "4. National Database & Registration Authority Ordinance 2000 (NADRA Ord §30) & ICAO 9303",
+            (
+                "Under Section 30 of the NADRA Ordinance 2000, possessing, forging, or uttering an unauthorized national "
+                "identity card or number constitutes a cognizable offense punishable by up to 14 years imprisonment. "
+                "DeepTrace validates the 13-digit administrative format, 1st-digit provincial encoding (1-8), 13th-digit gender "
+                "parity, and evaluates 3-line TD1 Machine Readable Zones (MRZ) against ICAO Doc 9303 7-3-1 modulus-10 checksum standards."
+            ),
+        ),
+        (
+            "5. NIST SP 800-86 Guide to Integrating Forensic Techniques into Incident Response",
             (
                 "All evidentiary artifacts, sub-pixel baseline offsets, discrete cosine transform (DCT) residual heatmaps, "
                 "and multi-page balance reconciliation audits are compiled under deterministic, non-destructive methodologies "

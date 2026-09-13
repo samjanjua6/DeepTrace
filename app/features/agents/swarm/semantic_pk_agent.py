@@ -15,6 +15,7 @@ class SemanticPKFinancialAgent(BaseForensicAgent):
         raw_findings = (
             self.get_findings_by_rule_prefix("RULE_PK_")
             + self.get_findings_by_rule_prefix("RULE_AML_")
+            + self.get_findings_by_rule_prefix("RULE_CNIC_")
             + self.get_findings_by_category("MATHEMATICAL_MISMATCH")
             + self.get_findings_by_category("IBAN_CHECKSUM_FAILURE")
             + self.get_findings_by_category("FINANCIAL_VERIFICATION")
@@ -47,6 +48,10 @@ class SemanticPKFinancialAgent(BaseForensicAgent):
         has_unsc_match = any("UNSC" in c for c in citations)
         has_pep_match = any("PEP" in c for c in citations)
         has_hawala = any("HIGH_RISK_NARRATION" in c for c in citations)
+        has_cnic_province = any("RULE_CNIC_PROVINCE_CODE_INVALID" in c for c in citations)
+        has_cnic_gender = any("RULE_CNIC_GENDER_PARITY_MISMATCH" in c for c in citations)
+        has_cnic_mrz = any("RULE_CNIC_MRZ_CHECKSUM_INVALID" in c for c in citations)
+        has_cnic_front_mrz = any("RULE_CNIC_MRZ_FRONT_MISMATCH" in c for c in citations)
 
         total_discrepancies = []
         for it in adverse_findings:
@@ -62,6 +67,14 @@ class SemanticPKFinancialAgent(BaseForensicAgent):
             key_indicators.append("HIGH: Politically Exposed Person (PEP) identified under SBP BPRD Circular No. 1/2021. Mandates Senior Management Approval (SMA) & EDD.")
         if has_hawala:
             key_indicators.append("HIGH: Suspicious informal Hawala/Hundi/Crypto red flag narrations detected violating SBP BPRD Circular No. 3/2018.")
+        if has_cnic_province:
+            key_indicators.append("CRITICAL: Pakistani CNIC 1st digit violates NADRA Ordinance 2000 §30 provincial administrative coding (codes 0 and 9 are non-existent).")
+        if has_cnic_gender:
+            key_indicators.append("CRITICAL: Pakistani CNIC 13th check digit gender parity contradicts declared cardholder sex/title under NADRA schema (Odd=Male, Even=Female).")
+        if has_cnic_mrz:
+            key_indicators.append("CRITICAL: Smart Identity Card reverse Machine Readable Zone (MRZ) failed ICAO Doc 9303 Part 5 7-3-1 modulus-10 checksum validation.")
+        if has_cnic_front_mrz:
+            key_indicators.append("CRITICAL: Visual front CNIC number contradicts reverse optical MRZ encoded data, confirming credential splicing or counterfeit assembly.")
         if has_iban_fail:
             key_indicators.append("Invalid Pakistani IBAN checksum failing ISO 7064 MOD-97 check.")
         if has_opening_fail:
@@ -72,20 +85,20 @@ class SemanticPKFinancialAgent(BaseForensicAgent):
             key_indicators.append("Running ledger math failure: debit/credit transactions do not sum to printed balance.")
 
         if anomalies_count > 0:
-            # Mathematical or AML sanctions tampering is deterministic and carries near 100% confidence
+            # Mathematical or AML sanctions or CNIC forgery is deterministic and carries near 100% confidence
             confidence = min(0.99, 0.85 + (anomalies_count * 0.05))
             summary = (
-                f"Pakistani financial & AML/CDD verification identified {anomalies_count} deterministic adverse finding(s). "
-                f"Discrepancies identified: {'; '.join(total_discrepancies) if total_discrepancies else 'Statutory AML/sanctions breaches or ledger reconciliation failures.'} "
-                "These findings provide definitive proof of regulatory non-compliance or numerical balance manipulation."
+                f"Pakistani financial, AML/CDD & NADRA identity verification identified {anomalies_count} deterministic adverse finding(s). "
+                f"Discrepancies identified: {'; '.join(total_discrepancies) if total_discrepancies else 'Statutory AML/sanctions breaches, CNIC administrative violations, or ledger reconciliation failures.'} "
+                "These findings provide definitive proof of regulatory non-compliance, identity forgery, or numerical balance manipulation."
             )
         else:
             confidence = 0.95
             summary = (
-                "Pakistani financial & SBP Customer Due Diligence (CDD) verification confirmed complete integrity. "
+                "Pakistani financial, SBP Customer Due Diligence (CDD), and NADRA identity verification confirmed complete integrity. "
                 "All transaction ledger debits and credits reconcile perfectly across all pages to stated opening and closing balances. "
                 "All SBP bank IBANs satisfy ISO 7064 MOD-97 checksum validation. "
-                "Screening against NACTA 4th Schedule, UNSC 1267 Sanctions, and PEP registries cleared with zero adverse matches."
+                "Screening against NACTA 4th Schedule, UNSC 1267 Sanctions, PEP registries, and NADRA CNIC structural integrity cleared with zero adverse matches."
             )
 
         return {

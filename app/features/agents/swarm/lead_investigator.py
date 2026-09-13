@@ -150,8 +150,26 @@ def _build_structured_credit_briefing_items(
         is_aml_unsc = "AML_UNSC" in (it.get("ruleId") or "")
         is_aml_pep = "AML_PEP" in (it.get("ruleId") or "")
         is_aml_hawala = "AML_HIGH_RISK" in (it.get("ruleId") or "")
+        is_cnic_province = "RULE_CNIC_PROVINCE_CODE_INVALID" in (it.get("ruleId") or "")
+        is_cnic_gender = "RULE_CNIC_GENDER_PARITY_MISMATCH" in (it.get("ruleId") or "")
+        is_cnic_mrz = "RULE_CNIC_MRZ_CHECKSUM_INVALID" in (it.get("ruleId") or "")
+        is_cnic_front_mrz = "RULE_CNIC_MRZ_FRONT_MISMATCH" in (it.get("ruleId") or "")
+        is_cnic_temporal = "RULE_CNIC_TEMPORAL_INVALID" in (it.get("ruleId") or "")
+        is_cnic_verified = "RULE_CNIC_VERIFIED" in (it.get("ruleId") or "")
 
-        if is_aml_nacta:
+        if is_cnic_province:
+            parts_ur = [f"صفحہ {page_num}: نادرا (NADRA) شناختی کارڈ ضابطہ بندی کی سنگین خلاف ورزی۔ کارڈ کا پہلا ہندسہ غیر قانونی صوبائی کوڈ ظاہر کرتا ہے (نادرا آرڈیننس 2000 دفعہ 30)۔"]
+        elif is_cnic_gender:
+            parts_ur = [f"صفحہ {page_num}: نادرا شناختی کارڈ کے 13ویں ہندسے اور کھاتہ دار کے نام/جنس میں کھلا تضاد۔ طاق/جفت ہندسہ قانونی جنس سے متصادم ہے (نادرا آرڈیننس 2000)۔"]
+        elif is_cnic_mrz:
+            parts_ur = [f"صفحہ {page_num}: سمارٹ کارڈ کے پچھلے رخ پر مشین ریڈ ایبل زون (MRZ) کا ICAO 9303 چیک سم فیل ہو گیا ہے۔ یہ کارڈ کمپیوٹر سے تیار کردہ جعلی دستاویز ہے۔"]
+        elif is_cnic_front_mrz:
+            parts_ur = [f"صفحہ {page_num}: شناختی کارڈ کے سامنے والے رخ کا نمبر پچھلے رخ کے MRZ کوڈ سے مختلف ہے۔ فوٹوشاپ یا کٹنگ کے ذریعے شناختی نمبر بدلا گیا ہے۔"]
+        elif is_cnic_temporal:
+            parts_ur = [f"صفحہ {page_num}: نادرا شناختی کارڈ کے اجرا اور میعاد کی تاریخوں میں زمانی تضاد پایا گیا ہے۔"]
+        elif is_cnic_verified:
+            parts_ur = [f"صفحہ {page_num}: نادرا شناختی کارڈ کے صوبائی کوڈ، جنس کے ہندسے اور سمارٹ کارڈ MRZ چیک سم کی باضابطہ تصدیق مکمل ہو چکی ہے۔"]
+        elif is_aml_nacta:
             parts_ur = [f"صفحہ {page_num}: نیکٹا (NACTA) فورتھ شیڈول کے تحت کالعدم فرد/تنظیم سے مماثلت (انسدادِ دہشت گردی ایکٹ 1997 دفعہ 11EE کی سنگین خلاف ورزی)۔ فوری اکاؤنٹ منجمد اور FMU کو STR بھیجنا لازمی ہے۔"]
         elif is_aml_unsc:
             parts_ur = [f"صفحہ {page_num}: اقوامِ متحدہ کی سلامتی کونسل (UNSC 1267) کی پابندیوں کی فہرست میں شامل دہشت گرد سے مماثلت (یو این ایس سی ایکٹ 1948)۔ فوری اثاثے منجمد کرنا لازمی ہے۔"]
@@ -460,6 +478,25 @@ class LeadInvestigatorAgent(BaseForensicAgent):
             if has_aml_pep and has_financial:
                 correlations.append(
                     "High-Risk PEP Exposure: Identified Politically Exposed Person (PEP) account displays abnormal transaction ledger manipulations requiring immediate senior management escalation."
+                )
+
+            # NADRA CNIC & Smart Card cross-correlations
+            has_cnic_tamper = any(
+                ("RULE_CNIC_PROVINCE_CODE_INVALID" in (it.get("ruleId") or "")
+                 or "RULE_CNIC_GENDER_PARITY_MISMATCH" in (it.get("ruleId") or "")
+                 or "RULE_CNIC_MRZ_CHECKSUM_INVALID" in (it.get("ruleId") or "")
+                 or "RULE_CNIC_MRZ_FRONT_MISMATCH" in (it.get("ruleId") or ""))
+                for it in ev_items
+            )
+            if has_cnic_tamper and has_financial:
+                correlations.append(
+                    "Identity-Financial Nexus (NADRA Ordinance 2000 §30): Identity credential tampering (CNIC province code, gender parity, or MRZ checksum failure) "
+                    "is coupled with financial ledger inconsistencies, indicating synthetic identity banking fraud."
+                )
+            elif has_cnic_tamper:
+                correlations.append(
+                    "National Identity Forgery (NADRA Ordinance 2000 §30): CNIC administrative encoding or reverse ICAO 9303 MRZ checksum failure "
+                    "establishes fraudulent credential manufacturing or Photoshop alteration."
                 )
             pages_with_font = {
                 it.get("pageNumber") or it.get("page_number")

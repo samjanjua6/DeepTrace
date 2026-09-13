@@ -10,6 +10,7 @@ import { SplitLedgerEvidenceViewer } from "@/components/dossier/SplitLedgerEvide
 import { AnomalyCard } from "@/components/dossier/AnomalyCard";
 import { IBANChecksumCard } from "@/components/dossier/IBANChecksumCard";
 import { SBPAmlCddCard } from "@/components/dossier/SBPAmlCddCard";
+import { NadraCnicCard } from "@/components/dossier/NadraCnicCard";
 import { AnalystOverrideModal } from "@/components/dossier/AnalystOverrideModal";
 import { CreditOfficerBriefing } from "@/components/dossier/CreditOfficerBriefing";
 import {
@@ -405,6 +406,16 @@ export default function InvestigationWorkspacePage() {
   );
   const financialData = stage6?.outputPayload;
 
+  const isIdentity =
+    documentType === "IDENTITY_DOCUMENT" ||
+    evidence.some(
+      (e) =>
+        (e.ruleId || "").includes("CNIC") ||
+        (e.technicalDetails as any)?.identity_category === "NADRA_CNIC_ANOMALY" ||
+        (e.technicalDetails as any)?.statutory_reference?.includes("NADRA")
+    ) ||
+    Boolean(financialData?.cnic_verification);
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-paper-0 text-ink-900">
       {/* Editorial Top Masthead */}
@@ -667,6 +678,20 @@ export default function InvestigationWorkspacePage() {
                 </>
               )}
 
+              {/* NADRA CNIC Identity Tab */}
+              {(isIdentity || isFinancial || Boolean(financialData?.cnic_verification)) && (
+                <button
+                  onClick={() => setActiveTab("cnic")}
+                  className={`px-3 py-1 border transition-colors uppercase ${
+                    activeTab === "cnic"
+                      ? "bg-ink-900 text-paper-0 border-ink-900 font-semibold"
+                      : "bg-paper-1 text-ink-700 border-rule hover:bg-paper-2"
+                  }`}
+                >
+                  NADRA CNIC Audit
+                </button>
+              )}
+
               {/* Custody Chain tab (PECA 2016 / ETO 2002) */}
               <button
                 onClick={() => setActiveTab("custody")}
@@ -824,6 +849,22 @@ export default function InvestigationWorkspacePage() {
               />
               <SBPAmlCddCard
                 screening={financialData?.aml_cdd_screening}
+                evidence={evidence}
+              />
+              {financialData?.cnic_verification && (
+                <NadraCnicCard
+                  verification={financialData?.cnic_verification}
+                  evidence={evidence}
+                />
+              )}
+            </div>
+          )}
+
+          {/* Tab: NADRA CNIC Audit */}
+          {activeTab === "cnic" && (
+            <div className="space-y-4">
+              <NadraCnicCard
+                verification={financialData?.cnic_verification}
                 evidence={evidence}
               />
             </div>
@@ -1048,20 +1089,30 @@ export default function InvestigationWorkspacePage() {
                 })()}
               </div>
 
-              {/* 6. Deterministic Financial Math & SBP CDD Audit */}
+              {/* 6. Financial Math & Statutory Compliance (SBP & NADRA) */}
               <div className="flex justify-between items-center font-semibold">
-                <span>6. Deterministic Financial Math & SBP CDD Audit</span>
+                <span>6. Financial Math & Statutory Compliance (SBP & NADRA)</span>
                 {(() => {
-                  if (!isFinancial) return <span className="text-ink-500 font-normal">— NOT APPLICABLE</span>;
+                  if (!isFinancial && !isIdentity) return <span className="text-ink-500 font-normal">— NOT APPLICABLE</span>;
                   const st = getStageStatus("FINANCIAL_VERIFICATION");
                   if (st === "PENDING") return <span className="text-ink-400 font-normal">○ PENDING</span>;
-                  if (st === "RUNNING") return <span className="text-forensic-amber animate-pulse">● RECONCILING...</span>;
+                  if (st === "RUNNING") return <span className="text-forensic-amber animate-pulse">● AUDITING...</span>;
                   if (st === "FAILED") return <span className="text-forensic-red">✕ VERIFICATION FAILED</span>;
                   const hasNactaOrUnsc = evidence.some(
                     (e) => (e.ruleId || "").includes("AML_NACTA") || (e.ruleId || "").includes("AML_UNSC")
                   );
                   if (hasNactaOrUnsc) {
                     return <span className="text-forensic-red font-bold">✕ PROSCRIBED MATCH (NACTA / UNSC)</span>;
+                  }
+                  const hasCnicTamper = evidence.some(
+                    (e) =>
+                      (e.ruleId || "").includes("RULE_CNIC_PROVINCE_CODE_INVALID") ||
+                      (e.ruleId || "").includes("RULE_CNIC_GENDER_PARITY_MISMATCH") ||
+                      (e.ruleId || "").includes("RULE_CNIC_MRZ_CHECKSUM_INVALID") ||
+                      (e.ruleId || "").includes("RULE_CNIC_MRZ_FRONT_MISMATCH")
+                  );
+                  if (hasCnicTamper) {
+                    return <span className="text-forensic-red font-bold">✕ NADRA CNIC / MRZ FORGERY</span>;
                   }
                   const hasPep = evidence.some((e) => (e.ruleId || "").includes("AML_PEP"));
                   if (hasPep) {
@@ -1076,9 +1127,16 @@ export default function InvestigationWorkspacePage() {
                       (e.ruleId || "").includes("LEDGER") ||
                       (e.ruleId || "").includes("HOLIDAY")
                   );
+                  if (hasMathAnom) {
+                    return <span className="text-forensic-red font-bold">✕ RECONCILIATION MISMATCH</span>;
+                  }
+                  const hasCnicVerified = evidence.some((e) => (e.ruleId || "").includes("RULE_CNIC_VERIFIED"));
+                  if (hasCnicVerified && !isFinancial) {
+                    return <span className="text-forensic-green">✓ NADRA & ICAO 9303 VERIFIED</span>;
+                  }
                   return (
-                    <span className={hasMathAnom ? "text-forensic-red" : "text-forensic-green"}>
-                      {hasMathAnom ? "✕ RECONCILIATION MISMATCH" : "✓ RECONCILED & CDD CLEARED"}
+                    <span className="text-forensic-green">
+                      ✓ RECONCILED & STATUTORY CLEARED
                     </span>
                   );
                 })()}

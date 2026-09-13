@@ -596,13 +596,13 @@ async def process_financial(
                 )
                 return output_payload
 
-            # Check if any document is a financial statement / ledger
+            # Check if any document is a financial statement / ledger / identity document
             relevant_docs = [
                 d for d in pdf_docs
-                if d.documentType in ("BANK_STATEMENT", "DIGITAL_WALLET_LEDGER", "UTILITY_BILL")
+                if d.documentType in ("BANK_STATEMENT", "DIGITAL_WALLET_LEDGER", "UTILITY_BILL", "IDENTITY_DOCUMENT")
             ]
             if not relevant_docs:
-                # Document is not a bank statement/ledger/utility bill (e.g. CNIC, Salary Slip, FBR Challan)
+                # Document is not a bank statement/ledger/utility bill/identity document (e.g. Salary Slip, FBR Challan)
                 duration_ms = int((time.perf_counter() - start_time) * 1000)
                 doc_type_label = pdf_docs[0].documentType if pdf_docs else "OTHER"
                 output_payload = {
@@ -620,6 +620,7 @@ async def process_financial(
                     "closing_discrepancy": None,
                     "iban": None,
                     "rows": [],
+                    "cnic_verification": None,
                 }
                 await tx.pipelinestage.update(
                     where={"id": pipeline_stage_id},
@@ -643,6 +644,7 @@ async def process_financial(
             ledger_sm: CrossPageLedgerStateMachine | None = None
             template_eval_summary: dict[str, Any] | None = None
             aml_cdd_summary: dict[str, Any] | None = None
+            cnic_verification_summary: dict[str, Any] | None = None
 
             for doc in relevant_docs:
 
@@ -663,6 +665,48 @@ async def process_financial(
                 # Scanned / raster fallback: read OCR text produced by Stage 5
                 if len(all_text.strip()) < 30:
                     all_text = "\n".join([(pm.ocrText or "") for pm in page_meta_map.values() if pm])
+
+                # ─────────────────────────────────────────────────────────────
+                # 0. NADRA CNIC & Smart Card Identity Document Verification
+                # ─────────────────────────────────────────────────────────────
+                if doc.documentType == "IDENTITY_DOCUMENT":
+                    try:
+                        from app.features.pipeline.tasks.nadra_cnic_verifier import verify_identity_document
+                        lines = [line.strip() for line in all_text.splitlines() if line.strip()]
+                        cnic_res = verify_identity_document(all_text=all_text, ocr_lines=lines)
+                        cnic_verification_summary = cnic_res
+
+                        for cnic_f in cnic_res.get("findings", []):
+                            finding = await tx.evidenceitem.create(
+                                data={
+                                    "document": {"connect": {"id": doc.id}},
+                                    "pipelineStage": {"connect": {"id": pipeline_stage_id}},
+                                    "category": cnic_f.get("category", "TRANSACTION_FORMAT_VIOLATION"),
+                                    "severity": cnic_f.get("severity", "INFO"),
+                                    "ruleId": cnic_f.get("rule_id", "RULE_CNIC_VERIFIED"),
+                                    "riskPoints": cnic_f.get("risk_points", 0),
+                                    "title": cnic_f.get("title", "NADRA CNIC Verification"),
+                                    "description": cnic_f.get("description", ""),
+                                    "isDeterministic": True,
+                                    "pageNumber": 1,
+                                    "expectedValue": cnic_f.get("expected_value"),
+                                    "actualValue": cnic_f.get("actual_value"),
+                                    "discrepancy": cnic_f.get("discrepancy"),
+                                    "technicalDetails": Json(cnic_f.get("technical_details", {})),
+                                }
+                            )
+                            stage_findings.append({
+                                "id": finding.id,
+                                "rule_id": cnic_f.get("rule_id"),
+                                "severity": finding.severity,
+                                "page": 1,
+                                "title": finding.title,
+                            })
+                    except Exception as cnic_err:
+                        logger.warning(f"NADRA CNIC verification error on identity doc: {cnic_err}")
+
+                    pdf_doc.close()
+                    continue
 
                 # Check IBANs
                 iban_matches = PK_IBAN_REGEX.findall(all_text)
@@ -1647,10 +1691,133 @@ async def process_financial(
                     except Exception as aml_err:
                         logger.warning(f"SBP CDD / AML screening error: {aml_err}")
 
+                # ─────────────────────────────────────────────────────────────
+                # 6. NADRA CNIC Integrity Verification for Statement Holders
+                # ─────────────────────────────────────────────────────────────
+                if doc.documentType in ("BANK_STATEMENT", "DIGITAL_WALLET_LEDGER"):
+                    try:
+                        from app.features.pipeline.tasks.nadra_cnic_verifier import (
+                            validate_cnic_structure,
+                            verify_gender_parity,
+                            CNIC_HYPHEN_REGEX,
+                            CNIC_RAW_REGEX,
+                        )
+                        detected_cnic_tuples = CNIC_HYPHEN_REGEX.findall(all_text)
+                        candidate_cnics = []
+                        for t in detected_cnic_tuples:
+                            candidate_cnics.append(f"{t[0]}-{t[1]}-{t[2]}")
+                        if not candidate_cnics:
+                            raw_13 = CNIC_RAW_REGEX.findall(all_text)
+                            for r in raw_13:
+                                if r[0] not in ("0", "9"):
+                                    candidate_cnics.append(r)
+
+                        # Deduplicate
+                        seen_c = set()
+                        unique_cnics = [c for c in candidate_cnics if not (c in seen_c or seen_c.add(c))]
+
+                        # Check for customer title / gender hint in header
+                        customer_title_hint = None
+                        if aml_cdd_summary and aml_cdd_summary.get("account_title"):
+                            customer_title_hint = aml_cdd_summary["account_title"]
+                        elif "mr." in all_text.lower() or "mr " in all_text.lower() or "mian " in all_text.lower():
+                            customer_title_hint = "Mr."
+                        elif "mrs." in all_text.lower() or "ms." in all_text.lower() or "miss " in all_text.lower():
+                            customer_title_hint = "Mrs."
+
+                        for cnic_cand in unique_cnics[:3]:
+                            struct_res = validate_cnic_structure(cnic_cand)
+                            if not struct_res.get("is_valid"):
+                                for err in struct_res.get("errors", []):
+                                    rule_id = "RULE_CNIC_PROVINCE_CODE_INVALID" if "Province" in err else "RULE_CNIC_FORMAT_INVALID"
+                                    finding = await tx.evidenceitem.create(
+                                        data={
+                                            "document": {"connect": {"id": doc.id}},
+                                            "pipelineStage": {"connect": {"id": pipeline_stage_id}},
+                                            "category": "TRANSACTION_FORMAT_VIOLATION",
+                                            "severity": "CRITICAL",
+                                            "ruleId": rule_id,
+                                            "riskPoints": 50,
+                                            "title": f"Invalid Account Holder CNIC Structure: {cnic_cand}",
+                                            "description": (
+                                                f"The financial statement cites CNIC '{cnic_cand}' which violates Pakistani administrative "
+                                                f"numbering standards: {err}. Under NADRA Ordinance 2000 Section 30, legitimate banking accounts "
+                                                "must be anchored to valid provincial division codes."
+                                            ),
+                                            "isDeterministic": True,
+                                            "pageNumber": 1,
+                                            "expectedValue": "Valid Pakistani CNIC (Province Code 1-8)",
+                                            "actualValue": cnic_cand,
+                                            "discrepancy": err,
+                                            "technicalDetails": Json({"cnic": cnic_cand, "error": err, "statutory_reference": "NADRA Ordinance 2000 Section 30"}),
+                                        }
+                                    )
+                                    stage_findings.append({
+                                        "id": finding.id,
+                                        "rule_id": rule_id,
+                                        "severity": finding.severity,
+                                        "page": 1,
+                                        "title": finding.title,
+                                    })
+                            else:
+                                parity_ok = True
+                                parity_reason = ""
+                                if customer_title_hint:
+                                    parity_ok, parity_reason = verify_gender_parity(cnic_cand, customer_title_hint)
+                                    if not parity_ok:
+                                        finding = await tx.evidenceitem.create(
+                                            data={
+                                                "document": {"connect": {"id": doc.id}},
+                                                "pipelineStage": {"connect": {"id": pipeline_stage_id}},
+                                                "category": "TRANSACTION_FORMAT_VIOLATION",
+                                                "severity": "CRITICAL",
+                                                "ruleId": "RULE_CNIC_GENDER_PARITY_MISMATCH",
+                                                "riskPoints": 60,
+                                                "title": f"Account Title Gender Mismatch with CNIC Check Digit: {cnic_cand}",
+                                                "description": (
+                                                    f"The account title '{customer_title_hint}' contradicts CNIC '{cnic_cand}' gender parity. "
+                                                    f"{parity_reason}. NADRA Ordinance 2000 Section 30 mandates that odd check digits designate male holders "
+                                                    "and even check digits designate female holders."
+                                                ),
+                                                "isDeterministic": True,
+                                                "pageNumber": 1,
+                                                "expectedValue": f"Gender parity matching account title '{customer_title_hint}'",
+                                                "actualValue": f"CNIC check digit '{struct_res['check_digit']}' ({struct_res['gender_parity']})",
+                                                "discrepancy": parity_reason,
+                                                "technicalDetails": Json({
+                                                    "cnic": cnic_cand,
+                                                    "title_hint": customer_title_hint,
+                                                    "parity_reason": parity_reason,
+                                                    "statutory_reference": "NADRA Ordinance 2000 Section 30",
+                                                }),
+                                            }
+                                        )
+                                        stage_findings.append({
+                                            "id": finding.id,
+                                            "rule_id": "RULE_CNIC_GENDER_PARITY_MISMATCH",
+                                            "severity": finding.severity,
+                                            "page": 1,
+                                            "title": finding.title,
+                                        })
+
+                                if not cnic_verification_summary:
+                                    cnic_verification_summary = {
+                                        "overall_status": "VERIFIED" if parity_ok else "TAMPERED",
+                                        "primary_cnic": struct_res["formatted_cnic"],
+                                        "cnic_structure": struct_res,
+                                        "gender_parity_verified": parity_ok,
+                                        "gender_explanation": parity_reason or f"Check digit {struct_res['check_digit']} satisfies {struct_res['gender_parity']}",
+                                        "findings": [],
+                                        "is_conforming": parity_ok,
+                                    }
+                    except Exception as cnic_err:
+                        logger.warning(f"CNIC verification in bank statement error: {cnic_err}")
+
                 pdf_doc.close()
 
             duration_ms = int((time.perf_counter() - start_time) * 1000)
             has_bank_statement = any(d.documentType in ("BANK_STATEMENT", "DIGITAL_WALLET_LEDGER") for d in pdf_docs)
+            has_identity_doc = any(d.documentType == "IDENTITY_DOCUMENT" for d in pdf_docs)
             output_payload = {
                 "findings_count": len(stage_findings),
                 "findings": stage_findings,
@@ -1659,11 +1826,11 @@ async def process_financial(
                     "MISMATCH" in f.get("rule_id", "") or "RECONCILIATION_FAIL" in f.get("rule_id", "")
                     for f in stage_findings
                 ),
-                "skipped": not has_bank_statement,
+                "skipped": not (has_bank_statement or has_identity_doc),
                 "bypass_reason": (
                     f"Document classified as {pdf_docs[0].documentType if pdf_docs else 'UTILITY_BILL'}. "
                     "Non-financial documents bypass ledger reconciliation."
-                ) if not has_bank_statement else None,
+                ) if not (has_bank_statement or has_identity_doc) else None,
                 "stated_opening": float(stated_opening) if stated_opening is not None else None,
                 "implied_opening": float(ledger_sm.implied_opening) if (ledger_sm is not None and ledger_sm.implied_opening is not None) else (float(stated_opening) if stated_opening is not None else None),
                 "opening_discrepancy": float(stated_opening - ledger_sm.implied_opening) if (ledger_sm is not None and stated_opening is not None and ledger_sm.implied_opening is not None) else None,
@@ -1674,6 +1841,7 @@ async def process_financial(
                 "rows": ledger_sm.get_ledger_rows() if ledger_sm is not None else [],
                 "bank_template_verification": template_eval_summary,
                 "aml_cdd_screening": aml_cdd_summary,
+                "cnic_verification": cnic_verification_summary,
             }
 
             await tx.pipelinestage.update(
