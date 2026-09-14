@@ -725,17 +725,17 @@ class LeadInvestigatorAgent(BaseForensicAgent):
                     if f.get("id"):
                         cited_evidence_ids.append(f["id"])
                 if is_urdu_query:
-                    parts.append(f"⚠️ **پاکستانی IBAN چیک فیل**: {iban_findings[0].get('description', 'آئی بی اے این چیک سم میں غلطی پائی گئی۔')}")
+                    parts.append(f"**پاکستانی IBAN چیک فیل**: {iban_findings[0].get('description', 'آئی بی اے این چیک سم میں غلطی پائی گئی۔')}")
                 else:
                     parts.append(
-                        f"⚠️ **PK-IBAN Check Failed**: {iban_findings[0].get('description', 'The stated Pakistani IBAN failed ISO 7064 MOD-97 checksum validation.')}"
+                        f"**PK-IBAN Check Failed**: {iban_findings[0].get('description', 'The stated Pakistani IBAN failed ISO 7064 MOD-97 checksum validation.')}"
                     )
             else:
                 if is_urdu_query:
-                    parts.append("✓ **پاکستانی IBAN تصدیق شدہ**: تمام IBAN نمبرز اسٹیٹ بینک آف پاکستان (SBP) کے رجسٹرڈ بینک کوڈ اور ISO 7064 MOD-97 پر مکمل درست ہیں۔")
+                    parts.append("**پاکستانی IBAN تصدیق شدہ**: تمام IBAN نمبرز اسٹیٹ بینک آف پاکستان (SBP) کے رجسٹرڈ بینک کوڈ اور ISO 7064 MOD-97 پر مکمل درست ہیں۔")
                 else:
                     parts.append(
-                        "✓ **PK-IBAN Check Verified**: All Pakistani IBAN(s) detected in the document are mathematically authentic under ISO 7064 MOD-97 check-digit validation with legitimate State Bank of Pakistan (SBP) registered bank codes."
+                        "**PK-IBAN Check Verified**: All Pakistani IBAN(s) detected in the document are mathematically authentic under ISO 7064 MOD-97 check-digit validation with legitimate State Bank of Pakistan (SBP) registered bank codes."
                     )
 
         # 1b. Questions regarding SBP AML/CFT, NACTA, UNSC Sanctions, PEPs, or Hawala
@@ -753,9 +753,9 @@ class LeadInvestigatorAgent(BaseForensicAgent):
                     parts.append(f"- **{f.get('title')}** [{f.get('severity', 'CRITICAL')}]: {f.get('description')}")
             else:
                 if is_urdu_query:
-                    parts.append("✓ **اسٹیٹ بینک CDD اور AML کلیئر**: کھاتہ دار نیکٹا (NACTA 4th Schedule)، اقوامِ متحدہ 1267 پابندیوں اور پی ای پی (PEP) رجسٹری سے مکمل پاک ہے اور کوئی مشتبہ حوالہ/ہنڈی ٹرانزیکشن نہیں پائی گئی۔")
+                    parts.append("**اسٹیٹ بینک CDD اور AML کلیئر**: کھاتہ دار نیکٹا (NACTA 4th Schedule)، اقوامِ متحدہ 1267 پابندیوں اور پی ای پی (PEP) رجسٹری سے مکمل پاک ہے اور کوئی مشتبہ حوالہ/ہنڈی ٹرانزیکشن نہیں پائی گئی۔")
                 else:
-                    parts.append("✓ **SBP CDD & AML/CFT Cleared**: The account holder cleared screening against NACTA 4th Schedule, UNSC Resolution 1267 Sanctions, and Politically Exposed Persons (PEPs) registry under SBP BPRD Circular No. 1 of 2021 with zero adverse matches.")
+                    parts.append("**SBP CDD & AML/CFT Cleared**: The account holder cleared screening against NACTA 4th Schedule, UNSC Resolution 1267 Sanctions, and Politically Exposed Persons (PEPs) registry under SBP BPRD Circular No. 1 of 2021 with zero adverse matches.")
 
         # 1c. Questions regarding NADRA CNIC, SNIC, MRZ, or Gender Parity
         elif any(w in q_lower for w in ["cnic", "nadra", "snic", "mrz", "identity", "شناختی کارڈ", "نادرا", "سی این آئی سی"]):
@@ -772,9 +772,9 @@ class LeadInvestigatorAgent(BaseForensicAgent):
                     parts.append(f"- **{f.get('title')}** [{f.get('severity', 'CRITICAL')}]: {f.get('description')}")
             else:
                 if is_urdu_query:
-                    parts.append("✓ **نادرا شناختی کارڈ تصدیق شدہ**: شناختی کارڈ کا صوبائی کوڈ، جنس کا ہندسہ اور سمارٹ کارڈ MRZ چیک سم نادرا آرڈیننس 2000 کے عین مطابق درست پایا گیا۔")
+                    parts.append("**نادرا شناختی کارڈ تصدیق شدہ**: شناختی کارڈ کا صوبائی کوڈ، جنس کا ہندسہ اور سمارٹ کارڈ MRZ چیک سم نادرا آرڈیننس 2000 کے عین مطابق درست پایا گیا۔")
                 else:
-                    parts.append("✓ **NADRA CNIC Verified**: The 13-digit CNIC provincial administrative code, gender parity check digit, and Smart Card reverse ICAO 9303 MRZ checksum are fully conforming under the NADRA Ordinance 2000.")
+                    parts.append("**NADRA CNIC Verified**: The 13-digit CNIC provincial administrative code, gender parity check digit, and Smart Card reverse ICAO 9303 MRZ checksum are fully conforming under the NADRA Ordinance 2000.")
 
         # 1d. Questions regarding FBR Tax, NTN, Withholding Tax (WHT), Section 149, or CPR
         elif any(w in q_lower for w in ["fbr", "ntn", "wht", "withholding", "salary slip", "tax", "cpr", "section 149", "ٹیکس", "تنخواہ", "سیلری سلپ"]):
@@ -791,9 +791,9 @@ class LeadInvestigatorAgent(BaseForensicAgent):
                     parts.append(f"- **{f.get('title')}** [{f.get('severity', 'CRITICAL')}]: {f.get('description')}")
             else:
                 if is_urdu_query:
-                    parts.append("✓ **ایف بی آر ٹیکس قوانین کی تعمیل**: این ٹی این (NTN) موڈیولس 11 چیک سم، انکم ٹیکس آرڈیننس 2001 کے سیکشن 149 کے تحت سیلری سلپ ٹیکس کٹوتی اور کمپیوٹرائزڈ پیمنٹ رسید (CPR) مکمل درست ہیں۔")
+                    parts.append("**ایف بی آر ٹیکس قوانین کی تعمیل**: این ٹی این (NTN) موڈیولس 11 چیک سم، انکم ٹیکس آرڈیننس 2001 کے سیکشن 149 کے تحت سیلری سلپ ٹیکس کٹوتی اور کمپیوٹرائزڈ پیمنٹ رسید (CPR) مکمل درست ہیں۔")
                 else:
-                    parts.append("✓ **FBR Tax Compliance Verified**: National Tax Number (NTN) satisfies Modulus 11 check digit verification, salary withholding tax fully reconciles against statutory Finance Act Section 149 progressive tax slabs, and Computerized Payment Receipts (CPR) are authentic.")
+                    parts.append("**FBR Tax Compliance Verified**: National Tax Number (NTN) satisfies Modulus 11 check digit verification, salary withholding tax fully reconciles against statutory Finance Act Section 149 progressive tax slabs, and Computerized Payment Receipts (CPR) are authentic.")
 
         # 2. Questions regarding balance tampering or ledger calculations
         elif any(w in q_lower for w in ["balance", "ledger", "math", "opening", "closing", "tamper", "tampered", "discrepancy", "بیلنس", "حساب", "رقم"]):
@@ -815,10 +815,10 @@ class LeadInvestigatorAgent(BaseForensicAgent):
                     )
             else:
                 if is_urdu_query:
-                    parts.append("✓ **لیجر میتھ تصدیق شدہ**: تمام ٹرانزیکشنز اور رننگ بیلنس بغیر کسی غلطی کے 100% درست اور تصدیق شدہ ہیں۔")
+                    parts.append("**لیجر میتھ تصدیق شدہ**: تمام ٹرانزیکشنز اور رننگ بیلنس بغیر کسی غلطی کے 100% درست اور تصدیق شدہ ہیں۔")
                 else:
                     parts.append(
-                        "✓ **Ledger Math Verified**: All transactions across all pages reconcile with 0 mathematical errors. The running balances strictly match stated opening and closing balances."
+                        "**Ledger Math Verified**: All transactions across all pages reconcile with 0 mathematical errors. The running balances strictly match stated opening and closing balances."
                     )
 
         # 3. Questions regarding risk score or classification
@@ -860,9 +860,9 @@ class LeadInvestigatorAgent(BaseForensicAgent):
                     parts.append(f"- **{f.get('title')}**: {f.get('description')}")
             else:
                 if is_urdu_query:
-                    parts.append("✓ **فونٹ اور ساخت تصدیق شدہ**: دستاویز میں کوئی بیرونی ایڈیٹر یا غیر مطابقت پذیر فونٹ نہیں پایا گیا۔")
+                    parts.append("**فونٹ اور ساخت تصدیق شدہ**: دستاویز میں کوئی بیرونی ایڈیٹر یا غیر مطابقت پذیر فونٹ نہیں پایا گیا۔")
                 else:
-                    parts.append("✓ **Typography & Structure Verified**: No font substitutions, sub-pixel baseline offsets, or consumer PDF editor signatures were detected.")
+                    parts.append("**Typography & Structure Verified**: No font substitutions, sub-pixel baseline offsets, or consumer PDF editor signatures were detected.")
 
         # 5. Questions regarding visual ELA or image tampering
         elif any(w in q_lower for w in ["ela", "visual", "image", "compression", "heat", "ghosting", "pixel", "تصویر"]):
@@ -878,9 +878,9 @@ class LeadInvestigatorAgent(BaseForensicAgent):
                     parts.append(f"- **{f.get('title')}**: {f.get('description')}")
             else:
                 if is_urdu_query:
-                    parts.append("✓ **تصویری سالمیت تصدیق شدہ**: تمام صفحات پر یکساں اور معیاری کمپریشن موجود ہے۔")
+                    parts.append("**تصویری سالمیت تصدیق شدہ**: تمام صفحات پر یکساں اور معیاری کمپریشن موجود ہے۔")
                 else:
-                    parts.append("✓ **Visual Integrity Verified**: Clean ELA heatmap with uniform compression residuals across all pages.")
+                    parts.append("**Visual Integrity Verified**: Clean ELA heatmap with uniform compression residuals across all pages.")
 
         # 6. Default general synthesis
         else:

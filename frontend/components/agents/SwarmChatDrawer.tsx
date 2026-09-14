@@ -371,7 +371,7 @@ export function SwarmChatDrawer({
 
           <div className="flex items-center justify-between font-mono text-[11px] text-ink-600">
             <span className="hidden sm:inline">
-              Press <kbd className="px-1 py-0.5 bg-paper-2 border border-rule text-ink-800">Enter ↵</kbd> to submit
+              Press <kbd className="px-1 py-0.5 bg-paper-2 border border-rule text-ink-800">Enter</kbd> to submit
             </span>
 
             <button

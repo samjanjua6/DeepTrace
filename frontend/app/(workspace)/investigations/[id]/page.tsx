@@ -783,7 +783,7 @@ export default function InvestigationWorkspacePage() {
                 title="Toggle interactive Lead Investigator Q&A drawer"
               >
                 <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                <span>[ ⚡ ASK LEAD INVESTIGATOR ]</span>
+                <span>[ ASK LEAD INVESTIGATOR ]</span>
               </button>
 
               {!isSample && (
@@ -996,7 +996,7 @@ export default function InvestigationWorkspacePage() {
                               </span>
                               {rfc?.status === "SEALED" && (
                                 <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-800 border border-emerald-500/30">
-                                  ⚖️ RFC 3161 TSA SEALED
+                                  RFC 3161 TSA SEALED
                                 </span>
                               )}
                             </div>
@@ -1062,7 +1062,7 @@ export default function InvestigationWorkspacePage() {
                                 }}
                                 className="px-2 py-0.5 text-[9px] font-mono uppercase bg-paper-2 hover:bg-ink-900 hover:text-paper-0 border border-rule transition-colors"
                               >
-                                ⬇ Download Proof (.tst)
+                                Download Proof (.tst)
                               </button>
                             </div>
                           </div>

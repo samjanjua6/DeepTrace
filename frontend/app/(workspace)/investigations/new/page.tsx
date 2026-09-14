@@ -141,7 +141,7 @@ export default function NewCaseIntakePage() {
               onChange={(e) => handleDocTypeChange(e.target.value)}
               className="w-full bg-paper-1 border border-rule px-4 py-3 text-sm text-ink-900 font-mono focus:outline-none focus:border-ink-900 cursor-pointer"
             >
-              <option value="AUTO">⚡ Auto-Detect via Stage 0 Classifier (Bank, Salary, K-Electric, FBR, CNIC)</option>
+              <option value="AUTO">Auto-Detect via Stage 0 Classifier (Bank, Salary, K-Electric, FBR, CNIC)</option>
               <option value="OTHER">Academic & Educational (Matric / Inter / University Degree / BISE)</option>
               <option value="BANK_STATEMENT">Bank Statement & Financial Ledger (Lakh/Crore & IBAN)</option>
               <option value="SALARY_SLIP">Salary Slip & Employment Certificate</option>

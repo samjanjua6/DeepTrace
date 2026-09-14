@@ -309,7 +309,7 @@ Forensic validation confirms 100% document authenticity across all pages. All tr
       ) && (
         <div className="px-4 py-2 bg-forensic-red/15 border-b border-forensic-red/30 flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-forensic-red">
           <div className="flex items-center gap-2 font-bold uppercase tracking-wider">
-            <span>⚖️ ETO 2002 §29 STATUTORY PRESUMPTION REBUTTED</span>
+            <span>ETO 2002 §29 STATUTORY PRESUMPTION REBUTTED</span>
           </div>
           <span className="text-[11px] font-sans">
             {activeLang === "ur"
@@ -326,7 +326,7 @@ Forensic validation confirms 100% document authenticity across all pages. All tr
         ) && (
           <div className="px-4 py-2 bg-emerald-500/15 border-b border-emerald-500/30 flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-emerald-800">
             <div className="flex items-center gap-2 font-bold uppercase tracking-wider">
-              <span>⚖️ ETO 2002 §29 STATUTORY PRESUMPTION SATISFIED</span>
+              <span>ETO 2002 §29 STATUTORY PRESUMPTION SATISFIED</span>
             </div>
             <span className="text-[11px] font-sans">
               {activeLang === "ur"

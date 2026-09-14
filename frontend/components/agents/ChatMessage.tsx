@@ -73,7 +73,7 @@ export function ChatMessage({
         const bulletText = trimmed.replace(/^[-*]\s*/, "");
         return (
           <div key={idx} className="flex items-start gap-2 my-1 text-xs pl-2">
-            <span className="text-ink-500 font-mono select-none">▪</span>
+            <span className="text-ink-500 font-mono select-none">-</span>
             <div className="flex-1 leading-relaxed">{renderInlineMarkup(bulletText)}</div>
           </div>
         );
