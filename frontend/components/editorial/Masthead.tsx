@@ -4,7 +4,8 @@ import React, { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { ChevronDown, Building2, LogOut, User, Check, RefreshCw } from "lucide-react";
+import { ChevronDown, Building2, LogOut, User, Check, RefreshCw, ShieldCheck } from "lucide-react";
+import { TwoFactorSetupModal } from "@/components/auth/TwoFactorSetupModal";
 
 interface MastheadProps {
   caseNumber?: string;
@@ -26,6 +27,7 @@ export function Masthead({
   const [timeStr, setTimeStr] = useState<string>("");
   const [orgDropdownOpen, setOrgDropdownOpen] = useState<boolean>(false);
   const [switching, setSwitching] = useState<boolean>(false);
+  const [mfaModalOpen, setMfaModalOpen] = useState<boolean>(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -207,6 +209,22 @@ export function Masthead({
                   [{user.role}]
                 </span>
               </div>
+
+              {/* Interactive 2FA Configuration Trigger */}
+              <button
+                type="button"
+                onClick={() => setMfaModalOpen(true)}
+                className={`px-2 py-1 border text-[10px] font-mono uppercase font-semibold tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer ${
+                  user.mfa_enabled
+                    ? "border-emerald-600 text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
+                    : "border-rule text-ink-700 bg-paper-1 hover:border-ink-900 hover:bg-paper-2"
+                }`}
+                title="Manage Real Two-Factor Authentication (2FA) for your account"
+              >
+                <ShieldCheck className={`w-3 h-3 ${user.mfa_enabled ? "text-emerald-600" : "text-ink-500"}`} />
+                <span>{user.mfa_enabled ? "2FA: ENFORCED" : "2FA: SETUP"}</span>
+              </button>
+
               <button
                 type="button"
                 onClick={handleLogout}
@@ -285,6 +303,12 @@ export function Masthead({
           </div>
         </div>
       )}
+
+      {/* Two-Factor Authentication Setup Modal */}
+      <TwoFactorSetupModal
+        isOpen={mfaModalOpen}
+        onClose={() => setMfaModalOpen(false)}
+      />
     </header>
   );
 }

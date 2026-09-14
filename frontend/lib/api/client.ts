@@ -254,6 +254,37 @@ export async function logoutUser(): Promise<void> {
   clearAuthTokens();
 }
 
+export async function setupMfa(): Promise<{ secret: string; otpauth_uri: string }> {
+  const res = await fetchWithAuth(`${API_BASE}/auth/mfa/setup`, { method: "POST" });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || "Failed to initialize 2FA setup");
+  }
+  return res.json();
+}
+
+export async function enableMfa(secret: string, code: string): Promise<void> {
+  const res = await fetchWithAuth(`${API_BASE}/auth/mfa/enable`, {
+    method: "POST",
+    body: JSON.stringify({ secret, code }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || "Invalid authenticator code");
+  }
+}
+
+export async function disableMfa(password: string, code: string): Promise<void> {
+  const res = await fetchWithAuth(`${API_BASE}/auth/mfa/disable`, {
+    method: "POST",
+    body: JSON.stringify({ password, code }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || "Failed to disable 2FA. Verify password and code.");
+  }
+}
+
 export async function ensureAuth(): Promise<string> {
   const token = getAuthToken();
   if (token) return token;

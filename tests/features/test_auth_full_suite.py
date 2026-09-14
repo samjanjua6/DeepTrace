@@ -213,3 +213,54 @@ async def test_multi_tenancy_and_switching(client: AsyncClient):
     assert me_data["organization_id"] == hbl_org["id"]
     assert me_data["organization_slug"] == "hbl"
     assert me_data["organization_name"] == "Habib Bank Limited"
+
+
+@pytest.mark.asyncio
+async def test_mfa_setup_enable_and_disable_lifecycle(client: AsyncClient):
+    """Test full real-world MFA lifecycle: enrollment, activation, and disablement."""
+    # 1. Login as standard analyst
+    login_resp = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "analyst@meezan.pk", "password": "Analyst@12345"},
+    )
+    assert login_resp.status_code == 200
+    token = login_resp.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 2. Call /mfa/setup to generate secret & QR URI
+    setup_resp = await client.post("/api/v1/auth/mfa/setup", headers=headers)
+    assert setup_resp.status_code == 200, setup_resp.text
+    setup_data = setup_resp.json()
+    secret = setup_data["secret"]
+    otpauth_uri = setup_data["otpauth_uri"]
+    assert len(secret) >= 16
+    assert otpauth_uri.startswith("otpauth://totp/")
+    assert "secret=" in otpauth_uri
+
+    # 3. User scans QR code and enters valid 6-digit code
+    current_code = get_totp_code(secret)
+    enable_resp = await client.post(
+        "/api/v1/auth/mfa/enable",
+        json={"secret": secret, "code": current_code},
+        headers=headers,
+    )
+    assert enable_resp.status_code == 204
+
+    # 4. Verify /me now confirms MFA is enabled
+    me_resp = await client.get("/api/v1/auth/me", headers=headers)
+    assert me_resp.status_code == 200
+    assert me_resp.json()["mfa_enabled"] is True
+
+    # 5. Disable MFA with password and code
+    disable_code = get_totp_code(secret)
+    disable_resp = await client.post(
+        "/api/v1/auth/mfa/disable",
+        json={"password": "Analyst@12345", "code": disable_code},
+        headers=headers,
+    )
+    assert disable_resp.status_code == 204
+
+    # 6. Verify /me confirms MFA is now disabled
+    me_after = await client.get("/api/v1/auth/me", headers=headers)
+    assert me_after.status_code == 200
+    assert me_after.json()["mfa_enabled"] is False
