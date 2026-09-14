@@ -256,3 +256,42 @@ export interface ApiKeyCreatedResponse extends ApiKeyItem {
   plaintext_key: string;
 }
 
+export interface WebhookEndpointItem {
+  id: string;
+  url: string;
+  events: string[];
+  is_active: boolean;
+  description: string | null;
+  failure_count: number;
+  created_at: string;
+  secret?: string;
+}
+
+export interface WebhookEndpointCreated extends WebhookEndpointItem {
+  secret: string;
+}
+
+export interface WebhookDeliveryLog {
+  id: string;
+  event_type: string;
+  http_status_code: number | null;
+  attempt: number;
+  response_duration_ms: number | null;
+  response_body: string | null;
+  delivered_at: string | null;
+  failed_at: string | null;
+  error_message: string | null;
+  created_at: string;
+}
+
+export interface WebhookTestResult {
+  success: boolean;
+  http_status_code: number | null;
+  response_duration_ms: number;
+  signature_header: string;
+  payload_sent: Record<string, any>;
+  response_body: string | null;
+  error_message: string | null;
+}
+
+

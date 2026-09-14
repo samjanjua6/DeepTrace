@@ -12,6 +12,10 @@ import {
   AskHistoryResponse,
   ApiKeyItem,
   ApiKeyCreatedResponse,
+  WebhookEndpointItem,
+  WebhookEndpointCreated,
+  WebhookDeliveryLog,
+  WebhookTestResult,
 } from "../types/forensics";
 
 const API_BASE = "/api/v1";
@@ -925,5 +929,105 @@ export async function revokeApiKey(keyId: string): Promise<void> {
     throw new Error(message);
   }
 }
+
+export async function getWebhooks(): Promise<WebhookEndpointItem[]> {
+  await ensureAuth().catch(() => {});
+  const res = await fetch(`${API_BASE}/webhooks`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    if (res.status === 403) {
+      throw new Error("403 Forbidden: Insufficient permissions. Admin access required.");
+    }
+    throw new Error(`Failed to fetch webhooks: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function createWebhook(payload: {
+  url: string;
+  events: string[];
+  description?: string;
+}): Promise<WebhookEndpointCreated> {
+  await ensureAuth().catch(() => {});
+  const res = await fetch(`${API_BASE}/webhooks`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const message =
+      errorData?.detail?.message ||
+      errorData?.error?.message ||
+      errorData?.message ||
+      "Failed to register webhook endpoint";
+    throw new Error(message);
+  }
+  return res.json();
+}
+
+export async function deleteWebhook(endpointId: string): Promise<void> {
+  await ensureAuth().catch(() => {});
+  const res = await fetch(`${API_BASE}/webhooks/${endpointId}`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const message =
+      errorData?.detail?.message ||
+      errorData?.error?.message ||
+      errorData?.message ||
+      "Failed to deactivate webhook endpoint";
+    throw new Error(message);
+  }
+}
+
+export async function getWebhookSecret(endpointId: string): Promise<string> {
+  await ensureAuth().catch(() => {});
+  const res = await fetch(`${API_BASE}/webhooks/${endpointId}/secret`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to fetch webhook secret: ${res.statusText}`);
+  }
+  const data = await res.json();
+  return data.secret;
+}
+
+export async function getWebhookDeliveries(endpointId: string): Promise<WebhookDeliveryLog[]> {
+  await ensureAuth().catch(() => {});
+  const res = await fetch(`${API_BASE}/webhooks/${endpointId}/deliveries`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to fetch webhook delivery history: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function testWebhookEndpoint(
+  endpointId: string,
+  eventType: string = "test.ping"
+): Promise<WebhookTestResult> {
+  await ensureAuth().catch(() => {});
+  const res = await fetch(`${API_BASE}/webhooks/${endpointId}/test`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ event_type: eventType }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const message =
+      errorData?.detail?.message ||
+      errorData?.error?.message ||
+      errorData?.message ||
+      "Test ping failed";
+    throw new Error(message);
+  }
+  return res.json();
+}
+
 
 
