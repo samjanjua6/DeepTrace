@@ -215,12 +215,35 @@ async def generate_report(db: Prisma, investigation_id: str, options: dict | Non
     p1.draw_rect(pymupdf.Rect(40, curr_y, 555, curr_y + 20), color=cnic_col, fill=None, width=0.8)
     p1.insert_text((50, curr_y + 13), cnic_status_str, fontsize=7.2, fontname="hebo", color=cnic_col)
 
-    curr_y += 26
+    curr_y += 24
+    has_fbr_fail = any(
+        ("RULE_FBR_NTN_INVALID" in (it.ruleId or "")
+         or "RULE_FBR_WHT_ZERO_ON_TAXABLE_SALARY" in (it.ruleId or "")
+         or "RULE_FBR_WHT_DISCREPANCY" in (it.ruleId or "")
+         or "RULE_FBR_CPR_" in (it.ruleId or ""))
+        for it in evidence_items
+    )
+    has_fbr_verified = any("RULE_FBR_WHT_VERIFIED" in (it.ruleId or "") for it in evidence_items)
+
+    if has_fbr_fail:
+        fbr_status_str = "FBR TAX & WITHHOLDING: STATUTORY VIOLATION (ITO 2001 §149 Slabs / NTN Mod-11 Check Failed)"
+        fbr_col = (0.7, 0.1, 0.1)
+    elif has_fbr_verified:
+        fbr_status_str = "FBR TAX & WITHHOLDING: STATUTORILY RECONCILED (ITO 2001 §149 Progressive Tax & NTN Verified)"
+        fbr_col = (0.05, 0.45, 0.15)
+    else:
+        fbr_status_str = "FBR TAX & WITHHOLDING: NTN Structure & First Schedule Tax Thresholds Audited"
+        fbr_col = (0.3, 0.35, 0.45)
+
+    p1.draw_rect(pymupdf.Rect(40, curr_y, 555, curr_y + 18), color=fbr_col, fill=None, width=0.8)
+    p1.insert_text((50, curr_y + 12), fbr_status_str, fontsize=7.0, fontname="hebo", color=fbr_col)
+
+    curr_y += 24
     # Regulatory statement snippet on Page 1
     p1.insert_text(
         (40, curr_y),
-        "STATUTORY RECOGNITION: ETO 2002 §3 & §4  |  PECA 2016 §33/§34  |  SBP BPRD 1/2021  |  NADRA Ord 2000 §30",
-        fontsize=7.2,
+        "STATUTORY RECOGNITION: ETO 2002 §3 & §4  |  PECA 2016 §33/§34  |  SBP BPRD 1/2021  |  NADRA Ord 2000 §30  |  ITO 2001 §149/§181",
+        fontsize=6.8,
         fontname="helv",
         color=(0.3, 0.3, 0.3),
     )
@@ -238,33 +261,36 @@ async def generate_report(db: Prisma, investigation_id: str, options: dict | Non
     else:
         for idx, it in enumerate(evidence_items[:8], 1):
             sev = it.severity or "UNKNOWN"
-            card_col = (0.99, 0.95, 0.95) if sev == "CRITICAL" else ((1.0, 0.98, 0.92) if sev == "HIGH" else (0.98, 0.98, 0.98))
-            brd_col = (0.85, 0.2, 0.2) if sev == "CRITICAL" else ((0.9, 0.5, 0.1) if sev == "HIGH" else (0.8, 0.8, 0.8))
+            if sev == "CRITICAL":
+                badge_col, tag_col = (0.86, 0.15, 0.15), (0.7, 0.1, 0.1)
+            elif sev == "HIGH":
+                badge_col, tag_col = (0.9, 0.4, 0.1), (0.75, 0.3, 0.0)
+            elif sev == "MEDIUM":
+                badge_col, tag_col = (0.9, 0.7, 0.1), (0.6, 0.45, 0.0)
+            else:
+                badge_col, tag_col = (0.2, 0.5, 0.8), (0.1, 0.3, 0.6)
 
-            card_h = 70
-            card_rect = pymupdf.Rect(40, p2_y, 555, p2_y + card_h)
-            p2.draw_rect(card_rect, color=brd_col, fill=card_col, width=0.8)
+            card_rect = pymupdf.Rect(40, p2_y, 555, p2_y + 80)
+            p2.draw_rect(card_rect, color=(0.85, 0.85, 0.85), fill=(0.99, 0.99, 0.99), width=0.8)
+            p2.draw_rect(pymupdf.Rect(40, p2_y, 44, p2_y + 80), color=badge_col, fill=badge_col)
 
-            title = it.title or "Forensic Finding"
-            rule_id = it.ruleId or "RULE_UNKNOWN"
-            p2.insert_text((50, p2_y + 15), f"#{idx}. {title}", fontsize=8.5, fontname="hebo", color=(0.1, 0.1, 0.1))
-            p2.insert_text((430, p2_y + 15), f"[{sev}] {it.riskPoints or 0} pts", fontsize=8, fontname="hebo", color=brd_col)
-            p2.insert_text((50, p2_y + 28), f"Rule: {rule_id}  |  Page: {it.pageNumber or 1}", fontsize=7.5, fontname="Courier", color=(0.3, 0.3, 0.3))
+            p2.insert_text((55, p2_y + 18), f"#{idx}  {it.title or 'Forensic Finding'}", fontsize=8.5, fontname="hebo", color=(0.1, 0.1, 0.1))
+            p2.insert_text((440, p2_y + 18), f"[{sev}] {it.ruleId or 'RULE'}", fontsize=7.5, fontname="hebo", color=tag_col)
 
-            desc = it.description or ""
-            if it.discrepancy:
-                desc += f" [Discrepancy: {it.discrepancy}]"
-            desc_rect = pymupdf.Rect(50, p2_y + 32, 545, p2_y + card_h - 4)
-            p2.insert_textbox(desc_rect, desc, fontsize=7.2, fontname="helv")
+            desc = it.description or "Deterministic rule violation detected."
+            p2.insert_textbox(pymupdf.Rect(55, p2_y + 24, 545, p2_y + 55), desc, fontsize=7.5, fontname="helv", color=(0.2, 0.2, 0.2))
 
-            p2_y += card_h + 10
+            meta_str = f"Page: {it.pageNumber or 1}  |  Category: {it.category or 'FORENSIC'}  |  Risk Points: {it.riskPoints or 0}"
+            p2.insert_text((55, p2_y + 70), meta_str, fontsize=6.8, fontname="helv", color=(0.45, 0.45, 0.45))
+
+            p2_y += 88
 
     # ─────────────────────────────────────────────────────────────────────────
     # Page 3: Regulatory Framework & Legal Disclosures
     # ─────────────────────────────────────────────────────────────────────────
     p3 = doc.new_page(width=595, height=842)
     p3_y = 55
-    p3.insert_text((40, p3_y), "STATUTORY & REGULATORY COMPLIANCE DISCLOSURE", fontsize=11, fontname="hebo", color=(0.1, 0.1, 0.1))
+    p3.insert_text((40, p3_y), "PAKISTANI REGULATORY FRAMEWORK & STATUTORY ADMISSIBILITY", fontsize=11, fontname="hebo", color=(0.1, 0.1, 0.1))
     p3_y += 25
 
     reg_sections = [
@@ -306,7 +332,17 @@ async def generate_report(db: Prisma, investigation_id: str, options: dict | Non
             ),
         ),
         (
-            "5. NIST SP 800-86 Guide to Integrating Forensic Techniques into Incident Response",
+            "5. Income Tax Ordinance 2001 (ITO 2001 §149 & §181) — Withholding Tax Slabs & NTN Validation",
+            (
+                "Under Section 149 of the Income Tax Ordinance 2001 read with Division I, Part I of the First Schedule, "
+                "every employer is legally mandated to deduct withholding tax from salaried employees exceeding PKR 600,000/year "
+                "(PKR 50,000/month) according to progressive statutory slabs. Under Section 181 and FBR regulations, corporate "
+                "NTNs must satisfy the Modulus 11 weighted check digit algorithm. DeepTrace audits salary slip deductions against "
+                "statutory brackets and verifies corporate/individual NTN credentials."
+            ),
+        ),
+        (
+            "6. NIST SP 800-86 Guide to Integrating Forensic Techniques into Incident Response",
             (
                 "All evidentiary artifacts, sub-pixel baseline offsets, discrete cosine transform (DCT) residual heatmaps, "
                 "and multi-page balance reconciliation audits are compiled under deterministic, non-destructive methodologies "

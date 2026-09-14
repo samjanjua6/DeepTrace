@@ -156,8 +156,23 @@ def _build_structured_credit_briefing_items(
         is_cnic_front_mrz = "RULE_CNIC_MRZ_FRONT_MISMATCH" in (it.get("ruleId") or "")
         is_cnic_temporal = "RULE_CNIC_TEMPORAL_INVALID" in (it.get("ruleId") or "")
         is_cnic_verified = "RULE_CNIC_VERIFIED" in (it.get("ruleId") or "")
+        is_fbr_ntn = "RULE_FBR_NTN_INVALID" in (it.get("ruleId") or "")
+        is_fbr_wht_zero = "RULE_FBR_WHT_ZERO" in (it.get("ruleId") or "")
+        is_fbr_wht_disc = "RULE_FBR_WHT_DISCREPANCY" in (it.get("ruleId") or "")
+        is_fbr_cpr = "RULE_FBR_CPR_" in (it.get("ruleId") or "")
+        is_fbr_verified = "RULE_FBR_WHT_VERIFIED" in (it.get("ruleId") or "")
 
-        if is_cnic_province:
+        if is_fbr_ntn:
+            parts_ur = [f"صفحہ {page_num}: ایف بی آر (FBR) نیشنل ٹیکس نمبر (NTN) کی سنگین جعل سازی۔ ماڈیولس 11 چیک سم فیل ہو گیا ہے، جو بوگس یا من گھڑت ٹیکس رجسٹریشن ظاہر کرتا ہے۔"]
+        elif is_fbr_wht_zero:
+            parts_ur = [f"صفحہ {page_num}: انکم ٹیکس آرڈیننس 2001 کے سیکشن 149 کی کھلی خلاف ورزی۔ تنخواہ 50 ہزار روپے ماہانہ سے زیادہ ہونے کے باوجود ٹیکس کٹوتی صفر ظاہر کی گئی ہے (جعلی سیلری سلپ کا شبہ)۔"]
+        elif is_fbr_wht_disc:
+            parts_ur = [f"صفحہ {page_num}: سیلری سلپ پر ودہولڈنگ ٹیکس کی رقم ایف بی آر فنانس ایکٹ کے قانونی سلیب سے مطابقت نہیں رکھتی۔ ٹیکس کٹوتی میں واضح فرق موجود ہے۔"]
+        elif is_fbr_cpr:
+            parts_ur = [f"صفحہ {page_num}: ایف بی آر کمپیوٹرائزڈ پیمنٹ رسید (CPR) کا فارمیٹ ناقص ہے یا مستقبل کی ناممکن تاریخ درج ہے۔"]
+        elif is_fbr_verified:
+            parts_ur = [f"صفحہ {page_num}: ایف بی آر انکم ٹیکس آرڈیننس 2001 سیکشن 149 کے تحت ودہولڈنگ ٹیکس اور NTN کی قانونی تصدیق درست پائی گئی ہے۔"]
+        elif is_cnic_province:
             parts_ur = [f"صفحہ {page_num}: نادرا (NADRA) شناختی کارڈ ضابطہ بندی کی سنگین خلاف ورزی۔ کارڈ کا پہلا ہندسہ غیر قانونی صوبائی کوڈ ظاہر کرتا ہے (نادرا آرڈیننس 2000 دفعہ 30)۔"]
         elif is_cnic_gender:
             parts_ur = [f"صفحہ {page_num}: نادرا شناختی کارڈ کے 13ویں ہندسے اور کھاتہ دار کے نام/جنس میں کھلا تضاد۔ طاق/جفت ہندسہ قانونی جنس سے متصادم ہے (نادرا آرڈیننس 2000)۔"]
@@ -498,6 +513,33 @@ class LeadInvestigatorAgent(BaseForensicAgent):
                     "National Identity Forgery (NADRA Ordinance 2000 §30): CNIC administrative encoding or reverse ICAO 9303 MRZ checksum failure "
                     "establishes fraudulent credential manufacturing or Photoshop alteration."
                 )
+
+            # FBR Tax & Income Nexus cross-correlations
+            has_wht_zero = any("RULE_FBR_WHT_ZERO_ON_TAXABLE_SALARY" in (it.get("ruleId") or "") for it in ev_items)
+            has_ntn_invalid = any("RULE_FBR_NTN_INVALID" in (it.get("ruleId") or "") for it in ev_items)
+            has_fbr_other = any(
+                ("RULE_FBR_WHT_DISCREPANCY" in (it.get("ruleId") or "") or "RULE_FBR_CPR_" in (it.get("ruleId") or ""))
+                for it in ev_items
+            )
+            if has_wht_zero and has_financial:
+                correlations.append(
+                    "Tax-Income Nexus (Income Tax Ordinance 2001 §149): Salary slip declares taxable salary exceeding PKR 50,000/month "
+                    "with ZERO tax deduction, coupled with bank statement transactions, indicating phantom employment or fabricated payslips."
+                )
+            elif has_wht_zero:
+                correlations.append(
+                    "Statutory Tax Evasion (Income Tax Ordinance 2001 §149): Declared salary exceeds tax-exempt threshold of PKR 600,000/year "
+                    "with zero withholding tax, in direct violation of First Schedule statutory tax brackets."
+                )
+            if has_ntn_invalid:
+                correlations.append(
+                    "Taxpayer Identity Fraud (FBR ITO 2001 §181): Employer or corporate entity National Tax Number (NTN) "
+                    "violates Modulus 11 statutory check digit algorithm, proving fraudulent registration credentials."
+                )
+            elif has_fbr_other:
+                correlations.append(
+                    "FBR Regulatory Tax Discrepancy: Declared tax deduction contradicts statutory Finance Act tax slabs or CPR receipt contains invalid date/structure."
+                )
             pages_with_font = {
                 it.get("pageNumber") or it.get("page_number")
                 for it in ev_items
@@ -714,6 +756,44 @@ class LeadInvestigatorAgent(BaseForensicAgent):
                     parts.append("✓ **اسٹیٹ بینک CDD اور AML کلیئر**: کھاتہ دار نیکٹا (NACTA 4th Schedule)، اقوامِ متحدہ 1267 پابندیوں اور پی ای پی (PEP) رجسٹری سے مکمل پاک ہے اور کوئی مشتبہ حوالہ/ہنڈی ٹرانزیکشن نہیں پائی گئی۔")
                 else:
                     parts.append("✓ **SBP CDD & AML/CFT Cleared**: The account holder cleared screening against NACTA 4th Schedule, UNSC Resolution 1267 Sanctions, and Politically Exposed Persons (PEPs) registry under SBP BPRD Circular No. 1 of 2021 with zero adverse matches.")
+
+        # 1c. Questions regarding NADRA CNIC, SNIC, MRZ, or Gender Parity
+        elif any(w in q_lower for w in ["cnic", "nadra", "snic", "mrz", "identity", "شناختی کارڈ", "نادرا", "سی این آئی سی"]):
+            cnic_findings = self.get_findings_by_rule_prefix("RULE_CNIC_")
+            adverse_cnic = [f for f in cnic_findings if f.get("ruleId") != "RULE_CNIC_VERIFIED"]
+            if adverse_cnic:
+                if is_urdu_query:
+                    parts.append("نادرا (NADRA) شناختی کارڈ جانچ پڑتال میں درج ذیل سنگین انتباہات پائے گئے:")
+                else:
+                    parts.append("NADRA CNIC & Smart Card forensic verification identified the following adverse findings:")
+                for f in adverse_cnic:
+                    if f.get("id"):
+                        cited_evidence_ids.append(f["id"])
+                    parts.append(f"- **{f.get('title')}** [{f.get('severity', 'CRITICAL')}]: {f.get('description')}")
+            else:
+                if is_urdu_query:
+                    parts.append("✓ **نادرا شناختی کارڈ تصدیق شدہ**: شناختی کارڈ کا صوبائی کوڈ، جنس کا ہندسہ اور سمارٹ کارڈ MRZ چیک سم نادرا آرڈیننس 2000 کے عین مطابق درست پایا گیا۔")
+                else:
+                    parts.append("✓ **NADRA CNIC Verified**: The 13-digit CNIC provincial administrative code, gender parity check digit, and Smart Card reverse ICAO 9303 MRZ checksum are fully conforming under the NADRA Ordinance 2000.")
+
+        # 1d. Questions regarding FBR Tax, NTN, Withholding Tax (WHT), Section 149, or CPR
+        elif any(w in q_lower for w in ["fbr", "ntn", "wht", "withholding", "salary slip", "tax", "cpr", "section 149", "ٹیکس", "تنخواہ", "سیلری سلپ"]):
+            fbr_findings = self.get_findings_by_rule_prefix("RULE_FBR_")
+            adverse_fbr = [f for f in fbr_findings if f.get("ruleId") != "RULE_FBR_WHT_VERIFIED"]
+            if adverse_fbr:
+                if is_urdu_query:
+                    parts.append("ایف بی آر (FBR) ٹیکس اور ودہولڈنگ جانچ پڑتال میں درج ذیل قانونی و حسابی خامیاں پائی گئیں:")
+                else:
+                    parts.append("Federal Board of Revenue (FBR) Tax & Section 149 Withholding audit identified the following statutory discrepancies:")
+                for f in adverse_fbr:
+                    if f.get("id"):
+                        cited_evidence_ids.append(f["id"])
+                    parts.append(f"- **{f.get('title')}** [{f.get('severity', 'CRITICAL')}]: {f.get('description')}")
+            else:
+                if is_urdu_query:
+                    parts.append("✓ **ایف بی آر ٹیکس قوانین کی تعمیل**: این ٹی این (NTN) موڈیولس 11 چیک سم، انکم ٹیکس آرڈیننس 2001 کے سیکشن 149 کے تحت سیلری سلپ ٹیکس کٹوتی اور کمپیوٹرائزڈ پیمنٹ رسید (CPR) مکمل درست ہیں۔")
+                else:
+                    parts.append("✓ **FBR Tax Compliance Verified**: National Tax Number (NTN) satisfies Modulus 11 check digit verification, salary withholding tax fully reconciles against statutory Finance Act Section 149 progressive tax slabs, and Computerized Payment Receipts (CPR) are authentic.")
 
         # 2. Questions regarding balance tampering or ledger calculations
         elif any(w in q_lower for w in ["balance", "ledger", "math", "opening", "closing", "tamper", "tampered", "discrepancy", "بیلنس", "حساب", "رقم"]):

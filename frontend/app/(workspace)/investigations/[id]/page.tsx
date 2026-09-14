@@ -11,6 +11,7 @@ import { AnomalyCard } from "@/components/dossier/AnomalyCard";
 import { IBANChecksumCard } from "@/components/dossier/IBANChecksumCard";
 import { SBPAmlCddCard } from "@/components/dossier/SBPAmlCddCard";
 import { NadraCnicCard } from "@/components/dossier/NadraCnicCard";
+import { FbrTaxCard } from "@/components/dossier/FbrTaxCard";
 import { AnalystOverrideModal } from "@/components/dossier/AnalystOverrideModal";
 import { CreditOfficerBriefing } from "@/components/dossier/CreditOfficerBriefing";
 import {
@@ -416,6 +417,16 @@ export default function InvestigationWorkspacePage() {
     ) ||
     Boolean(financialData?.cnic_verification);
 
+  const isTaxOrSalary =
+    documentType === "SALARY_SLIP" ||
+    documentType === "TAX_RETURN" ||
+    evidence.some(
+      (e) =>
+        (e.ruleId || "").includes("RULE_FBR_") ||
+        Boolean((e.technicalDetails as any)?.fbr_audit)
+    ) ||
+    Boolean(financialData?.fbr_tax_verification);
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-paper-0 text-ink-900">
       {/* Editorial Top Masthead */}
@@ -692,6 +703,20 @@ export default function InvestigationWorkspacePage() {
                 </button>
               )}
 
+              {/* FBR Tax Audit Tab */}
+              {(isTaxOrSalary || isFinancial || Boolean(financialData?.fbr_tax_verification)) && (
+                <button
+                  onClick={() => setActiveTab("fbr")}
+                  className={`px-3 py-1 border transition-colors uppercase ${
+                    activeTab === "fbr"
+                      ? "bg-ink-900 text-paper-0 border-ink-900 font-semibold"
+                      : "bg-paper-1 text-ink-700 border-rule hover:bg-paper-2"
+                  }`}
+                >
+                  FBR Tax & WHT
+                </button>
+              )}
+
               {/* Custody Chain tab (PECA 2016 / ETO 2002) */}
               <button
                 onClick={() => setActiveTab("custody")}
@@ -857,6 +882,12 @@ export default function InvestigationWorkspacePage() {
                   evidence={evidence}
                 />
               )}
+              {financialData?.fbr_tax_verification && (
+                <FbrTaxCard
+                  verification={financialData?.fbr_tax_verification}
+                  evidence={evidence}
+                />
+              )}
             </div>
           )}
 
@@ -865,6 +896,16 @@ export default function InvestigationWorkspacePage() {
             <div className="space-y-4">
               <NadraCnicCard
                 verification={financialData?.cnic_verification}
+                evidence={evidence}
+              />
+            </div>
+          )}
+
+          {/* Tab: FBR Tax & WHT Audit */}
+          {activeTab === "fbr" && (
+            <div className="space-y-4">
+              <FbrTaxCard
+                verification={financialData?.fbr_tax_verification}
                 evidence={evidence}
               />
             </div>
@@ -1089,11 +1130,11 @@ export default function InvestigationWorkspacePage() {
                 })()}
               </div>
 
-              {/* 6. Financial Math & Statutory Compliance (SBP & NADRA) */}
+              {/* 6. Financial Math & Statutory Compliance (SBP, NADRA & FBR) */}
               <div className="flex justify-between items-center font-semibold">
-                <span>6. Financial Math & Statutory Compliance (SBP & NADRA)</span>
+                <span>6. Financial Math & Statutory Compliance (SBP, NADRA & FBR)</span>
                 {(() => {
-                  if (!isFinancial && !isIdentity) return <span className="text-ink-500 font-normal">— NOT APPLICABLE</span>;
+                  if (!isFinancial && !isIdentity && !isTaxOrSalary) return <span className="text-ink-500 font-normal">— NOT APPLICABLE</span>;
                   const st = getStageStatus("FINANCIAL_VERIFICATION");
                   if (st === "PENDING") return <span className="text-ink-400 font-normal">○ PENDING</span>;
                   if (st === "RUNNING") return <span className="text-forensic-amber animate-pulse">● AUDITING...</span>;
@@ -1114,6 +1155,16 @@ export default function InvestigationWorkspacePage() {
                   if (hasCnicTamper) {
                     return <span className="text-forensic-red font-bold">✕ NADRA CNIC / MRZ FORGERY</span>;
                   }
+                  const hasFbrTamper = evidence.some(
+                    (e) =>
+                      (e.ruleId || "").includes("RULE_FBR_NTN_INVALID") ||
+                      (e.ruleId || "").includes("RULE_FBR_WHT_ZERO_ON_TAXABLE_SALARY") ||
+                      (e.ruleId || "").includes("RULE_FBR_WHT_DISCREPANCY") ||
+                      (e.ruleId || "").includes("RULE_FBR_CPR_")
+                  );
+                  if (hasFbrTamper) {
+                    return <span className="text-forensic-red font-bold">✕ FBR STATUTORY TAX VIOLATION</span>;
+                  }
                   const hasPep = evidence.some((e) => (e.ruleId || "").includes("AML_PEP"));
                   if (hasPep) {
                     return <span className="text-amber-800 font-bold">▲ PEP IDENTIFIED (EDD REQUIRED)</span>;
@@ -1131,8 +1182,12 @@ export default function InvestigationWorkspacePage() {
                     return <span className="text-forensic-red font-bold">✕ RECONCILIATION MISMATCH</span>;
                   }
                   const hasCnicVerified = evidence.some((e) => (e.ruleId || "").includes("RULE_CNIC_VERIFIED"));
-                  if (hasCnicVerified && !isFinancial) {
+                  if (hasCnicVerified && !isFinancial && !isTaxOrSalary) {
                     return <span className="text-forensic-green">✓ NADRA & ICAO 9303 VERIFIED</span>;
+                  }
+                  const hasFbrVerified = evidence.some((e) => (e.ruleId || "").includes("RULE_FBR_WHT_VERIFIED"));
+                  if (hasFbrVerified && !isFinancial && !isIdentity) {
+                    return <span className="text-forensic-green">✓ FBR §149 & NTN COMPLIANT</span>;
                   }
                   return (
                     <span className="text-forensic-green">

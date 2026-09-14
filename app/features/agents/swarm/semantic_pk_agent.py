@@ -16,6 +16,7 @@ class SemanticPKFinancialAgent(BaseForensicAgent):
             self.get_findings_by_rule_prefix("RULE_PK_")
             + self.get_findings_by_rule_prefix("RULE_AML_")
             + self.get_findings_by_rule_prefix("RULE_CNIC_")
+            + self.get_findings_by_rule_prefix("RULE_FBR_")
             + self.get_findings_by_category("MATHEMATICAL_MISMATCH")
             + self.get_findings_by_category("IBAN_CHECKSUM_FAILURE")
             + self.get_findings_by_category("FINANCIAL_VERIFICATION")
@@ -52,6 +53,10 @@ class SemanticPKFinancialAgent(BaseForensicAgent):
         has_cnic_gender = any("RULE_CNIC_GENDER_PARITY_MISMATCH" in c for c in citations)
         has_cnic_mrz = any("RULE_CNIC_MRZ_CHECKSUM_INVALID" in c for c in citations)
         has_cnic_front_mrz = any("RULE_CNIC_MRZ_FRONT_MISMATCH" in c for c in citations)
+        has_ntn_fail = any("RULE_FBR_NTN_INVALID_CHECKSUM" in c or "RULE_FBR_NTN_INVALID_FORMAT" in c for c in citations)
+        has_wht_zero = any("RULE_FBR_WHT_ZERO_ON_TAXABLE_SALARY" in c for c in citations)
+        has_wht_disc = any("RULE_FBR_WHT_DISCREPANCY" in c for c in citations)
+        has_cpr_fail = any("RULE_FBR_CPR_INVALID_FORMAT" in c or "RULE_FBR_CPR_FUTURE_DATE" in c or "RULE_FBR_CPR_INVALID_DATE" in c for c in citations)
 
         total_discrepancies = []
         for it in adverse_findings:
@@ -75,6 +80,14 @@ class SemanticPKFinancialAgent(BaseForensicAgent):
             key_indicators.append("CRITICAL: Smart Identity Card reverse Machine Readable Zone (MRZ) failed ICAO Doc 9303 Part 5 7-3-1 modulus-10 checksum validation.")
         if has_cnic_front_mrz:
             key_indicators.append("CRITICAL: Visual front CNIC number contradicts reverse optical MRZ encoded data, confirming credential splicing or counterfeit assembly.")
+        if has_ntn_fail:
+            key_indicators.append("CRITICAL: National Tax Number (NTN) violates FBR Modulus 11 statutory check digit algorithm, indicating fictitious taxpayer registration.")
+        if has_wht_zero:
+            key_indicators.append("CRITICAL: Salary exceeds statutory PKR 50,000/mo threshold but declares ZERO withholding tax, violating Income Tax Ordinance 2001 §149.")
+        if has_wht_disc:
+            key_indicators.append("HIGH: Declared withholding tax substantially deviates from statutory progressive tax slabs under Income Tax Ordinance 2001 First Schedule.")
+        if has_cpr_fail:
+            key_indicators.append("HIGH: FBR Computerized Payment Receipt (CPR) format invalid or contains post-dated/impossible tax deposit timestamp.")
         if has_iban_fail:
             key_indicators.append("Invalid Pakistani IBAN checksum failing ISO 7064 MOD-97 check.")
         if has_opening_fail:
@@ -85,20 +98,20 @@ class SemanticPKFinancialAgent(BaseForensicAgent):
             key_indicators.append("Running ledger math failure: debit/credit transactions do not sum to printed balance.")
 
         if anomalies_count > 0:
-            # Mathematical or AML sanctions or CNIC forgery is deterministic and carries near 100% confidence
+            # Mathematical or AML sanctions or CNIC forgery or FBR evasion is deterministic and carries near 100% confidence
             confidence = min(0.99, 0.85 + (anomalies_count * 0.05))
             summary = (
-                f"Pakistani financial, AML/CDD & NADRA identity verification identified {anomalies_count} deterministic adverse finding(s). "
-                f"Discrepancies identified: {'; '.join(total_discrepancies) if total_discrepancies else 'Statutory AML/sanctions breaches, CNIC administrative violations, or ledger reconciliation failures.'} "
-                "These findings provide definitive proof of regulatory non-compliance, identity forgery, or numerical balance manipulation."
+                f"Pakistani financial, AML/CDD, NADRA identity & FBR tax audit identified {anomalies_count} deterministic adverse finding(s). "
+                f"Discrepancies identified: {'; '.join(total_discrepancies) if total_discrepancies else 'Statutory AML/sanctions breaches, CNIC administrative violations, FBR tax evasion/forgery, or ledger reconciliation failures.'} "
+                "These findings provide definitive proof of regulatory non-compliance, identity forgery, tax non-compliance, or numerical balance manipulation."
             )
         else:
             confidence = 0.95
             summary = (
-                "Pakistani financial, SBP Customer Due Diligence (CDD), and NADRA identity verification confirmed complete integrity. "
+                "Pakistani financial, SBP Customer Due Diligence (CDD), NADRA identity, and FBR tax audit confirmed complete integrity. "
                 "All transaction ledger debits and credits reconcile perfectly across all pages to stated opening and closing balances. "
                 "All SBP bank IBANs satisfy ISO 7064 MOD-97 checksum validation. "
-                "Screening against NACTA 4th Schedule, UNSC 1267 Sanctions, PEP registries, and NADRA CNIC structural integrity cleared with zero adverse matches."
+                "Screening against NACTA 4th Schedule, UNSC 1267 Sanctions, PEP registries, NADRA CNIC structural integrity, and FBR Section 149 statutory tax withholding cleared with zero adverse matches."
             )
 
         return {

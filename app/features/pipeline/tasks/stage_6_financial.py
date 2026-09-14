@@ -596,10 +596,17 @@ async def process_financial(
                 )
                 return output_payload
 
-            # Check if any document is a financial statement / ledger / identity document
+            # Check if any document is a financial statement / ledger / identity document / tax return / salary slip
             relevant_docs = [
                 d for d in pdf_docs
-                if d.documentType in ("BANK_STATEMENT", "DIGITAL_WALLET_LEDGER", "UTILITY_BILL", "IDENTITY_DOCUMENT")
+                if d.documentType in (
+                    "BANK_STATEMENT",
+                    "DIGITAL_WALLET_LEDGER",
+                    "UTILITY_BILL",
+                    "IDENTITY_DOCUMENT",
+                    "SALARY_SLIP",
+                    "TAX_RETURN",
+                )
             ]
             if not relevant_docs:
                 # Document is not a bank statement/ledger/utility bill/identity document (e.g. Salary Slip, FBR Challan)
@@ -645,6 +652,7 @@ async def process_financial(
             template_eval_summary: dict[str, Any] | None = None
             aml_cdd_summary: dict[str, Any] | None = None
             cnic_verification_summary: dict[str, Any] | None = None
+            fbr_tax_summary: dict[str, Any] | None = None
 
             for doc in relevant_docs:
 
@@ -704,6 +712,49 @@ async def process_financial(
                             })
                     except Exception as cnic_err:
                         logger.warning(f"NADRA CNIC verification error on identity doc: {cnic_err}")
+
+                    pdf_doc.close()
+                    continue
+
+                # ─────────────────────────────────────────────────────────────
+                # 0b. FBR Tax Verification & Section 149 WHT Audit
+                # ─────────────────────────────────────────────────────────────
+                if doc.documentType in ("SALARY_SLIP", "TAX_RETURN"):
+                    try:
+                        from app.features.pipeline.tasks.fbr_tax_verifier import audit_fbr_tax_compliance
+                        fbr_res = audit_fbr_tax_compliance(all_text, doc_type=doc.documentType)
+                        fbr_tax_summary = fbr_res
+
+                        for fbr_f in fbr_res.get("findings", []):
+                            finding = await tx.evidenceitem.create(
+                                data={
+                                    "document": {"connect": {"id": doc.id}},
+                                    "pipelineStage": {"connect": {"id": pipeline_stage_id}},
+                                    "category": "FINANCIAL_LEDGER_ARITHMETIC",
+                                    "severity": fbr_f["severity"],
+                                    "ruleId": fbr_f["rule_id"],
+                                    "riskPoints": fbr_f["risk_points"],
+                                    "title": fbr_f["title"],
+                                    "description": fbr_f["description"],
+                                    "isDeterministic": True,
+                                    "pageNumber": 1,
+                                    "expectedValue": fbr_f.get("expected", "FBR Statutory Tax Compliance"),
+                                    "actualValue": fbr_f.get("actual", "Declared Document Figures"),
+                                    "discrepancy": fbr_f.get("description", ""),
+                                    "technicalDetails": Json({
+                                        "fbr_audit": fbr_res,
+                                    }),
+                                }
+                            )
+                            stage_findings.append({
+                                "id": finding.id,
+                                "rule_id": fbr_f["rule_id"],
+                                "severity": finding.severity,
+                                "page": 1,
+                                "title": finding.title,
+                            })
+                    except Exception as fbr_err:
+                        logger.warning(f"FBR tax verification error: {fbr_err}")
 
                     pdf_doc.close()
                     continue
@@ -1813,11 +1864,50 @@ async def process_financial(
                     except Exception as cnic_err:
                         logger.warning(f"CNIC verification in bank statement error: {cnic_err}")
 
+                    # FBR NTN / CPR audit in bank statement or ledger if present
+                    if not fbr_tax_summary and ("NTN" in all_text.upper() or "NATIONAL TAX NUMBER" in all_text.upper() or "CPR" in all_text.upper()):
+                        try:
+                            from app.features.pipeline.tasks.fbr_tax_verifier import audit_fbr_tax_compliance
+                            fbr_res = audit_fbr_tax_compliance(all_text, doc_type=doc.documentType)
+                            if fbr_res.get("ntn_result") or fbr_res.get("cpr_result"):
+                                fbr_tax_summary = fbr_res
+                                for fbr_f in fbr_res.get("findings", []):
+                                    finding = await tx.evidenceitem.create(
+                                        data={
+                                            "document": {"connect": {"id": doc.id}},
+                                            "pipelineStage": {"connect": {"id": pipeline_stage_id}},
+                                            "category": "FINANCIAL_LEDGER_ARITHMETIC",
+                                            "severity": fbr_f["severity"],
+                                            "ruleId": fbr_f["rule_id"],
+                                            "riskPoints": fbr_f["risk_points"],
+                                            "title": fbr_f["title"],
+                                            "description": fbr_f["description"],
+                                            "isDeterministic": True,
+                                            "pageNumber": 1,
+                                            "expectedValue": fbr_f.get("expected", "FBR Statutory Tax Compliance"),
+                                            "actualValue": fbr_f.get("actual", "Declared Document Figures"),
+                                            "discrepancy": fbr_f.get("description", ""),
+                                            "technicalDetails": Json({
+                                                "fbr_audit": fbr_res,
+                                            }),
+                                        }
+                                    )
+                                    stage_findings.append({
+                                        "id": finding.id,
+                                        "rule_id": fbr_f["rule_id"],
+                                        "severity": finding.severity,
+                                        "page": 1,
+                                        "title": finding.title,
+                                    })
+                        except Exception as fbr_err:
+                            logger.warning(f"FBR tax verification in bank statement error: {fbr_err}")
+
                 pdf_doc.close()
 
             duration_ms = int((time.perf_counter() - start_time) * 1000)
             has_bank_statement = any(d.documentType in ("BANK_STATEMENT", "DIGITAL_WALLET_LEDGER") for d in pdf_docs)
             has_identity_doc = any(d.documentType == "IDENTITY_DOCUMENT" for d in pdf_docs)
+            has_fbr_doc = any(d.documentType in ("SALARY_SLIP", "TAX_RETURN") for d in pdf_docs)
             output_payload = {
                 "findings_count": len(stage_findings),
                 "findings": stage_findings,
@@ -1826,11 +1916,11 @@ async def process_financial(
                     "MISMATCH" in f.get("rule_id", "") or "RECONCILIATION_FAIL" in f.get("rule_id", "")
                     for f in stage_findings
                 ),
-                "skipped": not (has_bank_statement or has_identity_doc),
+                "skipped": not (has_bank_statement or has_identity_doc or has_fbr_doc),
                 "bypass_reason": (
                     f"Document classified as {pdf_docs[0].documentType if pdf_docs else 'UTILITY_BILL'}. "
                     "Non-financial documents bypass ledger reconciliation."
-                ) if not (has_bank_statement or has_identity_doc) else None,
+                ) if not (has_bank_statement or has_identity_doc or has_fbr_doc) else None,
                 "stated_opening": float(stated_opening) if stated_opening is not None else None,
                 "implied_opening": float(ledger_sm.implied_opening) if (ledger_sm is not None and ledger_sm.implied_opening is not None) else (float(stated_opening) if stated_opening is not None else None),
                 "opening_discrepancy": float(stated_opening - ledger_sm.implied_opening) if (ledger_sm is not None and stated_opening is not None and ledger_sm.implied_opening is not None) else None,
@@ -1842,6 +1932,7 @@ async def process_financial(
                 "bank_template_verification": template_eval_summary,
                 "aml_cdd_screening": aml_cdd_summary,
                 "cnic_verification": cnic_verification_summary,
+                "fbr_tax_verification": fbr_tax_summary,
             }
 
             await tx.pipelinestage.update(
