@@ -232,6 +232,37 @@ async def get_agent_sessions(db: Prisma, investigation_id: str) -> list[schemas.
     ]
 
 
+async def get_interactive_qa_history(db: Prisma, investigation_id: str) -> schemas.AskHistoryResponse:
+    """Retrieve all messages from the interactive QA session for this investigation."""
+    sess = await db.agentsession.find_first(
+        where={"investigationId": investigation_id, "agentRole": "INTERACTIVE_QA"},
+        include={"messages": True},
+        order={"createdAt": "desc"},
+    )
+    if not sess:
+        return schemas.AskHistoryResponse(messages=[])
+
+    sorted_messages = sorted(sess.messages or [], key=lambda m: m.sequenceOrder)
+    return schemas.AskHistoryResponse(
+        session_id=sess.id,
+        model_provider=sess.modelProvider,
+        model_name=sess.modelName,
+        status=sess.status,
+        messages=[
+            schemas.AgentMessageItem(
+                id=m.id,
+                role=str(m.role),
+                content=m.content,
+                tokens_in=m.tokensIn or 0,
+                tokens_out=m.tokensOut or 0,
+                sequence_order=m.sequenceOrder,
+                created_at=m.createdAt,
+            )
+            for m in sorted_messages
+        ],
+    )
+
+
 async def run_lead_investigator_analysis(
     db: Prisma,
     investigation_id: str,

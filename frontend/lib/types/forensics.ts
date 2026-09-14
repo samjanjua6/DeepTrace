@@ -200,3 +200,43 @@ export interface CustodyEvent {
   };
   timestamp: string;
 }
+
+export interface AgentMessage {
+  id: string;
+  role: "USER" | "ASSISTANT";
+  content: string;
+  tokensIn?: number;
+  tokensOut?: number;
+  sequenceOrder: number;
+  createdAt: string;
+  evidenceReferences?: string[];
+}
+
+export interface AskResponse {
+  answer: string;
+  agentSessionId: string;
+  evidenceReferences: string[];
+  tokensUsed: number;
+}
+
+export interface AgentSessionInfo {
+  id: string;
+  agentRole: string;
+  modelProvider?: string | null;
+  modelName?: string | null;
+  totalTokensIn: number;
+  totalTokensOut: number;
+  totalCostUsd: number;
+  status: string;
+  startedAt: string;
+  completedAt?: string | null;
+}
+
+export interface AskHistoryResponse {
+  sessionId?: string | null;
+  modelProvider?: string | null;
+  modelName?: string | null;
+  status?: string;
+  messages: AgentMessage[];
+}
+

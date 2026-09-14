@@ -260,6 +260,50 @@ class TestLeadInvestigatorAgent(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Straight-Through Approval", res["english_summary"])
         self.assertIn("براہِ راست منظوری", res["urdu_summary"])
 
+    async def test_interactive_qa_history_service(self):
+        """Test retrieving interactive QA history with sequence sorting."""
+        from app.features.agents.service import get_interactive_qa_history
+        from datetime import datetime, timezone
+
+        mock_db = MagicMock()
+        mock_session = MagicMock()
+        mock_session.id = "sess-123"
+        mock_session.modelProvider = "groq"
+        mock_session.modelName = "llama-3.3-70b-versatile"
+        mock_session.status = "active"
+
+        m1 = MagicMock()
+        m1.id = "msg-1"
+        m1.role = "USER"
+        m1.content = "What is the baseline offset?"
+        m1.tokensIn = 6
+        m1.tokensOut = 0
+        m1.sequenceOrder = 1
+        m1.createdAt = datetime.now(timezone.utc)
+
+        m2 = MagicMock()
+        m2.id = "msg-2"
+        m2.role = "ASSISTANT"
+        m2.content = "Sub-pixel typography offset of 2.50 pt detected."
+        m2.tokensIn = 0
+        m2.tokensOut = 85
+        m2.sequenceOrder = 2
+        m2.createdAt = datetime.now(timezone.utc)
+
+        mock_session.messages = [m2, m1]  # Intentionally unsorted to verify sorting logic
+        mock_db.agentsession.find_first = AsyncMock(return_value=mock_session)
+
+        history = await get_interactive_qa_history(mock_db, "inv-test-123")
+        self.assertEqual(history.session_id, "sess-123")
+        self.assertEqual(history.model_provider, "groq")
+        self.assertEqual(len(history.messages), 2)
+        # Verify deterministic ascending order
+        self.assertEqual(history.messages[0].id, "msg-1")
+        self.assertEqual(history.messages[0].role, "USER")
+        self.assertEqual(history.messages[1].id, "msg-2")
+        self.assertEqual(history.messages[1].role, "ASSISTANT")
+
 
 if __name__ == "__main__":
     unittest.main()
+

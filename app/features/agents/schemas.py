@@ -15,6 +15,25 @@ class AskResponse(BaseModel):
     tokens_used: int
 
 
+class AgentMessageItem(BaseModel):
+    id: str
+    role: str  # USER or ASSISTANT
+    content: str
+    tokens_in: int = 0
+    tokens_out: int = 0
+    sequence_order: int
+    created_at: datetime
+
+
+class AskHistoryResponse(BaseModel):
+    session_id: str | None = None
+    model_provider: str | None = None
+    model_name: str | None = None
+    status: str = "active"
+    messages: list[AgentMessageItem] = []
+
+
+
 class AgentSessionResponse(BaseModel):
     id: str
     agent_role: str

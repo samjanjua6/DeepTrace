@@ -14,6 +14,7 @@ import { NadraCnicCard } from "@/components/dossier/NadraCnicCard";
 import { FbrTaxCard } from "@/components/dossier/FbrTaxCard";
 import { AnalystOverrideModal } from "@/components/dossier/AnalystOverrideModal";
 import { CreditOfficerBriefing } from "@/components/dossier/CreditOfficerBriefing";
+import { SwarmChatDrawer } from "@/components/agents/SwarmChatDrawer";
 import {
   Investigation,
   DocumentPage,
@@ -218,6 +219,37 @@ export default function InvestigationWorkspacePage() {
   const [isLoading, setIsLoading] = useState<boolean>(!isSample);
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [pipelineRun, setPipelineRun] = useState<PipelineRun | null>(null);
+  const [isChatDrawerOpen, setIsChatDrawerOpen] = useState<boolean>(false);
+
+  const handleCitationClick = (citationId: string) => {
+    // Attempt to locate matching evidence item by ID or ruleId
+    const match = evidence.find(
+      (e) =>
+        e.id === citationId ||
+        e.ruleId === citationId ||
+        (e.ruleId && e.ruleId.toLowerCase().includes(citationId.toLowerCase()))
+    );
+
+    if (match) {
+      setActiveEvidenceId(match.id);
+      if (match.pageNumber) {
+        setFocusedPageNumber(match.pageNumber);
+      }
+
+      // Navigate to relevant domain tab
+      if (match.category?.includes("MATH") || match.ruleId?.includes("LEDGER")) {
+        setActiveTab("ledger");
+      } else if (match.ruleId?.includes("IBAN") || match.ruleId?.includes("AML")) {
+        setActiveTab("iban");
+      } else if (match.ruleId?.includes("CNIC")) {
+        setActiveTab("cnic");
+      } else if (match.ruleId?.includes("FBR") || match.ruleId?.includes("TAX")) {
+        setActiveTab("fbr");
+      } else {
+        setActiveTab("findings");
+      }
+    }
+  };
 
   // Load real investigation data with automatic polling for background execution
   useEffect(() => {
@@ -725,17 +757,45 @@ export default function InvestigationWorkspacePage() {
               >
                 Custody Chain
               </button>
+
+              {/* Interactive Agent Swarm Tab */}
+              <button
+                onClick={() => setActiveTab("swarm")}
+                className={`px-3 py-1 border transition-colors uppercase flex items-center gap-1.5 ${
+                  activeTab === "swarm"
+                    ? "bg-ink-900 text-paper-0 border-ink-900 font-semibold shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]"
+                    : "bg-paper-1 text-ink-700 border-rule hover:bg-paper-2"
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>Agent Swarm</span>
+              </button>
             </div>
 
-            {!isSample && (
+            <div className="flex items-center gap-2">
               <button
-                onClick={handleReanalyze}
-                disabled={isAnalyzing}
-                className="px-3 py-1 bg-paper-1 hover:bg-paper-2 border border-rule text-ink-900 uppercase font-semibold transition-colors disabled:opacity-50"
+                onClick={() => setIsChatDrawerOpen((prev) => !prev)}
+                className={`px-3 py-1 border text-xs font-mono font-bold uppercase transition-all flex items-center gap-1.5 cursor-pointer ${
+                  isChatDrawerOpen
+                    ? "bg-ink-900 text-paper-0 border-ink-900 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+                    : "bg-amber-50 hover:bg-amber-100 text-ink-900 border-ink-900 hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+                }`}
+                title="Toggle interactive Lead Investigator Q&A drawer"
               >
-                {isAnalyzing ? "Processing..." : "↻ Re-Analyze"}
+                <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                <span>[ ⚡ ASK LEAD INVESTIGATOR ]</span>
               </button>
-            )}
+
+              {!isSample && (
+                <button
+                  onClick={handleReanalyze}
+                  disabled={isAnalyzing}
+                  className="px-3 py-1 bg-paper-1 hover:bg-paper-2 border border-rule text-ink-900 uppercase font-semibold transition-colors disabled:opacity-50"
+                >
+                  {isAnalyzing ? "Processing..." : "↻ Re-Analyze"}
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Tab 1: Findings Feed or Verified Genuine Presentation */}
@@ -1019,6 +1079,17 @@ export default function InvestigationWorkspacePage() {
             </div>
           )}
 
+          {/* Interactive Agent Swarm Tab */}
+          {activeTab === "swarm" && (
+            <div className="space-y-3">
+              <SwarmChatDrawer
+                investigationId={investigationId}
+                mode="tab"
+                onCitationClick={handleCitationClick}
+              />
+            </div>
+          )}
+
           {/* 8-Stage Forensic Pipeline Audit Checklist */}
           <div className="bg-paper-1 border border-rule p-4 font-mono text-xs">
             <span className="font-semibold text-ink-900 uppercase tracking-wider block mb-2 text-[10px]">
@@ -1233,6 +1304,15 @@ export default function InvestigationWorkspacePage() {
         onClose={() => setIsOverrideOpen(false)}
         currentScore={risk.overallScore}
         onSave={handleOverrideSave}
+      />
+
+      {/* Floating Interactive Swarm Slide-Out Drawer */}
+      <SwarmChatDrawer
+        investigationId={investigationId}
+        isOpen={isChatDrawerOpen}
+        onClose={() => setIsChatDrawerOpen(false)}
+        mode="drawer"
+        onCitationClick={handleCitationClick}
       />
     </div>
   );

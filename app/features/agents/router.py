@@ -37,6 +37,17 @@ async def ask_agent(
             db, investigation.id, user.id, body.question, stream=False
         )
 
+@router.get("/{investigation_id}/ask/history", response_model=schemas.AskHistoryResponse,
+            summary="Get conversation history for interactive Q&A agent session")
+async def get_interactive_qa_history(
+    investigation=Depends(get_investigation),
+    db: Annotated[Prisma, Depends(get_db_dep)] = None,
+):
+    if db is None:
+        from app.db.client import db as global_db
+        db = global_db
+    return await service.get_interactive_qa_history(db, investigation.id)
+
 @router.get("/{investigation_id}/agents", response_model=list[schemas.AgentSessionResponse],
             summary="List all agent sessions for an investigation")
 async def list_agent_sessions(

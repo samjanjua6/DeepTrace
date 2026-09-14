@@ -6,6 +6,10 @@ import {
   RiskAssessment,
   PipelineRun,
   CustodyEvent,
+  AgentMessage,
+  AskResponse,
+  AgentSessionInfo,
+  AskHistoryResponse,
 } from "../types/forensics";
 
 const API_BASE = "/api/v1";
@@ -699,4 +703,170 @@ export async function getLeadInvestigatorAnalysis(
   if (!res.ok) throw new Error("Failed to fetch Lead Investigator analysis");
   return res.json();
 }
+
+export async function askAgentStream(
+  investigationId: string,
+  question: string,
+  onChunk: (chunk: string) => void
+): Promise<AskResponse> {
+  await ensureAuth().catch(() => {});
+  const res = await fetch(`${API_BASE}/investigations/${investigationId}/ask`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json",
+      Accept: "text/event-stream, application/json",
+    },
+    body: JSON.stringify({ question, stream: true }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`Failed to consult Lead Investigator: ${res.status} ${errText}`);
+  }
+
+  const contentType = res.headers.get("content-type") || "";
+  if (contentType.includes("application/json") || !res.body) {
+    const data = await res.json();
+    const answer = data.answer || "";
+    onChunk(answer);
+    return {
+      answer,
+      agentSessionId: data.agent_session_id || "",
+      evidenceReferences: data.evidence_references || [],
+      tokensUsed: data.tokens_used || 0,
+    };
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
+  let fullAnswer = "";
+  let finalResult: Partial<AskResponse> = {};
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) continue;
+      const jsonStr = trimmed.replace(/^data:\s*/, "");
+      if (!jsonStr) continue;
+
+      try {
+        const payload = JSON.parse(jsonStr);
+        if (payload.chunk) {
+          fullAnswer += payload.chunk;
+          onChunk(payload.chunk);
+        }
+        if (payload.done) {
+          finalResult = {
+            answer: payload.answer || fullAnswer,
+            agentSessionId: payload.agent_session_id || "",
+            evidenceReferences: payload.evidence_references || [],
+            tokensUsed: payload.tokens_used || 0,
+          };
+        }
+      } catch {
+        // Ignore partial JSON parse errors
+      }
+    }
+  }
+
+  return {
+    answer: finalResult.answer || fullAnswer,
+    agentSessionId: finalResult.agentSessionId || "",
+    evidenceReferences: finalResult.evidenceReferences || [],
+    tokensUsed: finalResult.tokensUsed || 0,
+  };
+}
+
+export async function askAgent(
+  investigationId: string,
+  question: string
+): Promise<AskResponse> {
+  await ensureAuth().catch(() => {});
+  const res = await fetch(`${API_BASE}/investigations/${investigationId}/ask`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ question, stream: false }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`Failed to consult Lead Investigator: ${res.status} ${errText}`);
+  }
+  const data = await res.json();
+  return {
+    answer: data.answer,
+    agentSessionId: data.agent_session_id,
+    evidenceReferences: data.evidence_references || [],
+    tokensUsed: data.tokens_used || 0,
+  };
+}
+
+export async function getAgentChatHistory(
+  investigationId: string
+): Promise<AskHistoryResponse> {
+  await ensureAuth().catch(() => {});
+  const res = await fetch(
+    `${API_BASE}/investigations/${investigationId}/ask/history`,
+    {
+      headers: getAuthHeaders(),
+    }
+  );
+  if (!res.ok) {
+    return { messages: [] };
+  }
+  const data = await res.json();
+  return {
+    sessionId: data.session_id,
+    modelProvider: data.model_provider,
+    modelName: data.model_name,
+    status: data.status,
+    messages: (data.messages || []).map((m: any) => ({
+      id: m.id,
+      role: m.role,
+      content: m.content,
+      tokensIn: m.tokens_in ?? m.tokensIn ?? 0,
+      tokensOut: m.tokens_out ?? m.tokensOut ?? 0,
+      sequenceOrder: m.sequence_order ?? m.sequenceOrder ?? 0,
+      createdAt: m.created_at || m.createdAt || new Date().toISOString(),
+    })),
+  };
+}
+
+export async function getAgentSessions(
+  investigationId: string
+): Promise<AgentSessionInfo[]> {
+  await ensureAuth().catch(() => {});
+  const res = await fetch(
+    `${API_BASE}/investigations/${investigationId}/agents`,
+    {
+      headers: getAuthHeaders(),
+    }
+  );
+  if (!res.ok) return [];
+  const sessions = await res.json();
+  return (sessions || []).map((s: any) => ({
+    id: s.id,
+    agentRole: s.agent_role || s.agentRole,
+    modelProvider: s.model_provider || s.modelProvider,
+    modelName: s.model_name || s.modelName,
+    totalTokensIn: s.total_tokens_in ?? s.totalTokensIn ?? 0,
+    totalTokensOut: s.total_tokens_out ?? s.totalTokensOut ?? 0,
+    totalCostUsd: s.total_cost_usd ?? s.totalCostUsd ?? 0,
+    status: s.status,
+    startedAt: s.started_at || s.startedAt,
+    completedAt: s.completed_at || s.completedAt,
+  }));
+}
+
 
