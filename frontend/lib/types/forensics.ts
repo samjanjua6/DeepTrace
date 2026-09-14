@@ -240,3 +240,19 @@ export interface AskHistoryResponse {
   messages: AgentMessage[];
 }
 
+export interface ApiKeyItem {
+  id: string;
+  name: string;
+  key_prefix: string;
+  scopes: string[];
+  is_active: boolean;
+  created_at: string;
+  expires_at?: string | null;
+  last_used_at?: string | null;
+  is_expired: boolean;
+}
+
+export interface ApiKeyCreatedResponse extends ApiKeyItem {
+  plaintext_key: string;
+}
+

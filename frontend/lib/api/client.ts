@@ -10,6 +10,8 @@ import {
   AskResponse,
   AgentSessionInfo,
   AskHistoryResponse,
+  ApiKeyItem,
+  ApiKeyCreatedResponse,
 } from "../types/forensics";
 
 const API_BASE = "/api/v1";
@@ -867,6 +869,61 @@ export async function getAgentSessions(
     startedAt: s.started_at || s.startedAt,
     completedAt: s.completed_at || s.completedAt,
   }));
+}
+
+export async function getApiKeys(includeRevoked: boolean = false): Promise<ApiKeyItem[]> {
+  await ensureAuth().catch(() => {});
+  const query = includeRevoked ? "?include_revoked=true" : "";
+  const res = await fetch(`${API_BASE}/api-keys${query}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    if (res.status === 403) {
+      throw new Error("403 Forbidden: Insufficient permissions. Admin access required.");
+    }
+    throw new Error(`Failed to fetch API keys: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function createApiKey(payload: {
+  name: string;
+  scopes: string[];
+  expires_in_days?: number | null;
+}): Promise<ApiKeyCreatedResponse> {
+  await ensureAuth().catch(() => {});
+  const res = await fetch(`${API_BASE}/api-keys`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const message =
+      errorData?.detail?.message ||
+      errorData?.error?.message ||
+      errorData?.message ||
+      "Failed to create API key";
+    throw new Error(message);
+  }
+  return res.json();
+}
+
+export async function revokeApiKey(keyId: string): Promise<void> {
+  await ensureAuth().catch(() => {});
+  const res = await fetch(`${API_BASE}/api-keys/${keyId}`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const message =
+      errorData?.detail?.message ||
+      errorData?.error?.message ||
+      errorData?.message ||
+      "Failed to revoke API key";
+    throw new Error(message);
+  }
 }
 
 

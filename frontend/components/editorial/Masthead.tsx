@@ -189,6 +189,18 @@ export function Masthead({
           >
             + New Intake
           </Link>
+          {(user?.role === "ADMIN" || user?.role === "OWNER") && (
+            <Link
+              href="/settings/api-keys"
+              className={`transition-colors hover:text-ink-900 pb-1 border-b-2 ${
+                pathname.startsWith("/settings/api-keys")
+                  ? "border-ink-900 text-ink-900 font-semibold"
+                  : "border-transparent text-ink-500"
+              }`}
+            >
+              API Keys
+            </Link>
+          )}
           <a
             href="http://localhost:8000/docs"
             target="_blank"
