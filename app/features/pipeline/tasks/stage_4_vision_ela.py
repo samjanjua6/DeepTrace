@@ -486,8 +486,9 @@ async def process_vision_ela(
                                         "riskPoints": 30,
                                         "title": f"Copy-Move Forgery: Duplicated Region on Page {page.pageNumber}",
                                         "description": (
-                                            f"ORB keypoint analysis (RANSAC verified, {match.match_count} inliers, "
-                                            f"confidence {match.confidence:.1%}) identified a geometrically consistent "
+                                            f"Dense keypoint analysis ({match.method}, RANSAC verified, "
+                                            f"substrate correlation {match.bg_zncc:.2f}, {match.match_count} inliers, "
+                                            f"confidence {match.confidence:.1%}) identified a verified "
                                             f"copy-move forgery on Page {page.pageNumber}. A region at "
                                             f"({match.src_bbox[0]}, {match.src_bbox[1]}) was duplicated to "
                                             f"({match.dst_bbox[0]}, {match.dst_bbox[1]}). "
@@ -497,12 +498,15 @@ async def process_vision_ela(
                                         "confidence": round(match.confidence, 3),
                                         "pageNumber": page.pageNumber,
                                         "expectedValue": "Unique, non-duplicated visual content across all regions",
-                                        "actualValue": f"Geometrically matching cloned region ({match.match_count} keypoint inliers)",
+                                        "actualValue": f"Geometrically matching cloned region ({match.match_count} keypoint inliers, background ZNCC {match.bg_zncc:.2f})",
                                         "discrepancy": "Copy-move duplication detected",
                                         "technicalDetails": Json({
-                                            "detection_method": "orb_bfmatcher_ransac",
+                                            "detection_method": match.method,
                                             "inlier_count": match.match_count,
                                             "confidence": match.confidence,
+                                            "shift_vector": list(match.shift_vector),
+                                            "bg_zncc": match.bg_zncc,
+                                            "conflict_ratio": match.conflict_ratio,
                                             "src_bbox_px": list(match.src_bbox),
                                             "dst_bbox_px": list(match.dst_bbox),
                                         }),

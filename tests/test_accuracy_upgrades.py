@@ -276,11 +276,102 @@ class TestCMFDEngine(unittest.TestCase):
         self.assertGreater(match.confidence, 0.0)
 
     def test_cmfd_returns_empty_on_none_input(self):
-
         """detect_copy_move with None input must return empty list, not raise."""
         from app.features.pipeline.tasks.cmfd_engine import detect_copy_move
         result = detect_copy_move(None)
         self.assertEqual(result, [])
+
+    def test_cmfd_suppresses_repeated_typographical_text(self):
+        """
+        Authentic repeated words across different lines (e.g. 'Muhammad' in cardholder
+        name and father's name) must be suppressed and not flagged as copy-move forgeries.
+        """
+        from app.features.pipeline.tasks.cmfd_engine import detect_copy_move
+        # Render a document page with repeated name 'Muhammad' across two rows
+        img = np.ones((500, 700), dtype=np.uint8) * 210
+        # Add background paper texture / noise
+        rng = np.random.RandomState(42)
+        noise = rng.normal(0, 4, (500, 700)).astype(np.int16)
+        img = np.clip(img.astype(np.int16) + noise, 0, 255).astype(np.uint8)
+
+        # Draw identical font text on Line 1 and Line 2
+        cv2.putText(img, "Muhammad Shaheer", (50, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.9, 30, 2)
+        cv2.putText(img, "Muhammad Akram", (50, 220), cv2.FONT_HERSHEY_SIMPLEX, 0.9, 30, 2)
+
+        matches = detect_copy_move(img, min_match_count=8)
+        self.assertEqual(
+            len(matches), 0,
+            msg=f"Expected zero CMFD matches on authentic repeated typography, but got {len(matches)}"
+        )
+
+    def test_cmfd_suppresses_conflicting_date_substrings(self):
+        """
+        Dates sharing pre-printed labels and day/month validity substrings
+        ('Date of Issue 30.08.2022' vs 'Date of Expiry 30.08.2032') must be suppressed
+        due to conflicting foreground strokes ('Issue' vs 'Expiry', '2022' vs '2032').
+        """
+        from app.features.pipeline.tasks.cmfd_engine import detect_copy_move
+        img = np.ones((400, 600), dtype=np.uint8) * 220
+        # Draw Issue Date and Expiry Date with shared 'Date of' and '30.08.20'
+        cv2.putText(img, "Date of Issue", (50, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.6, 25, 2)
+        cv2.putText(img, "30.08.2022", (50, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.6, 25, 2)
+        cv2.putText(img, "Date of Expiry", (300, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.6, 25, 2)
+        cv2.putText(img, "30.08.2032", (300, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.6, 25, 2)
+
+        matches = detect_copy_move(img, min_match_count=8)
+        self.assertEqual(
+            len(matches), 0,
+            msg=f"Expected zero CMFD matches on dates with conflicting substrings, but got {len(matches)}"
+        )
+
+    def test_cmfd_detects_cloned_signature_or_stamp(self):
+        """
+        True digital copy-move manipulation (e.g. cloned signature or stamp patch)
+        must be reliably detected with high confidence and matching background.
+        """
+        from app.features.pipeline.tasks.cmfd_engine import detect_copy_move
+        img = np.ones((500, 700), dtype=np.uint8) * 215
+
+        # Draw a rich signature / stamp emblem in source location (x:80, y:80)
+        cv2.circle(img, (140, 140), 45, 30, 2)
+        cv2.circle(img, (140, 140), 35, 30, 1)
+        cv2.putText(img, "VERIFIED", (105, 145), cv2.FONT_HERSHEY_SIMPLEX, 0.5, 30, 2)
+        for i in range(8):
+            ang = i * np.pi / 4
+            x1, y1 = int(140 + 35 * np.cos(ang)), int(140 + 35 * np.sin(ang))
+            x2, y2 = int(140 + 45 * np.cos(ang)), int(140 + 45 * np.sin(ang))
+            cv2.line(img, (x1, y1), (x2, y2), 30, 1)
+
+        # Clone stamp patch (100x100) to destination (x:450, y:300)
+        stamp_patch = img[90:190, 90:190].copy()
+        img[300:400, 450:550] = stamp_patch
+
+        matches = detect_copy_move(img, min_match_count=6)
+        self.assertGreater(
+            len(matches), 0,
+            msg="Expected CMFD to detect cloned official stamp/seal emblem"
+        )
+        match = matches[0]
+        self.assertGreater(match.match_count, 0)
+        self.assertGreaterEqual(match.bg_zncc, 0.85)
+
+    def test_cmfd_zero_false_positives_on_user_id_card(self):
+        """
+        Real Pakistani SNIC identity card from Active Docket DT-PK-2026-000048 must yield
+        exactly zero false positive copy-move detections.
+        """
+        import os
+        from app.features.pipeline.tasks.cmfd_engine import detect_copy_move
+        card_path = "storage/deeptrace-documents/documents/cmu02mwdl0003ljh6ktdirgkk/79f04e22-5eee-4de9-83a1-c445a81ea4b4/pages/page_1.png"
+        if not os.path.exists(card_path):
+            self.skipTest("User ID card image not present on disk in this environment")
+
+        gray = cv2.imread(card_path, cv2.IMREAD_GRAYSCALE)
+        matches = detect_copy_move(gray, min_match_count=16)
+        self.assertEqual(
+            len(matches), 0,
+            msg=f"Expected zero false positive CMFD matches on authentic user ID card, but got: {matches}"
+        )
 
 
 # ---------------------------------------------------------------------------
