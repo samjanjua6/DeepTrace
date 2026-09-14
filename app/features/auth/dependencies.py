@@ -38,7 +38,7 @@ async def get_current_user(
 
     async with db.tx() as tx:
         await tx.execute_raw("SELECT set_config('app.is_auth', 'true', true);")
-        user = await tx.user.find_unique(where={"id": user_id})
+        user = await tx.user.find_unique(where={"id": user_id}, include={"organization": True})
         if not user or not user.isActive:
             raise TokenExpiredError()
         return user

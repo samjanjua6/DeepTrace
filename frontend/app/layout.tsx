@@ -24,6 +24,8 @@ export const metadata: Metadata = {
     "Institutional document forensics, sub-pixel typography verification, and deterministic financial ledger reconciliation for banking and regulatory compliance.",
 };
 
+import { AuthProvider } from "@/context/AuthContext";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -39,7 +41,7 @@ export default function RootLayout({
         suppressHydrationWarning
         className="min-h-full flex flex-col bg-paper-0 text-ink-900 selection:bg-forensic-red selection:text-white"
       >
-        {children}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

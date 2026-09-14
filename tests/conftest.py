@@ -7,11 +7,14 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
+from app.db.client import connect, disconnect, db
 
 
 @pytest_asyncio.fixture
 async def client() -> AsyncClient:
     """Async HTTP test client against the FastAPI app."""
+    if not db.is_connected():
+        await connect()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
 

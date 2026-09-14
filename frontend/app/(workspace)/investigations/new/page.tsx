@@ -9,7 +9,6 @@ import {
   createInvestigation,
   uploadDocument,
   triggerPipeline,
-  loginAnalyst,
 } from "@/lib/api/client";
 import { Upload, ShieldCheck, FileText, CheckCircle2 } from "lucide-react";
 
@@ -82,8 +81,6 @@ export default function NewCaseIntakePage() {
     setError(null);
 
     try {
-      await loginAnalyst().catch(() => {});
-
       setStep("1/4: Registering case docket and custody record...");
       const inv = await createInvestigation({
         title,

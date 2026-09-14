@@ -33,7 +33,6 @@ import {
   triggerPipeline,
   getPipelineStatus,
   overrideRiskScore,
-  loginAnalyst,
 } from "@/lib/api/client";
 import {
   ShieldCheck,
@@ -239,8 +238,6 @@ export default function InvestigationWorkspacePage() {
       if (isInitial) setIsLoading(true);
       let isStillRunning = false;
       try {
-        await loginAnalyst().catch(() => {});
-
         // 1. Fetch Investigation
         const inv = await getInvestigation(investigationId).catch(() => null);
         if (!isMounted) return;

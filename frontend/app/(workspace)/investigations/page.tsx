@@ -6,7 +6,7 @@ import { Masthead } from "@/components/editorial/Masthead";
 import { FolioTag } from "@/components/editorial/FolioTag";
 import { HairlineRule } from "@/components/editorial/HairlineRule";
 import { Investigation } from "@/lib/types/forensics";
-import { getInvestigations, loginAnalyst } from "@/lib/api/client";
+import { getInvestigations } from "@/lib/api/client";
 import { formatDatePKT } from "@/lib/formatters";
 
 // Default authentic sample dockets for immediate display
@@ -56,7 +56,6 @@ export default function InvestigationsDocketPage() {
   useEffect(() => {
     async function load() {
       try {
-        await loginAnalyst().catch(() => {});
         const apiData = await getInvestigations();
         if (apiData && apiData.length > 0) {
           // Merge real cases with sample cases

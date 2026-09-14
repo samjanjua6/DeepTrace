@@ -10,74 +10,255 @@ import {
 
 const API_BASE = "/api/v1";
 
+export interface TokenResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  expires_in: number;
+  mfa_required?: boolean;
+  temp_token?: string;
+  message?: string;
+}
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+  organization_id: string;
+  mfa_enabled: boolean;
+  organization_name?: string;
+  organization_slug?: string;
+}
+
+export interface OrganizationOption {
+  id: string;
+  name: string;
+  slug: string;
+  domain?: string;
+  subscription_tier?: string;
+}
+
 let authToken: string | null = null;
-let authPromise: Promise<string> | null = null;
+let refreshPromise: Promise<TokenResponse | null> | null = null;
+
+export function getAuthToken(): string | null {
+  if (authToken) return authToken;
+  if (typeof window !== "undefined") {
+    authToken = localStorage.getItem("deeptrace_access_token");
+  }
+  return authToken;
+}
+
+export function getStoredRefreshToken(): string | null {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("deeptrace_refresh_token");
+  }
+  return null;
+}
 
 export function setAuthToken(token: string) {
   authToken = token;
+  if (typeof window !== "undefined") {
+    localStorage.setItem("deeptrace_access_token", token);
+  }
+}
+
+export function setAuthTokens(access: string, refresh?: string) {
+  authToken = access;
+  if (typeof window !== "undefined") {
+    localStorage.setItem("deeptrace_access_token", access);
+    if (refresh) {
+      localStorage.setItem("deeptrace_refresh_token", refresh);
+    }
+  }
+}
+
+export function clearAuthTokens() {
+  authToken = null;
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("deeptrace_access_token");
+    localStorage.removeItem("deeptrace_refresh_token");
+    localStorage.removeItem("deeptrace_user");
+  }
 }
 
 export function getAuthHeaders(): HeadersInit {
   const headers: HeadersInit = {
     "Content-Type": "application/json",
   };
-  if (authToken) {
-    headers["Authorization"] = `Bearer ${authToken}`;
+  const token = getAuthToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
   }
   return headers;
 }
 
-export async function loginAnalyst(
-  username = "analyst@meezan.pk",
-  password = "Analyst@12345"
-): Promise<string> {
-  if (authToken) return authToken;
+export async function refreshSession(): Promise<TokenResponse | null> {
+  const refresh = getStoredRefreshToken();
+  if (!refresh) {
+    clearAuthTokens();
+    return null;
+  }
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/auth/refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token: refresh }),
+        });
+        if (!res.ok) {
+          clearAuthTokens();
+          return null;
+        }
+        const data: TokenResponse = await res.json();
+        setAuthTokens(data.access_token, data.refresh_token);
+        return data;
+      } catch {
+        clearAuthTokens();
+        return null;
+      } finally {
+        refreshPromise = null;
+      }
+    })();
+  }
+  return refreshPromise;
+}
 
+export async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(options.headers || {});
+  if (!headers.has("Content-Type") && !(options.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
+  }
+  const token = getAuthToken();
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  let res = await fetch(url, { ...options, headers });
+
+  if (res.status === 401) {
+    // Attempt session refresh once
+    const refreshed = await refreshSession();
+    if (refreshed?.access_token) {
+      headers.set("Authorization", `Bearer ${refreshed.access_token}`);
+      res = await fetch(url, { ...options, headers });
+    }
+  }
+
+  return res;
+}
+
+export async function loginUser(req: {
+  email: string;
+  password: string;
+  mfa_code?: string;
+}): Promise<TokenResponse> {
   const res = await fetch(`${API_BASE}/auth/login`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      email: username,
-      password: password,
-    }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
   });
 
   if (!res.ok) {
-    // Also try /token endpoint as fallback
-    const formRes = await fetch(`${API_BASE}/auth/token`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        username: username,
-        password: password,
-      }),
-    });
-    if (!formRes.ok) {
-      throw new Error(`Authentication failed with status ${res.status}`);
-    }
-    const data = await formRes.json();
-    setAuthToken(data.access_token);
-    return data.access_token;
+    const err = await res.json().catch(() => ({}));
+    const message =
+      err.error?.message || err.detail?.message || err.detail || `Authentication failed (${res.status})`;
+    throw new Error(message);
   }
 
+  const data: TokenResponse = await res.json();
+  if (!data.mfa_required && data.access_token) {
+    setAuthTokens(data.access_token, data.refresh_token);
+  }
+  return data;
+}
+
+export async function verifyMfaLogin(tempToken: string, mfaCode: string): Promise<TokenResponse> {
+  const res = await fetch(`${API_BASE}/auth/mfa/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ temp_token: tempToken, mfa_code: mfaCode }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const message =
+      err.error?.message || err.detail?.message || err.detail || `2FA verification failed (${res.status})`;
+    throw new Error(message);
+  }
+
+  const data: TokenResponse = await res.json();
+  if (data.access_token) {
+    setAuthTokens(data.access_token, data.refresh_token);
+  }
+  return data;
+}
+
+export async function loginAnalyst(
+  username?: string,
+  password?: string,
+  mfaCode?: string
+): Promise<string> {
+  if (!username || !password) {
+    // Return existing token if available
+    const existing = getAuthToken();
+    if (existing) return existing;
+    throw new Error("Credentials required for authentication.");
+  }
+  const data = await loginUser({ email: username, password, mfa_code: mfaCode });
+  return data.access_token;
+}
+
+export async function getCurrentUser(): Promise<UserProfile> {
+  const res = await fetchWithAuth(`${API_BASE}/auth/me`);
+  if (!res.ok) throw new Error("Failed to fetch user profile");
+  return res.json();
+}
+
+export async function getOrganizations(): Promise<OrganizationOption[]> {
+  const res = await fetchWithAuth(`${API_BASE}/auth/organizations`);
+  if (!res.ok) throw new Error("Failed to fetch organizations");
+  return res.json();
+}
+
+export async function switchOrganization(
+  organizationId: string
+): Promise<{ access_token: string; refresh_token: string; organization: OrganizationOption }> {
+  const res = await fetchWithAuth(`${API_BASE}/auth/switch-org`, {
+    method: "POST",
+    body: JSON.stringify({ organization_id: organizationId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || "Failed to switch organization");
+  }
   const data = await res.json();
-  const token = data.access_token;
-  setAuthToken(token);
-  return token;
+  if (data.access_token && data.refresh_token) {
+    setAuthTokens(data.access_token, data.refresh_token);
+  }
+  return data;
+}
+
+export async function logoutUser(): Promise<void> {
+  const refresh = getStoredRefreshToken();
+  if (refresh) {
+    await fetch(`${API_BASE}/auth/logout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refresh }),
+    }).catch(() => {});
+  }
+  clearAuthTokens();
 }
 
 export async function ensureAuth(): Promise<string> {
-  if (authToken) return authToken;
-  if (!authPromise) {
-    authPromise = loginAnalyst().finally(() => {
-      authPromise = null;
-    });
-  }
-  return authPromise;
+  const token = getAuthToken();
+  if (token) return token;
+  const refreshed = await refreshSession();
+  return refreshed?.access_token || "";
 }
 
 // ── Investigations ────────────────────────────────────────────────────────────
