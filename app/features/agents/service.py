@@ -193,7 +193,7 @@ async def run_interactive_qa(
             final_payload = {
                 "done": True,
                 "answer": answer_text,
-                "agent_session_id": session.id,
+                "agent_session_id": session_id,
                 "evidence_references": evidence_refs,
                 "tokens_used": tokens_used,
             }
@@ -203,7 +203,7 @@ async def run_interactive_qa(
 
     return schemas.AskResponse(
         answer=answer_text,
-        agent_session_id=session.id,
+        agent_session_id=session_id,
         evidence_references=evidence_refs,
         tokens_used=tokens_used,
     )

@@ -258,7 +258,11 @@ class TestCoreStubsAndStorage(unittest.IsolatedAsyncioTestCase):
             async for chunk in stream_gen:
                 collected_chunks.append(chunk)
             self.assertTrue(len(collected_chunks) > 1)
-            self.assertTrue(any('"done": true' in c for c in collected_chunks))
+            final_chunk_str = [c for c in collected_chunks if '"done": true' in c][0]
+            import json
+            final_json = json.loads(final_chunk_str.replace("data: ", "").strip())
+            self.assertTrue(final_json["done"])
+            self.assertEqual(final_json["agent_session_id"], resp.agent_session_id)
 
     # ─────────────────────────────────────────────────────────────────────────
     # 3. Court-Admissible PDF Dossier Tests (Issue F2)
