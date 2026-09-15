@@ -23,6 +23,7 @@ from app.features.risk.router          import router as risk_router
 from app.features.agents.router        import router as agents_router
 from app.features.reports.router       import router as reports_router
 from app.features.webhooks.router      import router as webhooks_router
+from app.features.users.router         import router as users_router
 
 
 @asynccontextmanager
@@ -65,6 +66,7 @@ def create_app() -> FastAPI:
     # ── Routers ──────────────────────────────────────────────────────────────
     # Auth & identity
     app.include_router(auth_router,            prefix="/api/v1/auth",           tags=["Auth"])
+    app.include_router(users_router,           prefix="/api/v1/users",          tags=["Users"])
     app.include_router(organizations_router,   prefix="/api/v1/org",            tags=["Organization"])
     app.include_router(api_keys_router,        prefix="/api/v1/api-keys",       tags=["API Keys"])
 

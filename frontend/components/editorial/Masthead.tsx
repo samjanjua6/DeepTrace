@@ -192,6 +192,16 @@ export function Masthead({
           {(user?.role === "ADMIN" || user?.role === "OWNER") && (
             <>
               <Link
+                href="/settings/users"
+                className={`transition-colors hover:text-ink-900 pb-1 border-b-2 ${
+                  pathname.startsWith("/settings/users")
+                    ? "border-ink-900 text-ink-900 font-semibold"
+                    : "border-transparent text-ink-500"
+                }`}
+              >
+                Users
+              </Link>
+              <Link
                 href="/settings/api-keys"
                 className={`transition-colors hover:text-ink-900 pb-1 border-b-2 ${
                   pathname.startsWith("/settings/api-keys")

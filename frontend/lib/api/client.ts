@@ -18,6 +18,11 @@ import {
   WebhookTestResult,
   OrganizationDetails,
   OrganizationUsageStats,
+  OrgMemberItem,
+  InviteUserPayload,
+  InviteUserResponse,
+  UserActionResponse,
+  OrgUserRole,
 } from "../types/forensics";
 
 const API_BASE = "/api/v1";
@@ -1106,6 +1111,117 @@ export async function upgradeSubscriptionTier(targetTier: string): Promise<Organ
   }
   return res.json();
 }
+
+export async function getOrgUsers(): Promise<OrgMemberItem[]> {
+  await ensureAuth().catch(() => {});
+  const res = await fetch(`${API_BASE}/users`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const message =
+      errorData?.detail?.message ||
+      errorData?.error?.message ||
+      errorData?.message ||
+      "Failed to retrieve organization member roster";
+    throw new Error(message);
+  }
+  return res.json();
+}
+
+export async function inviteOrgUser(payload: InviteUserPayload): Promise<InviteUserResponse> {
+  await ensureAuth().catch(() => {});
+  const res = await fetch(`${API_BASE}/users/invite`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const message =
+      errorData?.detail?.message ||
+      errorData?.error?.message ||
+      errorData?.message ||
+      "Failed to generate credential dispatch memo";
+    throw new Error(message);
+  }
+  return res.json();
+}
+
+export async function updateUserRole(userId: string, role: OrgUserRole): Promise<OrgMemberItem> {
+  await ensureAuth().catch(() => {});
+  const res = await fetch(`${API_BASE}/users/${userId}/role`, {
+    method: "PATCH",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ role }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const message =
+      errorData?.detail?.message ||
+      errorData?.error?.message ||
+      errorData?.message ||
+      "Failed to update member role";
+    throw new Error(message);
+  }
+  return res.json();
+}
+
+export async function updateUserStatus(userId: string, isActive: boolean): Promise<OrgMemberItem> {
+  await ensureAuth().catch(() => {});
+  const res = await fetch(`${API_BASE}/users/${userId}/status`, {
+    method: "PATCH",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ is_active: isActive }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const message =
+      errorData?.detail?.message ||
+      errorData?.error?.message ||
+      errorData?.message ||
+      "Failed to update member active status";
+    throw new Error(message);
+  }
+  return res.json();
+}
+
+export async function unlockUserAccount(userId: string): Promise<UserActionResponse> {
+  await ensureAuth().catch(() => {});
+  const res = await fetch(`${API_BASE}/users/${userId}/unlock`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const message =
+      errorData?.detail?.message ||
+      errorData?.error?.message ||
+      errorData?.message ||
+      "Failed to unlock account";
+    throw new Error(message);
+  }
+  return res.json();
+}
+
+export async function resetUserMfa(userId: string): Promise<UserActionResponse> {
+  await ensureAuth().catch(() => {});
+  const res = await fetch(`${API_BASE}/users/${userId}/reset-mfa`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const message =
+      errorData?.detail?.message ||
+      errorData?.error?.message ||
+      errorData?.message ||
+      "Failed to reset two-factor authentication";
+    throw new Error(message);
+  }
+  return res.json();
+}
+
 
 
 

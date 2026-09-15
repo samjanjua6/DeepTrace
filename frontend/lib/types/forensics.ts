@@ -335,5 +335,47 @@ export interface BillingStatement {
   issued_at: string;
 }
 
+export type OrgUserRole = "OWNER" | "ADMIN" | "ANALYST" | "VIEWER";
 
+export interface OrgMemberItem {
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: OrgUserRole;
+  is_active: boolean;
+  mfa_enabled: boolean;
+  failed_login_count: number;
+  is_locked: boolean;
+  locked_until: string | null;
+  last_login_at: string | null;
+  created_at: string;
+}
 
+export interface InviteUserPayload {
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: OrgUserRole;
+  temp_password?: string;
+}
+
+export interface InviteUserResponse {
+  user: OrgMemberItem;
+  temp_password: string;
+  login_url: string;
+  dispatch_memo: string;
+}
+
+export interface UpdateRolePayload {
+  role: OrgUserRole;
+}
+
+export interface UpdateStatusPayload {
+  is_active: boolean;
+}
+
+export interface UserActionResponse {
+  success: boolean;
+  message: string;
+}
