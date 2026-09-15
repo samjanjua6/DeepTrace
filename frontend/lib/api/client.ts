@@ -16,6 +16,8 @@ import {
   WebhookEndpointCreated,
   WebhookDeliveryLog,
   WebhookTestResult,
+  OrganizationDetails,
+  OrganizationUsageStats,
 } from "../types/forensics";
 
 const API_BASE = "/api/v1";
@@ -1028,6 +1030,83 @@ export async function testWebhookEndpoint(
   }
   return res.json();
 }
+
+export async function getOrganization(): Promise<OrganizationDetails> {
+  await ensureAuth().catch(() => {});
+  const res = await fetch(`${API_BASE}/org`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const message =
+      errorData?.detail?.message ||
+      errorData?.error?.message ||
+      errorData?.message ||
+      "Failed to fetch organization details";
+    throw new Error(message);
+  }
+  return res.json();
+}
+
+export async function getOrganizationUsage(): Promise<OrganizationUsageStats> {
+  await ensureAuth().catch(() => {});
+  const res = await fetch(`${API_BASE}/org/usage`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const message =
+      errorData?.detail?.message ||
+      errorData?.error?.message ||
+      errorData?.message ||
+      "Failed to fetch organization usage statistics";
+    throw new Error(message);
+  }
+  return res.json();
+}
+
+export async function updateOrganizationSettings(payload: {
+  name?: string;
+  domain?: string;
+  settings?: Record<string, any>;
+}): Promise<OrganizationDetails> {
+  await ensureAuth().catch(() => {});
+  const res = await fetch(`${API_BASE}/org/settings`, {
+    method: "PATCH",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const message =
+      errorData?.detail?.message ||
+      errorData?.error?.message ||
+      errorData?.message ||
+      "Failed to update organization settings";
+    throw new Error(message);
+  }
+  return res.json();
+}
+
+export async function upgradeSubscriptionTier(targetTier: string): Promise<OrganizationDetails> {
+  await ensureAuth().catch(() => {});
+  const res = await fetch(`${API_BASE}/org/tier`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ target_tier: targetTier }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const message =
+      errorData?.detail?.message ||
+      errorData?.error?.message ||
+      errorData?.message ||
+      "Failed to update subscription tier";
+    throw new Error(message);
+  }
+  return res.json();
+}
+
 
 
 

@@ -43,6 +43,20 @@ async def upload_document(
     7. Render multi-res page images (150 DPI canvas + 72 DPI thumbnail).
     8. Atomically create Document, DocumentPage, and CustodyEvent records.
     """
+    # 0. Organization Monthly Quota Verification (Fast-Path)
+    org_quota = await db.organization.find_unique(where={"id": investigation.organizationId})
+    if org_quota and str(org_quota.subscriptionTier) != "ENTERPRISE" and org_quota.monthlyDocUsed >= org_quota.monthlyDocLimit:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "code": "DOCUMENT_QUOTA_EXCEEDED",
+                "message": f"Monthly document intake quota reached ({org_quota.monthlyDocUsed}/{org_quota.monthlyDocLimit}). Upgrade subscription tier to continue ingestion.",
+                "tier": str(org_quota.subscriptionTier),
+                "limit": org_quota.monthlyDocLimit,
+                "used": org_quota.monthlyDocUsed,
+            }
+        )
+
     # 1. Size check (Max 50MB)
     max_size = 50 * 1024 * 1024
     if len(data) > max_size:
@@ -180,6 +194,20 @@ async def upload_document(
     from prisma.errors import UniqueViolationError
 
     async with set_org_context(investigation.organizationId) as tx:
+        # Organization monthly quota verification
+        org = await tx.organization.find_unique(where={"id": investigation.organizationId})
+        if org and str(org.subscriptionTier) != "ENTERPRISE" and org.monthlyDocUsed >= org.monthlyDocLimit:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail={
+                    "code": "DOCUMENT_QUOTA_EXCEEDED",
+                    "message": f"Monthly document intake quota reached ({org.monthlyDocUsed}/{org.monthlyDocLimit}). Upgrade subscription tier to continue ingestion.",
+                    "tier": str(org.subscriptionTier),
+                    "limit": org.monthlyDocLimit,
+                    "used": org.monthlyDocUsed,
+                }
+            )
+
         # Duplicate Check (Idempotency) with active RLS
         existing = await tx.document.find_first(
             where={
@@ -213,6 +241,13 @@ async def upload_document(
                     "processingStatus": "UPLOADED",
                 }
             )
+
+            # Atomically increment organization monthly document consumption
+            if org:
+                await tx.organization.update(
+                    where={"id": investigation.organizationId},
+                    data={"monthlyDocUsed": org.monthlyDocUsed + 1},
+                )
         except UniqueViolationError:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

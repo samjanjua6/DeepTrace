@@ -211,6 +211,16 @@ export function Masthead({
               >
                 Webhooks
               </Link>
+              <Link
+                href="/settings/billing"
+                className={`transition-colors hover:text-ink-900 pb-1 border-b-2 ${
+                  pathname.startsWith("/settings/billing")
+                    ? "border-ink-900 text-ink-900 font-semibold"
+                    : "border-transparent text-ink-500"
+                }`}
+              >
+                Billing
+              </Link>
             </>
           )}
           <a

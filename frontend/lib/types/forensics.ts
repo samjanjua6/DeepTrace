@@ -294,4 +294,46 @@ export interface WebhookTestResult {
   error_message: string | null;
 }
 
+export interface OrganizationDetails {
+  id: string;
+  name: string;
+  slug: string;
+  subscription_tier: string;
+  monthly_doc_limit: number;
+  monthly_doc_used: number;
+  remaining_docs: number;
+  usage_percentage: number;
+  domain: string | null;
+  settings: Record<string, any> | null;
+  billing_cycle_start: string | null;
+  days_until_renewal: number;
+}
+
+export interface OrganizationUsageStats {
+  subscription_tier: string;
+  monthly_doc_limit: number;
+  monthly_doc_used: number;
+  remaining: number;
+  usage_percentage: number;
+  days_until_renewal: number;
+  billing_cycle_start: string | null;
+  document_type_breakdown: Record<string, number>;
+}
+
+export interface TierUpgradePayload {
+  target_tier: "FREE" | "FINTECH_GROWTH" | "BUSINESS_SCALE" | "ENTERPRISE";
+}
+
+export interface BillingStatement {
+  id: string;
+  period: string;
+  documents_processed: number;
+  allowance: number;
+  overage_units: number;
+  amount_pkr: number;
+  status: "SETTLED" | "PENDING" | "WAIVED";
+  issued_at: string;
+}
+
+
 
