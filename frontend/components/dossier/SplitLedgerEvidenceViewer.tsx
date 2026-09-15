@@ -28,54 +28,6 @@ interface SplitLedgerEvidenceViewerProps {
   onFocusCanvas?: (pageNumber: number, bbox?: [number, number, number, number]) => void;
 }
 
-// Default realistic Pakistani banking transactions (Meezan Bank case exhibit)
-const DEFAULT_SAMPLE_ROWS: LedgerRow[] = [
-  {
-    date: "01/03/2026",
-    particulars: "Opening Balance",
-    debit: undefined,
-    credit: undefined,
-    expectedBalance: 0,
-    recordedBalance: 0,
-    discrepancy: 0,
-    isTampered: false,
-    pageNumber: 1,
-  },
-  {
-    date: "01/03/2026",
-    particulars: "Cheque Clearing Deposit (NIFT Clg - HBL)",
-    debit: undefined,
-    credit: 400000,
-    expectedBalance: 400000,
-    recordedBalance: 400000,
-    discrepancy: 0,
-    isTampered: false,
-    pageNumber: 1,
-  },
-  {
-    date: "05/03/2026",
-    particulars: "Raast Instant Transfer Out (Ref #4829)",
-    debit: 150000,
-    credit: undefined,
-    expectedBalance: 250000,
-    recordedBalance: 250000,
-    discrepancy: 0,
-    isTampered: false,
-    pageNumber: 1,
-  },
-  {
-    date: "12/03/2026",
-    particulars: "Counter Cash Withdrawal (Chq #00482911)",
-    debit: 75000,
-    credit: undefined,
-    expectedBalance: 175000,
-    recordedBalance: 2500000,
-    discrepancy: 2325000,
-    isTampered: true,
-    pageNumber: 1,
-  },
-];
-
 export function SplitLedgerEvidenceViewer({
   rows = [],
   evidence = [],
@@ -86,7 +38,7 @@ export function SplitLedgerEvidenceViewer({
   onSelectEvidence,
   onFocusCanvas,
 }: SplitLedgerEvidenceViewerProps) {
-  const displayRows = rows && rows.length > 0 ? rows : DEFAULT_SAMPLE_ROWS;
+  const displayRows = rows || [];
   const [internalSelectedIndex, setInternalSelectedIndex] = useState<number | null>(null);
   const selectedIndex = externalSelectedIndex !== undefined ? externalSelectedIndex : internalSelectedIndex;
 
@@ -155,7 +107,7 @@ export function SplitLedgerEvidenceViewer({
   const statedClosing = financialData?.stated_closing;
   const impliedClosing = financialData?.implied_closing;
   const closingDiscrepancy = financialData?.closing_discrepancy;
-  const isReconciled = financialData?.reconciled !== false && !displayRows.some((r) => r.isTampered);
+  const isReconciled = displayRows.length > 0 && financialData?.reconciled !== false && !displayRows.some((r) => r.isTampered);
 
   // Unique pages available
   const availablePages = useMemo(() => {
@@ -230,7 +182,11 @@ export function SplitLedgerEvidenceViewer({
             </span>
           </div>
           <div className="flex items-center gap-2">
-            {isReconciled ? (
+            {displayRows.length === 0 ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-paper-2 border border-rule text-ink-500 text-[10px] font-bold uppercase tracking-wider">
+                No Transactions
+              </span>
+            ) : isReconciled ? (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-forensic-green/10 border border-forensic-green/30 text-forensic-green text-[10px] font-bold uppercase tracking-wider">
                 <CheckCircle2 className="w-3 h-3" />
                 Continuity Reconciled
@@ -367,11 +323,22 @@ export function SplitLedgerEvidenceViewer({
             </tr>
           </thead>
           <tbody className="divide-y divide-rule/60">
-            {filteredRows.length === 0 ? (
+            {displayRows.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="p-12 text-center text-xs text-ink-500 font-mono space-y-2">
+                  <div className="font-bold uppercase tracking-wider text-ink-800">
+                    No Tabular Ledger Rows Detected
+                  </div>
+                  <div className="text-[11px] text-ink-500 max-w-sm mx-auto">
+                    The document extraction engine did not locate tabular financial ledger columns in this document. Running balance mathematical verification applies to structured bank statements.
+                  </div>
+                </td>
+              </tr>
+            ) : filteredRows.length === 0 ? (
               <tr>
                 <td colSpan={7} className="p-8 text-center text-xs text-ink-400">
                   {filterMode === "INCONSISTENT"
-                    ? "✓ No mathematical ledger inconsistencies detected. All rows reconcile."
+                    ? "No mathematical ledger inconsistencies detected. All rows reconcile."
                     : "No transactions match the selected filter."}
                 </td>
               </tr>

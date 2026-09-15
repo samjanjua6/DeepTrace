@@ -25,50 +25,6 @@ interface LedgerMathTableProps {
   onSelectEvidence?: (evidenceId: string) => void;
 }
 
-// Default realistic Pakistani banking transactions (Meezan Bank case exhibit)
-const DEFAULT_SAMPLE_ROWS: LedgerRow[] = [
-  {
-    date: "01/03/2026",
-    particulars: "Opening Balance",
-    debit: undefined,
-    credit: undefined,
-    expectedBalance: 0,
-    recordedBalance: 0,
-    discrepancy: 0,
-    isTampered: false,
-  },
-  {
-    date: "01/03/2026",
-    particulars: "Cheque Clearing Deposit (NIFT Clg - HBL)",
-    debit: undefined,
-    credit: 400000,
-    expectedBalance: 400000,
-    recordedBalance: 400000,
-    discrepancy: 0,
-    isTampered: false,
-  },
-  {
-    date: "05/03/2026",
-    particulars: "Raast Instant Transfer Out (Ref #4829)",
-    debit: 150000,
-    credit: undefined,
-    expectedBalance: 250000,
-    recordedBalance: 250000,
-    discrepancy: 0,
-    isTampered: false,
-  },
-  {
-    date: "12/03/2026",
-    particulars: "Counter Cash Withdrawal (Chq #00482911)",
-    debit: 75000,
-    credit: undefined,
-    expectedBalance: 175000,
-    recordedBalance: 2500000,
-    discrepancy: 2325000,
-    isTampered: true,
-  },
-];
-
 export function LedgerMathTable({
   rows = [],
   evidence,

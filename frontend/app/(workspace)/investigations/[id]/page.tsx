@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Masthead } from "@/components/editorial/Masthead";
 import { ForensicCanvas } from "@/components/canvas/ForensicCanvas";
@@ -37,6 +38,7 @@ import {
 } from "@/lib/api/client";
 import {
   ShieldCheck,
+  ShieldAlert,
   CheckCircle2,
   FileSearch,
   Hash,
@@ -45,6 +47,9 @@ import {
   Info,
   Columns,
   FileText,
+  AlertTriangle,
+  ArrowLeft,
+  Loader2,
 } from "lucide-react";
 import { formatDatePKT } from "@/lib/formatters";
 
@@ -198,17 +203,18 @@ export default function InvestigationWorkspacePage() {
     isSample
       ? SAMPLE_EXHIBIT_RISK
       : {
-          id: "clean",
+          id: "pending",
           investigationId,
           overallScore: 0,
           riskTier: "LOW",
-          actionDirective: "STRAIGHT_THROUGH_APPROVAL",
-          confidenceScore: 1.0,
+          actionDirective: "MANUAL_SUPERVISOR_REVIEW",
+          confidenceScore: 0,
           isDeterministicOverride: false,
           computedAt: new Date().toISOString(),
           riskSignals: [],
         }
   );
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [custodyEvents, setCustodyEvents] = useState<CustodyEvent[]>([]);
   const [activeEvidenceId, setActiveEvidenceId] = useState<string | null>(null);
   const [isOverrideOpen, setIsOverrideOpen] = useState<boolean>(false);
@@ -270,10 +276,26 @@ export default function InvestigationWorkspacePage() {
       if (isInitial) setIsLoading(true);
       let isStillRunning = false;
       try {
-        // 1. Fetch Investigation
-        const inv = await getInvestigation(investigationId).catch(() => null);
-        if (!isMounted) return;
-        if (inv) setInvestigation(inv);
+        // 1. Fetch Investigation with strict error propagation on initial load
+        let inv = null;
+        try {
+          inv = await getInvestigation(investigationId);
+          if (!isMounted) return;
+          if (inv) setInvestigation(inv);
+        } catch (fetchErr: any) {
+          if (!isMounted) return;
+          if (isInitial) {
+            setFetchError(fetchErr?.message || "Investigation docket not found.");
+            setIsLoading(false);
+            return;
+          }
+        }
+
+        if (!inv && isInitial) {
+          setFetchError("Investigation docket not found in central repository.");
+          setIsLoading(false);
+          return;
+        }
 
         // 2. Fetch Documents & Pages (Fetched once on initial load or if empty)
         if (!hasLoadedPages) {
@@ -307,7 +329,7 @@ export default function InvestigationWorkspacePage() {
         if (!isMounted) return;
         if (r) {
           setRisk(r);
-        } else if (pRun?.status === "COMPLETED" || (inv && inv.status !== "PROCESSING")) {
+        } else if (pRun?.status === "COMPLETED") {
           setRisk({
             id: "clean",
             investigationId,
@@ -316,6 +338,18 @@ export default function InvestigationWorkspacePage() {
             actionDirective: "STRAIGHT_THROUGH_APPROVAL",
             confidenceScore: 1.0,
             isDeterministicOverride: false,
+            computedAt: new Date().toISOString(),
+            riskSignals: [],
+          });
+        } else if (pRun?.status === "FAILED") {
+          setRisk({
+            id: "failed",
+            investigationId,
+            overallScore: 100,
+            riskTier: "CRITICAL",
+            actionDirective: "IMMEDIATE_REJECTION",
+            confidenceScore: 1.0,
+            isDeterministicOverride: true,
             computedAt: new Date().toISOString(),
             riskSignals: [],
           });
@@ -337,8 +371,11 @@ export default function InvestigationWorkspacePage() {
 
       } catch (err) {
         console.error("Failed to load investigation data:", err);
-        // If an error occurred during active execution, keep polling with backoff
-        isStillRunning = true;
+        if (isInitial) {
+          setFetchError("Error querying forensic pipeline data.");
+        } else {
+          isStillRunning = true;
+        }
       } finally {
         if (isMounted && isInitial) {
           setIsLoading(false);
@@ -456,6 +493,70 @@ export default function InvestigationWorkspacePage() {
     ) ||
     Boolean(financialData?.fbr_tax_verification);
 
+  if (isLoading) {
+    return (
+      <div className="flex flex-col h-screen w-screen bg-paper-0 text-ink-900 font-mono">
+        <Masthead
+          caseNumber="LOADING"
+          caseTitle="Retrieving Forensic Docket..."
+          documentType={documentType}
+        />
+        <div className="flex-1 flex flex-col items-center justify-center p-8">
+          <Loader2 className="w-8 h-8 animate-spin text-ink-900 mb-3" />
+          <span className="text-xs uppercase tracking-widest text-ink-600 font-semibold">
+            Reconciling Forensic Chain-of-Custody Ledger...
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isSample && (fetchError || !investigation)) {
+    return (
+      <div className="flex flex-col h-screen w-screen bg-paper-0 text-ink-900 font-mono">
+        <Masthead
+          caseNumber="ERROR"
+          caseTitle="Forensic Case Docket Inaccessible"
+          documentType={documentType}
+        />
+        <main className="flex-1 max-w-2xl mx-auto p-6 flex flex-col justify-center">
+          <div className="bg-paper-0 border-2 border-rose-900 p-8 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 border-b border-rose-900/40 pb-4 text-rose-950">
+              <ShieldAlert className="w-6 h-6 text-rose-700 shrink-0" />
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-rose-700 block">
+                  Docket Error [404 / Unavailable]
+                </span>
+                <h1 className="text-base font-bold uppercase tracking-wider">
+                  Forensic Case Docket Inaccessible
+                </h1>
+              </div>
+            </div>
+            <p className="text-xs text-ink-700 leading-relaxed">
+              The requested investigation docket (
+              <span className="font-bold text-ink-900">{investigationId}</span>) could not be retrieved from the central institutional repository.
+            </p>
+            <div className="p-3 bg-paper-1 border border-rose-300 text-rose-900 text-xs">
+              {fetchError || "Docket record not found or clearance denied."}
+            </div>
+            <p className="text-[11px] text-ink-500">
+              Under SBP BPRD/2020 regulatory compliance, DeepTrace does not fabricate synthetic docket data when a requested case cannot be located.
+            </p>
+            <div className="pt-4 border-t border-rule flex items-center gap-4">
+              <Link
+                href="/investigations"
+                className="px-4 py-2 bg-ink-900 text-paper-0 hover:bg-black text-xs font-bold uppercase tracking-wider transition-colors inline-flex items-center gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Return to Case Register</span>
+              </Link>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-paper-0 text-ink-900">
       {/* Editorial Top Masthead */}
@@ -464,6 +565,21 @@ export default function InvestigationWorkspacePage() {
         caseTitle={caseTitle}
         documentType={documentType}
       />
+
+      {/* Persistent Demonstration Banner for Sample Exhibit */}
+      {isSample && (
+        <div className="bg-amber-100 border-b-2 border-ink-900 px-4 py-2 font-mono text-xs text-ink-900 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-amber-800 shrink-0" />
+            <span className="text-[11px]">
+              <strong>DEMONSTRATION EXHIBIT &mdash; SYNTHETIC BENCHMARK DATA.</strong> All document pages, ledger amounts, and risk scores are simulated for orientation and testing.
+            </span>
+          </div>
+          <span className="px-2 py-0.5 bg-ink-900 text-paper-0 text-[10px] font-bold uppercase tracking-widest shrink-0 ml-4">
+            Synthetic Benchmark
+          </span>
+        </div>
+      )}
 
       {/* Workbench Sub-Header Ribbon with View Switcher */}
       <div className="bg-paper-1 border-b border-rule px-4 py-2 flex items-center justify-between font-mono text-xs select-none">
