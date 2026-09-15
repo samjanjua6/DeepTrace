@@ -45,7 +45,12 @@ def _get_client():
         region_name=settings.s3_region,
         aws_access_key_id=settings.s3_access_key_id,
         aws_secret_access_key=settings.s3_secret_access_key,
-        config=Config(signature_version="s3v4", connect_timeout=1, read_timeout=3),
+        config=Config(
+            signature_version="s3v4",
+            connect_timeout=0.5,
+            read_timeout=0.5,
+            retries={"max_attempts": 0},
+        ),
     )
     if settings.s3_endpoint_url:
         kwargs["endpoint_url"] = settings.s3_endpoint_url
@@ -55,13 +60,35 @@ def _get_client():
 def _check_s3(force_refresh: bool = False) -> bool:
     """
     Check if remote S3 / MinIO endpoint is reachable.
-    Uses head_bucket (IAM-scoped safe) instead of list_buckets (which requires root account permissions).
-    Features a 30-second TTL to allow automatic recovery from transient network partitions.
+    Uses fast socket pre-flight when endpoint_url is configured to avoid blocking event loop.
+    Features a 60-second TTL to allow automatic recovery from transient network partitions.
     """
     global _s3_available, _last_s3_check_time
     now = time.time()
-    if not force_refresh and _s3_available is not None and (now - _last_s3_check_time < _S3_CHECK_TTL_SECONDS):
+    ttl = 60.0 if _s3_available is False else _S3_CHECK_TTL_SECONDS
+    if not force_refresh and _s3_available is not None and (now - _last_s3_check_time < ttl):
         return _s3_available
+
+    # Fast TCP pre-flight check if custom endpoint_url (e.g. MinIO localhost) is configured
+    if settings.s3_endpoint_url:
+        try:
+            import socket
+            from urllib.parse import urlparse
+            parsed = urlparse(settings.s3_endpoint_url)
+            if parsed.hostname:
+                port = parsed.port or (443 if parsed.scheme == "https" else 80)
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(0.2)
+                try:
+                    sock.connect((parsed.hostname, port))
+                except Exception:
+                    _s3_available = False
+                    _last_s3_check_time = now
+                    return False
+                finally:
+                    sock.close()
+        except Exception:
+            pass
 
     try:
         client = _get_client()
