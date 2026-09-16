@@ -24,6 +24,7 @@ async def login(
         body.email,
         body.password,
         mfa_code=body.mfa_code,
+        remember_me=bool(body.remember_me),
         ip_address=ip,
         user_agent=user_agent,
     )
@@ -37,17 +38,20 @@ async def token(
     """Accept both application/x-www-form-urlencoded (OAuth2) and application/json."""
     content_type = request.headers.get("content-type", "")
     mfa_code = None
+    remember_me = False
     if "application/x-www-form-urlencoded" in content_type:
         form = await request.form()
         email = str(form.get("username") or form.get("email") or "")
         password = str(form.get("password") or "")
         mfa_code = form.get("mfa_code") or form.get("otp")
+        remember_me = str(form.get("remember_me") or "").lower() in ("true", "1", "yes")
     else:
         try:
             data = await request.json()
             email = str(data.get("email") or data.get("username") or "")
             password = str(data.get("password") or "")
             mfa_code = data.get("mfa_code")
+            remember_me = bool(data.get("remember_me", False))
         except Exception:
             email, password = "", ""
 
@@ -58,6 +62,7 @@ async def token(
         email,
         password,
         mfa_code=str(mfa_code) if mfa_code else None,
+        remember_me=remember_me,
         ip_address=ip,
         user_agent=user_agent,
     )
@@ -97,6 +102,7 @@ async def verify_mfa(
         db,
         temp_token=body.temp_token,
         mfa_code=body.mfa_code,
+        remember_me=bool(body.remember_me),
         ip_address=ip,
         user_agent=user_agent,
     )
@@ -172,4 +178,18 @@ async def me(current_user: CurrentUser):
         mfa_enabled=current_user.mfaEnabled,
         organization_name=org_name,
         organization_slug=org_slug,
+    )
+
+
+@router.get("/sso/providers", response_model=list[schemas.SsoProviderOption], summary="Get available enterprise SSO identity providers")
+async def sso_providers():
+    return service.get_sso_providers()
+
+
+@router.post("/sso/initiate", response_model=schemas.SsoInitiateResponse, summary="Initiate enterprise SSO federation")
+async def sso_initiate(body: schemas.SsoInitiateRequest):
+    return service.initiate_sso(
+        provider=body.provider,
+        tenant_domain=body.tenant_domain,
+        redirect_uri=body.redirect_uri,
     )

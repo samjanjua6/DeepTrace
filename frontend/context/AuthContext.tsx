@@ -20,8 +20,17 @@ interface AuthContextType {
   organizations: OrganizationOption[];
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string, mfaCode?: string) => Promise<TokenResponse>;
-  verifyMfa: (tempToken: string, mfaCode: string) => Promise<TokenResponse>;
+  login: (
+    email: string,
+    password: string,
+    mfaCode?: string,
+    rememberDevice?: boolean
+  ) => Promise<TokenResponse>;
+  verifyMfa: (
+    tempToken: string,
+    mfaCode: string,
+    rememberDevice?: boolean
+  ) => Promise<TokenResponse>;
   logout: () => Promise<void>;
   switchOrg: (organizationId: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -78,16 +87,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [refreshProfile]);
 
-  const login = async (email: string, password: string, mfaCode?: string): Promise<TokenResponse> => {
-    const res = await loginUser({ email, password, mfa_code: mfaCode });
+  const login = async (
+    email: string,
+    password: string,
+    mfaCode?: string,
+    rememberDevice: boolean = true
+  ): Promise<TokenResponse> => {
+    const res = await loginUser({
+      email,
+      password,
+      mfa_code: mfaCode,
+      remember_me: rememberDevice,
+    });
     if (!res.mfa_required) {
       await refreshProfile();
     }
     return res;
   };
 
-  const verifyMfa = async (tempToken: string, mfaCode: string): Promise<TokenResponse> => {
-    const res = await verifyMfaLogin(tempToken, mfaCode);
+  const verifyMfa = async (
+    tempToken: string,
+    mfaCode: string,
+    rememberDevice: boolean = true
+  ): Promise<TokenResponse> => {
+    const res = await verifyMfaLogin(tempToken, mfaCode, rememberDevice);
     await refreshProfile();
     return res;
   };

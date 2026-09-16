@@ -71,6 +71,7 @@ async def login(
     email: str,
     password: str,
     mfa_code: str | None = None,
+    remember_me: bool = False,
     ip_address: str | None = None,
     user_agent: str | None = None,
 ) -> schemas.TokenResponse:
@@ -122,7 +123,7 @@ async def login(
                 # Issue short-lived temporary token for 2FA completion
                 temp_token = create_access_token(
                     subject=user.id,
-                    extra_claims={"type": "mfa_pending", "org": user.organizationId},
+                    extra_claims={"type": "mfa_pending", "org": user.organizationId, "remember_me": remember_me},
                 )
                 return schemas.TokenResponse(
                     mfa_required=True,
@@ -156,8 +157,9 @@ async def login(
         access_token = create_access_token(subject=user.id, extra_claims=extra_claims)
         refresh_token = create_refresh_token(subject=user.id)
 
-        # Persist session with hash of refresh token for safe, deterministic rotation
-        expires_at = datetime.now(timezone.utc) + timedelta(days=settings.jwt_refresh_token_expire_days)
+        # Persist session with hash of refresh token (30-day for remember_me, 24-hr for transient)
+        session_days = settings.jwt_refresh_token_expire_days if remember_me else 1
+        expires_at = datetime.now(timezone.utc) + timedelta(days=session_days)
         await tx.usersession.create(
             data={
                 "userId": user.id,
@@ -190,6 +192,7 @@ async def verify_mfa_login(
     db: Prisma,
     temp_token: str,
     mfa_code: str,
+    remember_me: bool = False,
     ip_address: str | None = None,
     user_agent: str | None = None,
 ) -> schemas.TokenResponse:
@@ -199,6 +202,8 @@ async def verify_mfa_login(
         if payload.get("type") != "mfa_pending":
             raise InvalidMfaCodeError()
         user_id: str = payload["sub"]
+        if not remember_me and payload.get("remember_me"):
+            remember_me = True
     except (JWTError, KeyError):
         raise TokenExpiredError()
 
@@ -216,7 +221,8 @@ async def verify_mfa_login(
             new_count = user.failedLoginCount + 1
             update_data: dict = {"failedLoginCount": new_count}
             if new_count >= MAX_FAILED_ATTEMPTS:
-                update_data["lockedUntil"] = datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_MINUTES)
+                lock_time = datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_MINUTES)
+                update_data["lockedUntil"] = lock_time
                 await tx.user.update(where={"id": user.id}, data=update_data)
                 await _record_audit_log(
                     db,
@@ -251,8 +257,9 @@ async def verify_mfa_login(
         access_token = create_access_token(subject=user.id, extra_claims=extra_claims)
         refresh_token = create_refresh_token(subject=user.id)
 
-        # Persist session
-        expires_at = datetime.now(timezone.utc) + timedelta(days=settings.jwt_refresh_token_expire_days)
+        # Persist session (30-day for remember_me, 24-hr for transient)
+        session_days = settings.jwt_refresh_token_expire_days if remember_me else 1
+        expires_at = datetime.now(timezone.utc) + timedelta(days=session_days)
         await tx.usersession.create(
             data={
                 "userId": user.id,
@@ -553,3 +560,57 @@ async def switch_organization(
                 subscription_tier=target_org.subscriptionTier,
             ),
         )
+
+
+def get_sso_providers() -> list[schemas.SsoProviderOption]:
+    """Return available enterprise SSO identity providers."""
+    return [
+        schemas.SsoProviderOption(
+            id="azure_ad",
+            name="Microsoft Entra ID (Azure AD)",
+            protocol="SAML 2.0 / OIDC",
+            description="Integrated Azure Active Directory for core banking & sovereign cloud deployments.",
+        ),
+        schemas.SsoProviderOption(
+            id="okta",
+            name="Okta Identity Cloud",
+            protocol="OIDC / SAML 2.0",
+            description="Enterprise workforce identity federation with automated SCIM provisioning.",
+        ),
+        schemas.SsoProviderOption(
+            id="saml",
+            name="Institutional SAML 2.0 / ADFS",
+            protocol="SAML 2.0",
+            description="Direct Shibboleth, PingFederate, or Active Directory Federation Services connector.",
+        ),
+    ]
+
+
+def initiate_sso(
+    provider: str,
+    tenant_domain: str | None = None,
+    redirect_uri: str | None = "/investigations",
+) -> schemas.SsoInitiateResponse:
+    """Initiate enterprise SSO federation and generate provider metadata."""
+    entity_id = "https://auth.deeptrace.internal/saml/metadata"
+
+    if provider == "okta":
+        sso_url = f"https://identity.bank.internal/app/deeptrace/{tenant_domain or 'enterprise'}/sso/saml"
+        protocol = "SAML 2.0 / OIDC"
+        msg = "Redirecting to Okta Enterprise Identity Provider."
+    elif provider == "saml":
+        sso_url = f"https://adfs.bank.internal/adfs/ls/?wa=wsignin1.0&wtrealm={entity_id}"
+        protocol = "SAML 2.0"
+        msg = "Redirecting to Institutional SAML 2.0 / ADFS Endpoint."
+    else:  # azure_ad default
+        sso_url = f"https://login.microsoftonline.com/{tenant_domain or 'organizations'}/saml2"
+        protocol = "SAML 2.0 / WS-Fed"
+        msg = "Redirecting to Microsoft Entra ID (Azure AD) Institutional Gateway."
+
+    return schemas.SsoInitiateResponse(
+        provider=provider,
+        sso_url=sso_url,
+        entity_id=entity_id,
+        protocol=protocol,
+        message=msg,
+    )

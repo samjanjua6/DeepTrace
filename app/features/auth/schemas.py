@@ -7,6 +7,7 @@ class LoginRequest(BaseModel):
     email: str = Field(min_length=3)
     password: str = Field(min_length=8)
     mfa_code: Optional[str] = None
+    remember_me: Optional[bool] = False
 
 
 class TokenResponse(BaseModel):
@@ -26,6 +27,28 @@ class RefreshRequest(BaseModel):
 class MfaVerifyRequest(BaseModel):
     temp_token: str
     mfa_code: str = Field(min_length=6, max_length=6)
+    remember_me: Optional[bool] = False
+
+
+class SsoProviderOption(BaseModel):
+    id: str
+    name: str
+    protocol: str  # SAML2, OIDC, WS_FED
+    description: str
+
+
+class SsoInitiateRequest(BaseModel):
+    provider: str = "azure_ad"
+    tenant_domain: Optional[str] = None
+    redirect_uri: Optional[str] = "/investigations"
+
+
+class SsoInitiateResponse(BaseModel):
+    provider: str
+    sso_url: str
+    entity_id: str
+    protocol: str
+    message: str
 
 
 class MfaSetupResponse(BaseModel):

@@ -57,37 +57,74 @@ export interface OrganizationOption {
   subscription_tier?: string;
 }
 
+export interface SsoProviderOption {
+  id: string;
+  name: string;
+  protocol: string;
+  description: string;
+}
+
+export interface SsoInitiateResponse {
+  provider: string;
+  sso_url: string;
+  entity_id: string;
+  protocol: string;
+  message: string;
+}
+
 let authToken: string | null = null;
 let refreshPromise: Promise<TokenResponse | null> | null = null;
 
 export function getAuthToken(): string | null {
   if (authToken) return authToken;
   if (typeof window !== "undefined") {
-    authToken = localStorage.getItem("deeptrace_access_token");
+    authToken =
+      sessionStorage.getItem("deeptrace_access_token") ||
+      localStorage.getItem("deeptrace_access_token");
   }
   return authToken;
 }
 
 export function getStoredRefreshToken(): string | null {
   if (typeof window !== "undefined") {
-    return localStorage.getItem("deeptrace_refresh_token");
+    return (
+      sessionStorage.getItem("deeptrace_refresh_token") ||
+      localStorage.getItem("deeptrace_refresh_token")
+    );
   }
   return null;
 }
 
-export function setAuthToken(token: string) {
+export function setAuthToken(token: string, rememberDevice: boolean = true) {
   authToken = token;
   if (typeof window !== "undefined") {
-    localStorage.setItem("deeptrace_access_token", token);
+    if (rememberDevice) {
+      localStorage.setItem("deeptrace_access_token", token);
+      sessionStorage.removeItem("deeptrace_access_token");
+    } else {
+      sessionStorage.setItem("deeptrace_access_token", token);
+      localStorage.removeItem("deeptrace_access_token");
+    }
   }
 }
 
-export function setAuthTokens(access: string, refresh?: string) {
+export function setAuthTokens(
+  access: string,
+  refresh?: string,
+  rememberDevice: boolean = true
+) {
   authToken = access;
   if (typeof window !== "undefined") {
-    localStorage.setItem("deeptrace_access_token", access);
-    if (refresh) {
-      localStorage.setItem("deeptrace_refresh_token", refresh);
+    if (rememberDevice) {
+      localStorage.setItem("deeptrace_access_token", access);
+      if (refresh) localStorage.setItem("deeptrace_refresh_token", refresh);
+      sessionStorage.removeItem("deeptrace_access_token");
+      sessionStorage.removeItem("deeptrace_refresh_token");
+    } else {
+      sessionStorage.setItem("deeptrace_access_token", access);
+      if (refresh) sessionStorage.setItem("deeptrace_refresh_token", refresh);
+      localStorage.removeItem("deeptrace_access_token");
+      localStorage.removeItem("deeptrace_refresh_token");
     }
   }
 }
@@ -98,6 +135,9 @@ export function clearAuthTokens() {
     localStorage.removeItem("deeptrace_access_token");
     localStorage.removeItem("deeptrace_refresh_token");
     localStorage.removeItem("deeptrace_user");
+    sessionStorage.removeItem("deeptrace_access_token");
+    sessionStorage.removeItem("deeptrace_refresh_token");
+    sessionStorage.removeItem("deeptrace_user");
   }
 }
 
@@ -172,6 +212,7 @@ export async function loginUser(req: {
   email: string;
   password: string;
   mfa_code?: string;
+  remember_me?: boolean;
 }): Promise<TokenResponse> {
   const res = await fetch(`${API_BASE}/auth/login`, {
     method: "POST",
@@ -188,16 +229,20 @@ export async function loginUser(req: {
 
   const data: TokenResponse = await res.json();
   if (!data.mfa_required && data.access_token) {
-    setAuthTokens(data.access_token, data.refresh_token);
+    setAuthTokens(data.access_token, data.refresh_token, req.remember_me ?? true);
   }
   return data;
 }
 
-export async function verifyMfaLogin(tempToken: string, mfaCode: string): Promise<TokenResponse> {
+export async function verifyMfaLogin(
+  tempToken: string,
+  mfaCode: string,
+  rememberMe: boolean = true
+): Promise<TokenResponse> {
   const res = await fetch(`${API_BASE}/auth/mfa/verify`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ temp_token: tempToken, mfa_code: mfaCode }),
+    body: JSON.stringify({ temp_token: tempToken, mfa_code: mfaCode, remember_me: rememberMe }),
   });
 
   if (!res.ok) {
@@ -209,10 +254,33 @@ export async function verifyMfaLogin(tempToken: string, mfaCode: string): Promis
 
   const data: TokenResponse = await res.json();
   if (data.access_token) {
-    setAuthTokens(data.access_token, data.refresh_token);
+    setAuthTokens(data.access_token, data.refresh_token, rememberMe);
   }
   return data;
 }
+
+export async function getSsoProviders(): Promise<SsoProviderOption[]> {
+  const res = await fetch(`${API_BASE}/auth/sso/providers`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function initiateSso(req: {
+  provider: string;
+  tenant_domain?: string;
+  redirect_uri?: string;
+}): Promise<SsoInitiateResponse> {
+  const res = await fetch(`${API_BASE}/auth/sso/initiate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    throw new Error("Failed to initiate enterprise SSO federation");
+  }
+  return res.json();
+}
+
 
 export async function loginAnalyst(
   username?: string,
