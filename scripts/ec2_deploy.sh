@@ -78,9 +78,7 @@ npm run build
 echo ">>> [6/7] Managing PM2 processes..."
 cd /home/ubuntu/DeepTrace
 pm2 delete all || true
-pm2 start "source /home/ubuntu/DeepTrace/.venv/bin/activate && uvicorn app.main:app --host 127.0.0.1 --port 8000" --name "deeptrace-api"
-cd /home/ubuntu/DeepTrace/frontend
-pm2 start "npm run start -- -p 3000" --name "deeptrace-web"
+pm2 start ecosystem.config.cjs
 pm2 save
 sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2-startup install -u ubuntu --hp /home/ubuntu || true
 
