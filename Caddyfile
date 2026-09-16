@@ -2,9 +2,7 @@
 #
 # When your domain DNS A-record points to this server IP (13.222.128.119),
 # replace ":80" below with your domain (e.g. "deeptrace.yourdomain.com")
-# and Caddy will automatically issue and renew Let's Encrypt / ZeroSSL HTTPS certificates.
-
-:80 {
+deeptrace.mychatbot.codes {
     # Direct static documentation PDF for mentors & reviewers
     handle /DeepTrace_Project_Documentation.pdf {
         root * /usr/share/caddy
