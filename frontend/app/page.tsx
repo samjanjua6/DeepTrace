@@ -5,10 +5,12 @@ import Link from "next/link";
 import { Masthead } from "@/components/editorial/Masthead";
 import { FolioTag } from "@/components/editorial/FolioTag";
 import { HairlineRule } from "@/components/editorial/HairlineRule";
+import { useAuth } from "@/context/AuthContext";
 import { ArrowRight, ShieldCheck, Cpu, Sliders, FileCode } from "lucide-react";
 
 export default function EditorialHomePage() {
   const [sliderPos, setSliderPos] = useState<number>(50);
+  const { isAuthenticated } = useAuth();
 
   return (
     <div className="min-h-screen bg-paper-0 text-ink-900 flex flex-col font-sans selection:bg-forensic-red selection:text-white">
@@ -42,7 +44,7 @@ export default function EditorialHomePage() {
 
             <div className="flex flex-wrap items-center gap-4">
               <Link
-                href="/investigations/new"
+                href={isAuthenticated ? "/investigations/new" : "/login?redirect=/investigations/new"}
                 className="px-8 py-3.5 bg-ink-900 hover:bg-black text-paper-0 font-mono text-xs uppercase tracking-widest font-semibold transition-colors flex items-center gap-2"
               >
                 <span>Intake Document for Verification</span>
@@ -241,10 +243,16 @@ export default function EditorialHomePage() {
             <span>NIST SP 800-86 AUDIT COMPLIANT</span>
           </div>
           <div className="flex items-center gap-6">
-            <Link href="/investigations" className="hover:text-ink-900 transition-colors">
+            <Link
+              href={isAuthenticated ? "/investigations" : "/login?redirect=/investigations"}
+              className="hover:text-ink-900 transition-colors"
+            >
               Case Docket
             </Link>
-            <Link href="/investigations/new" className="hover:text-ink-900 transition-colors">
+            <Link
+              href={isAuthenticated ? "/investigations/new" : "/login?redirect=/investigations/new"}
+              className="hover:text-ink-900 transition-colors"
+            >
               Intake
             </Link>
             <a

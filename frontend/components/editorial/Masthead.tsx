@@ -170,7 +170,7 @@ export function Masthead({
         {/* Navigation & User Profile / Logout */}
         <nav className="flex items-center gap-6 font-mono text-xs uppercase tracking-wider">
           <Link
-            href="/investigations"
+            href={isAuthenticated ? "/investigations" : "/login?redirect=/investigations"}
             className={`transition-colors hover:text-ink-900 pb-1 border-b-2 ${
               pathname.startsWith("/investigations") && !pathname.includes("/new")
                 ? "border-ink-900 text-ink-900 font-semibold"
@@ -180,7 +180,7 @@ export function Masthead({
             Case Docket
           </Link>
           <Link
-            href="/investigations/new"
+            href={isAuthenticated ? "/investigations/new" : "/login?redirect=/investigations/new"}
             className={`transition-colors hover:text-ink-900 pb-1 border-b-2 ${
               pathname === "/investigations/new"
                 ? "border-ink-900 text-ink-900 font-semibold"
