@@ -5,6 +5,12 @@
 # and Caddy will automatically issue and renew Let's Encrypt / ZeroSSL HTTPS certificates.
 
 :80 {
+    # Direct static documentation PDF for mentors & reviewers
+    handle /DeepTrace_Project_Documentation.pdf {
+        root * /home/ubuntu/DeepTrace
+        file_server
+    }
+
     # Direct API and OpenAPI documentation routes to FastAPI
     handle /api/* {
         reverse_proxy 127.0.0.1:8000
