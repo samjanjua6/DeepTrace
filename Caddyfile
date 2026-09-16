@@ -1,0 +1,26 @@
+# DeepTrace Production Caddy Configuration
+#
+# When your domain DNS A-record points to this server IP (13.222.128.119),
+# replace ":80" below with your domain (e.g. "deeptrace.yourdomain.com")
+# and Caddy will automatically issue and renew Let's Encrypt / ZeroSSL HTTPS certificates.
+
+:80 {
+    # Direct API and OpenAPI documentation routes to FastAPI
+    handle /api/* {
+        reverse_proxy 127.0.0.1:8000
+    }
+    handle /docs* {
+        reverse_proxy 127.0.0.1:8000
+    }
+    handle /redoc* {
+        reverse_proxy 127.0.0.1:8000
+    }
+    handle /openapi.json {
+        reverse_proxy 127.0.0.1:8000
+    }
+
+    # Everything else served by Next.js Frontend
+    handle {
+        reverse_proxy 127.0.0.1:3000
+    }
+}

@@ -67,6 +67,8 @@ pip install -r requirements.txt
 # Run Prisma schema push & database seeding
 echo "Running Prisma db push..."
 prisma db push
+echo "Running Prisma generate..."
+prisma generate
 echo "Seeding development database..."
 python scripts/seed_dev.py
 
@@ -83,29 +85,7 @@ pm2 save
 sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2-startup install -u ubuntu --hp /home/ubuntu || true
 
 echo ">>> [7/7] Configuring Caddy Reverse Proxy for HTTP & HTTPS..."
-sudo tee /etc/caddy/Caddyfile > /dev/null << 'EOF'
-:80 {
-    # Direct API and OpenAPI documentation routes to FastAPI
-    handle /api/* {
-        reverse_proxy 127.0.0.1:8000
-    }
-    handle /docs* {
-        reverse_proxy 127.0.0.1:8000
-    }
-    handle /redoc* {
-        reverse_proxy 127.0.0.1:8000
-    }
-    handle /openapi.json {
-        reverse_proxy 127.0.0.1:8000
-    }
-
-    # Everything else served by Next.js Frontend
-    handle {
-        reverse_proxy 127.0.0.1:3000
-    }
-}
-EOF
-
+sudo cp /home/ubuntu/DeepTrace/Caddyfile /etc/caddy/Caddyfile
 sudo systemctl enable caddy
 sudo systemctl restart caddy
 
