@@ -6,39 +6,26 @@ echo "=========================================================="
 echo "      DEEPTRACE PRODUCTION DEPLOYMENT ENGINE (UBUNTU)     "
 echo "=========================================================="
 
-echo ">>> [1/8] Updating package lists and upgrading base packages..."
+echo ">>> [1/7] Installing system packages, Caddy, Node.js & Docker..."
 sudo apt-get update -y
 sudo apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" \
-    git curl wget build-essential python3.12 python3.12-venv python3-pip \
-    libgl1 libglib2.0-0 tesseract-ocr tesseract-ocr-urd debian-keyring debian-archive-keyring apt-transport-https
+    git curl wget build-essential python3 python3-venv python3-pip \
+    libgl1 libglib2.0-0 tesseract-ocr tesseract-ocr-urd \
+    caddy docker.io docker-compose-v2
 
-echo ">>> [2/8] Installing Caddy Web Server..."
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg --yes
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-sudo apt-get update -y
-sudo apt-get install -y caddy
+# Start and enable Docker
+sudo systemctl enable docker
+sudo systemctl start docker
+sudo usermod -aG docker ubuntu || true
 
-echo ">>> [3/8] Installing Node.js 20.x LTS & PM2 process manager..."
+# Install Node.js 20.x and PM2
 if ! command -v node &> /dev/null; then
     curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
     sudo apt-get install -y nodejs
 fi
 sudo npm install -g pm2
 
-echo ">>> [4/8] Installing Docker Engine & Docker Compose Plugin..."
-if ! command -v docker &> /dev/null; then
-    sudo install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg --yes
-    sudo chmod a+r /etc/apt/keyrings/docker.gpg
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-    sudo apt-get update -y
-    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-    sudo usermod -aG docker ubuntu
-    sudo systemctl enable docker
-    sudo systemctl start docker
-fi
-
-echo ">>> [5/8] Cloning / Pulling DeepTrace Codebase..."
+echo ">>> [2/7] Cloning or Updating DeepTrace Repository..."
 cd /home/ubuntu
 if [ -d "DeepTrace/.git" ]; then
     cd DeepTrace
@@ -55,10 +42,11 @@ if [ ! -f ".env" ]; then
     cp .env.example .env
 fi
 
-echo ">>> [6/8] Starting PostgreSQL 16 & Redis via Docker Compose..."
+echo ">>> [3/7] Launching PostgreSQL 16 & Redis containers..."
+cd /home/ubuntu/DeepTrace
 sudo docker compose up -d
 
-echo "Waiting for PostgreSQL to be ready..."
+echo "Waiting for PostgreSQL to be healthy..."
 for i in {1..30}; do
     if sudo docker compose exec -T postgres pg_isready -U deeptrace -d deeptrace_db >/dev/null 2>&1; then
         echo "PostgreSQL is online and accepting connections!"
@@ -67,31 +55,36 @@ for i in {1..30}; do
     sleep 1
 done
 
-echo ">>> [7/8] Setting up Python 3.12 environment, Prisma, and database seed..."
+echo ">>> [4/7] Setting up Python virtual environment and Prisma..."
 cd /home/ubuntu/DeepTrace
-python3.12 -m venv .venv
+if [ ! -d ".venv" ]; then
+    python3 -m venv .venv
+fi
 source .venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
 
 # Run Prisma schema push & database seeding
+echo "Running Prisma db push..."
 prisma db push
+echo "Seeding development database..."
 python scripts/seed_dev.py
 
-echo ">>> [8/8] Building Frontend & Starting Daemons..."
+echo ">>> [5/7] Installing frontend dependencies & building Next.js production bundle..."
 cd /home/ubuntu/DeepTrace/frontend
 npm install
 npm run build
 
+echo ">>> [6/7] Managing PM2 processes..."
 cd /home/ubuntu/DeepTrace
 pm2 delete all || true
-pm2 start "source .venv/bin/activate && uvicorn app.main:app --host 127.0.0.1 --port 8000" --name "deeptrace-api"
+pm2 start "source /home/ubuntu/DeepTrace/.venv/bin/activate && uvicorn app.main:app --host 127.0.0.1 --port 8000" --name "deeptrace-api"
 cd /home/ubuntu/DeepTrace/frontend
 pm2 start "npm run start -- -p 3000" --name "deeptrace-web"
 pm2 save
 sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2-startup install -u ubuntu --hp /home/ubuntu || true
 
-echo ">>> Configuring Caddy Reverse Proxy & HTTPS..."
+echo ">>> [7/7] Configuring Caddy Reverse Proxy for HTTP & HTTPS..."
 sudo tee /etc/caddy/Caddyfile > /dev/null << 'EOF'
 :80 {
     # Direct API and OpenAPI documentation routes to FastAPI
