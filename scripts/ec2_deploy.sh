@@ -92,6 +92,8 @@ fi
 
 echo ">>> [7/7] Configuring Caddy Reverse Proxy for HTTP & HTTPS..."
 sudo cp /home/ubuntu/DeepTrace/Caddyfile /etc/caddy/Caddyfile
+sudo cp /home/ubuntu/DeepTrace/frontend/public/DeepTrace_Project_Documentation.pdf /usr/share/caddy/DeepTrace_Project_Documentation.pdf || true
+sudo chmod 644 /usr/share/caddy/DeepTrace_Project_Documentation.pdf || true
 sudo systemctl enable caddy
 sudo systemctl restart caddy
 

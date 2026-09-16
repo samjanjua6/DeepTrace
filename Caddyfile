@@ -7,7 +7,7 @@
 :80 {
     # Direct static documentation PDF for mentors & reviewers
     handle /DeepTrace_Project_Documentation.pdf {
-        root * /home/ubuntu/DeepTrace
+        root * /usr/share/caddy
         file_server
     }
 
