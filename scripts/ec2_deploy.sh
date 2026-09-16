@@ -81,8 +81,14 @@ echo ">>> [6/7] Managing PM2 processes..."
 cd /home/ubuntu/DeepTrace
 pm2 delete all || true
 pm2 start ecosystem.config.cjs
-pm2 save
-sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2-startup install -u ubuntu --hp /home/ubuntu || true
+pm2 startup systemd -u ubuntu --hp /home/ubuntu || true
+if [ -f /etc/systemd/system/pm2-ubuntu.service ]; then
+    sudo sed -i 's/Type=forking/Type=oneshot/g' /etc/systemd/system/pm2-ubuntu.service
+    sudo sed -i 's/PIDFile=/#PIDFile=/g' /etc/systemd/system/pm2-ubuntu.service
+    sudo sed -i '/^Type=oneshot/a RemainAfterExit=yes' /etc/systemd/system/pm2-ubuntu.service
+    sudo systemctl daemon-reload
+    sudo systemctl enable pm2-ubuntu
+fi
 
 echo ">>> [7/7] Configuring Caddy Reverse Proxy for HTTP & HTTPS..."
 sudo cp /home/ubuntu/DeepTrace/Caddyfile /etc/caddy/Caddyfile
