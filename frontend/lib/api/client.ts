@@ -23,6 +23,7 @@ import {
   InviteUserResponse,
   UserActionResponse,
   OrgUserRole,
+  DashboardMetrics,
 } from "../types/forensics";
 
 const API_BASE = "/api/v1";
@@ -1285,6 +1286,23 @@ export async function resetUserMfa(userId: string): Promise<UserActionResponse> 
       errorData?.error?.message ||
       errorData?.message ||
       "Failed to reset two-factor authentication";
+    throw new Error(message);
+  }
+  return res.json();
+}
+
+export async function getDashboardMetrics(): Promise<DashboardMetrics> {
+  await ensureAuth().catch(() => {});
+  const res = await fetch(`${API_BASE}/analytics/dashboard`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const message =
+      errorData?.detail?.message ||
+      errorData?.error?.message ||
+      errorData?.message ||
+      "Failed to fetch executive fraud analytics metrics";
     throw new Error(message);
   }
   return res.json();

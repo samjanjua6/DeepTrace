@@ -24,6 +24,7 @@ from app.features.agents.router        import router as agents_router
 from app.features.reports.router       import router as reports_router
 from app.features.webhooks.router      import router as webhooks_router
 from app.features.users.router         import router as users_router
+from app.features.analytics.router     import router as analytics_router
 
 
 @asynccontextmanager
@@ -81,6 +82,10 @@ def create_app() -> FastAPI:
 
     # Platform integrations
     app.include_router(webhooks_router,        prefix="/api/v1/webhooks",       tags=["Webhooks"])
+
+    # Analytics & Executive Command Center
+    app.include_router(analytics_router,       prefix="/api/v1/analytics",      tags=["Analytics"])
+    app.include_router(analytics_router,       prefix="/api/v1/dashboard",      tags=["Analytics"])
 
     # ── Local Storage Preview Streaming ───────────────────────────────────────
     @app.api_route("/api/v1/storage/{bucket}/{path:path}", methods=["GET", "HEAD"], tags=["Storage"], include_in_schema=False)

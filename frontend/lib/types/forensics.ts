@@ -379,3 +379,74 @@ export interface UserActionResponse {
   success: boolean;
   message: string;
 }
+
+// ── Executive Fraud Analytics & Risk Command Center ──────────────────────────
+
+export interface ScannedDocumentsMetric {
+  month_to_date: number;
+  monthly_limit: number;
+  quota_usage_percentage: number;
+  remaining_capacity: number;
+  total_lifetime: number;
+  days_until_renewal: number;
+  tier: string;
+}
+
+export interface TamperingDetectionMetric {
+  rate_percentage: number;
+  critical_count: number;
+  high_count: number;
+  elevated_count: number;
+  moderate_count: number;
+  low_count: number;
+  total_evaluated: number;
+  risk_status: string;
+}
+
+export interface FinancialExposureMetric {
+  total_prevented_pkr: number;
+  total_prevented_formatted: string;
+  total_prevented_short: string;
+  flagged_cases_count: number;
+  average_inflation_pkr: number;
+  largest_single_inflation_pkr: number;
+}
+
+export interface VerificationLatencyMetric {
+  p50_ms: number;
+  p95_ms: number;
+  p50_formatted: string;
+  p95_formatted: string;
+  deterministic_p50_ms: number;
+  deterministic_formatted: string;
+  multi_page_ocr_p95_ms: number;
+  multi_page_ocr_formatted: string;
+  stage_latencies: Record<string, number>;
+}
+
+export interface CriticalAlertItem {
+  id: string;
+  case_number: string;
+  title: string;
+  document_type: string;
+  risk_score: number | null;
+  risk_tier: string;
+  action_directive: string;
+  prevented_rupees: number | null;
+  prevented_rupees_formatted: string | null;
+  client_reference: string | null;
+  created_at: string;
+}
+
+export interface DashboardMetrics {
+  organization_id: string;
+  organization_name: string;
+  tenant_slug: string;
+  total_scanned: ScannedDocumentsMetric;
+  tampering_detection: TamperingDetectionMetric;
+  financial_exposure: FinancialExposureMetric;
+  verification_latency: VerificationLatencyMetric;
+  recent_critical_alerts: CriticalAlertItem[];
+  document_type_distribution: Record<string, number>;
+  generated_at: string;
+}
