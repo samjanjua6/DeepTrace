@@ -3,6 +3,7 @@
 import React from "react";
 import { Sparkles, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { cn } from "@/lib/utils";
 
 interface DossierActionRibbonProps {
   activeTab: string;
@@ -36,39 +37,130 @@ export function DossierActionRibbon({
   onReanalyze,
 }: DossierActionRibbonProps) {
   return (
-    <div className="flex items-center justify-between font-mono text-xs border-b border-rule pb-3">
-      {/* Domain-Aware Tab Navigation */}
-      <div className="flex flex-wrap gap-2">
+    <div className="space-y-2.5 font-mono border-b border-rule pb-3">
+      {/* Top Utility Bar: Section Identifier & Global Action Controls */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-ink-500 whitespace-nowrap">
+            § 03 / Forensic Dossier
+          </span>
+          {evidenceCount > 0 ? (
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[9px] font-bold bg-forensic-red/10 text-forensic-red border border-forensic-red/30 whitespace-nowrap">
+              <span className="w-1.5 h-1.5 rounded-full bg-forensic-red animate-pulse shrink-0" />
+              {evidenceCount} {evidenceCount === 1 ? "Anomaly" : "Anomalies"}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[9px] font-bold bg-forensic-green/10 text-forensic-green border border-forensic-green/30 whitespace-nowrap">
+              <span className="w-1.5 h-1.5 rounded-full bg-forensic-green shrink-0" />
+              Clean Record
+            </span>
+          )}
+        </div>
+
+        {/* Global Action Buttons */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={onToggleChatDrawer}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-bold uppercase tracking-wider transition-all whitespace-nowrap shrink-0 border cursor-pointer select-none focus:outline-none focus:ring-1 focus:ring-ink-900",
+              isChatDrawerOpen
+                ? "bg-ink-900 text-paper-0 border-ink-900 shadow-sm ring-1 ring-ink-900"
+                : "bg-amber-500/10 hover:bg-amber-500/20 text-ink-900 border-amber-600/30 hover:border-amber-600/50 shadow-xs"
+            )}
+            title="Toggle interactive Lead Investigator Q&A drawer"
+          >
+            <Sparkles
+              className={cn(
+                "w-3.5 h-3.5 shrink-0",
+                isChatDrawerOpen
+                  ? "text-amber-400 animate-pulse"
+                  : "text-amber-600"
+              )}
+            />
+            <span>Ask Investigator</span>
+            {isChatDrawerOpen && (
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 ml-0.5" />
+            )}
+          </button>
+
+          {!isSample && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onReanalyze}
+              isLoading={isAnalyzing}
+              leftIcon={
+                !isAnalyzing ? <RefreshCw className="w-3.5 h-3.5" /> : undefined
+              }
+              className="whitespace-nowrap shrink-0 text-xs py-1.5 px-3 h-auto"
+            >
+              Re-Analyze
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Domain-Aware Tab Navigation Strip */}
+      <div
+        role="tablist"
+        aria-label="Forensic Dossier Tabs"
+        className="flex flex-wrap items-center gap-1.5"
+      >
         <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "findings"}
           onClick={() => onSelectTab("findings")}
-          className={`px-3 py-1 border transition-colors uppercase ${
+          className={cn(
+            "px-3 py-1.5 border text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer select-none whitespace-nowrap focus:outline-none focus:ring-1 focus:ring-ink-900",
             activeTab === "findings"
-              ? "bg-ink-900 text-paper-0 border-ink-900 font-semibold"
-              : "bg-paper-1 text-ink-700 border-rule hover:bg-paper-2"
-          }`}
+              ? "bg-ink-900 text-paper-0 border-ink-900 font-bold shadow-xs"
+              : "bg-paper-1 hover:bg-paper-2 text-ink-700 hover:text-ink-900 border-rule hover:border-ink-500 font-medium"
+          )}
         >
-          Findings ({evidenceCount})
+          <span>Findings</span>
+          <span
+            className={cn(
+              "px-1.5 py-0.2 text-[10px] font-bold tabular-nums leading-none",
+              activeTab === "findings"
+                ? "bg-paper-0 text-ink-900"
+                : evidenceCount > 0
+                ? "bg-forensic-red text-white"
+                : "bg-paper-2 text-ink-600 border border-rule"
+            )}
+          >
+            {evidenceCount}
+          </span>
         </button>
 
         {isFinancial && (
           <>
             <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "ledger"}
               onClick={() => onSelectTab("ledger")}
-              className={`px-3 py-1 border transition-colors uppercase ${
+              className={cn(
+                "px-3 py-1.5 border text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer select-none whitespace-nowrap focus:outline-none focus:ring-1 focus:ring-ink-900",
                 activeTab === "ledger"
-                  ? "bg-ink-900 text-paper-0 border-ink-900 font-semibold"
-                  : "bg-paper-1 text-ink-700 border-rule hover:bg-paper-2"
-              }`}
+                  ? "bg-ink-900 text-paper-0 border-ink-900 font-bold shadow-xs"
+                  : "bg-paper-1 hover:bg-paper-2 text-ink-700 hover:text-ink-900 border-rule hover:border-ink-500 font-medium"
+              )}
             >
               Math Ledger
             </button>
             <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "iban"}
               onClick={() => onSelectTab("iban")}
-              className={`px-3 py-1 border transition-colors uppercase ${
+              className={cn(
+                "px-3 py-1.5 border text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer select-none whitespace-nowrap focus:outline-none focus:ring-1 focus:ring-ink-900",
                 activeTab === "iban"
-                  ? "bg-ink-900 text-paper-0 border-ink-900 font-semibold"
-                  : "bg-paper-1 text-ink-700 border-rule hover:bg-paper-2"
-              }`}
+                  ? "bg-ink-900 text-paper-0 border-ink-900 font-bold shadow-xs"
+                  : "bg-paper-1 hover:bg-paper-2 text-ink-700 hover:text-ink-900 border-rule hover:border-ink-500 font-medium"
+              )}
             >
               SBP IBAN & AML
             </button>
@@ -77,12 +169,16 @@ export function DossierActionRibbon({
 
         {(isIdentity || isFinancial || hasCnic) && (
           <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "cnic"}
             onClick={() => onSelectTab("cnic")}
-            className={`px-3 py-1 border transition-colors uppercase ${
+            className={cn(
+              "px-3 py-1.5 border text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer select-none whitespace-nowrap focus:outline-none focus:ring-1 focus:ring-ink-900",
               activeTab === "cnic"
-                ? "bg-ink-900 text-paper-0 border-ink-900 font-semibold"
-                : "bg-paper-1 text-ink-700 border-rule hover:bg-paper-2"
-            }`}
+                ? "bg-ink-900 text-paper-0 border-ink-900 font-bold shadow-xs"
+                : "bg-paper-1 hover:bg-paper-2 text-ink-700 hover:text-ink-900 border-rule hover:border-ink-500 font-medium"
+            )}
           >
             NADRA CNIC Audit
           </button>
@@ -90,69 +186,56 @@ export function DossierActionRibbon({
 
         {(isTaxOrSalary || isFinancial || hasFbr) && (
           <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "fbr"}
             onClick={() => onSelectTab("fbr")}
-            className={`px-3 py-1 border transition-colors uppercase ${
+            className={cn(
+              "px-3 py-1.5 border text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer select-none whitespace-nowrap focus:outline-none focus:ring-1 focus:ring-ink-900",
               activeTab === "fbr"
-                ? "bg-ink-900 text-paper-0 border-ink-900 font-semibold"
-                : "bg-paper-1 text-ink-700 border-rule hover:bg-paper-2"
-            }`}
+                ? "bg-ink-900 text-paper-0 border-ink-900 font-bold shadow-xs"
+                : "bg-paper-1 hover:bg-paper-2 text-ink-700 hover:text-ink-900 border-rule hover:border-ink-500 font-medium"
+            )}
           >
             FBR Tax & WHT
           </button>
         )}
 
         <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "custody"}
           onClick={() => onSelectTab("custody")}
-          className={`px-3 py-1 border transition-colors uppercase ${
+          className={cn(
+            "px-3 py-1.5 border text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer select-none whitespace-nowrap focus:outline-none focus:ring-1 focus:ring-ink-900",
             activeTab === "custody"
-              ? "bg-ink-900 text-paper-0 border-ink-900 font-semibold"
-              : "bg-paper-1 text-ink-700 border-rule hover:bg-paper-2"
-          }`}
+              ? "bg-ink-900 text-paper-0 border-ink-900 font-bold shadow-xs"
+              : "bg-paper-1 hover:bg-paper-2 text-ink-700 hover:text-ink-900 border-rule hover:border-ink-500 font-medium"
+          )}
         >
           Custody Chain
         </button>
 
         <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "swarm"}
           onClick={() => onSelectTab("swarm")}
-          className={`px-3 py-1 border transition-colors uppercase flex items-center gap-1.5 ${
+          className={cn(
+            "px-3 py-1.5 border text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer select-none whitespace-nowrap focus:outline-none focus:ring-1 focus:ring-ink-900",
             activeTab === "swarm"
-              ? "bg-ink-900 text-paper-0 border-ink-900 font-semibold shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]"
-              : "bg-paper-1 text-ink-700 border-rule hover:bg-paper-2"
-          }`}
+              ? "bg-ink-900 text-paper-0 border-ink-900 font-bold shadow-xs"
+              : "bg-paper-1 hover:bg-paper-2 text-ink-700 hover:text-ink-900 border-rule hover:border-ink-500 font-medium"
+          )}
         >
-          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+          <Sparkles
+            className={cn(
+              "w-3.5 h-3.5 shrink-0",
+              activeTab === "swarm" ? "text-amber-400" : "text-amber-600"
+            )}
+          />
           <span>Agent Swarm</span>
         </button>
-      </div>
-
-      {/* Action Controls */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={onToggleChatDrawer}
-          className={`px-3 py-1 border text-xs font-mono font-bold uppercase transition-all flex items-center gap-1.5 cursor-pointer ${
-            isChatDrawerOpen
-              ? "bg-ink-900 text-paper-0 border-ink-900 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
-              : "bg-amber-50 hover:bg-amber-100 text-ink-900 border-ink-900 hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
-          }`}
-          title="Toggle interactive Lead Investigator Q&A drawer"
-        >
-          <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-          <span>[ ASK LEAD INVESTIGATOR ]</span>
-        </button>
-
-        {!isSample && (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={onReanalyze}
-            isLoading={isAnalyzing}
-            leftIcon={
-              !isAnalyzing ? <RefreshCw className="w-3 h-3" /> : undefined
-            }
-          >
-            Re-Analyze
-          </Button>
-        )}
       </div>
     </div>
   );

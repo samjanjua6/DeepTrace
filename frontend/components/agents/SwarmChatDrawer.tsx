@@ -260,16 +260,17 @@ export function SwarmChatDrawer({
       </div>
 
       {/* Live Swarm Telemetry Ribbon */}
-      <div className="p-3 bg-paper-1 border-b border-rule shrink-0">
+      <div className="p-2.5 bg-paper-1 border-b border-rule shrink-0">
         <AgentStatusBadge
           isStreaming={isStreaming}
           activeModel={activeModel}
           totalTokens={totalTokens}
+          defaultCollapsed={messages.length > 0}
         />
       </div>
 
       {/* Chat Messages Stream */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-paper-0">
+      <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-3 bg-paper-0">
         {isLoadingHistory ? (
           <div className="flex flex-col items-center justify-center h-48 font-mono text-xs text-ink-600 gap-2">
             <Loader2 className="w-5 h-5 animate-spin text-ink-900" />
@@ -291,6 +292,7 @@ export function SwarmChatDrawer({
               <SuggestedPrompts
                 onSelectPrompt={(p) => handleSendMessage(p)}
                 disabled={isStreaming}
+                variant="card"
               />
             </div>
           </div>
@@ -339,10 +341,11 @@ export function SwarmChatDrawer({
 
       {/* Suggested Prompts Pill Tray (when chat has messages) */}
       {messages.length > 0 && !isStreaming && (
-        <div className="px-4 py-2 bg-paper-1 border-t border-rule shrink-0 overflow-x-auto">
+        <div className="px-3 py-1.5 bg-paper-1 border-t border-rule shrink-0">
           <SuggestedPrompts
             onSelectPrompt={(p) => handleSendMessage(p)}
             disabled={isStreaming}
+            variant="tray"
           />
         </div>
       )}

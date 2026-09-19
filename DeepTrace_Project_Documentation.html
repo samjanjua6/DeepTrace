@@ -1151,7 +1151,7 @@
 
   <h2>10.1 Production Cloud Topology on AWS EC2</h2>
   <p>
-    DeepTrace is fully deployed in production on an <strong>AWS EC2 instance (`13.222.128.119`)</strong> powered by 4th Generation Intel Xeon Sapphire Rapids processors (m7i-flex.large, 7.6 GiB RAM).
+    DeepTrace is fully deployed in production on an <strong>AWS EC2 instance (`13.222.128.119`)</strong> with custom domain <strong>`deeptrace.mychatbot.codes`</strong> powered by 4th Generation Intel Xeon Sapphire Rapids processors (m7i-flex.large, 7.6 GiB RAM).
   </p>
 
   <table>
@@ -1205,7 +1205,7 @@
     <li><strong>PM2 Systemd Oneshot Unit</strong>: Service <code>pm2-ubuntu.service</code> is configured with <code>Type=oneshot</code> and <code>RemainAfterExit=yes</code>, executing <code>pm2 resurrect</code> during host boot. Both FastAPI and Next.js automatically recover with zero human intervention.</li>
     <li><strong>Caddy Reverse Proxy Routing</strong>:
       <pre>
-:80 {
+deeptrace.mychatbot.codes {
     handle /api/* { reverse_proxy 127.0.0.1:8000 }
     handle /docs* { reverse_proxy 127.0.0.1:8000 }
     handle /openapi.json { reverse_proxy 127.0.0.1:8000 }
@@ -1213,7 +1213,7 @@
 }
       </pre>
     </li>
-    <li><strong>Automatic HTTPS Integration</strong>: Once the custom domain DNS A-record is attached, replacing <code>:80</code> with the domain name in <code>/etc/caddy/Caddyfile</code> immediately activates automated Let's Encrypt / ZeroSSL TLS certificate provisioning with automatic HTTP-to-HTTPS redirection.</li>
+    <li><strong>Automatic HTTPS Provisioning</strong>: Fully automated Let's Encrypt / ZeroSSL TLS certificate lifecycle active for <code>deeptrace.mychatbot.codes</code> with HTTP-to-HTTPS permanent redirection and HTTP/3 support.</li>
   </ul>
 </div>
 
@@ -1345,7 +1345,7 @@ tests/test_db_connection.py .............. PASSED
 
   <div class="callout success">
     <div class="callout-title">Public Specimen Lab (No Sign-In Required)</div>
-    Mentors can immediately inspect the benchmark tampering specimen and interactive ELA heatmap overlay at: <code>http://13.222.128.119/investigations/sample</code>.
+    Mentors can immediately inspect the benchmark tampering specimen and interactive ELA heatmap overlay at: <code>https://deeptrace.mychatbot.codes/investigations/sample</code>.
   </div>
 
   <h2>11.4 Conclusion & Future Vision</h2>

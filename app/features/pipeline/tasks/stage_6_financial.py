@@ -796,6 +796,7 @@ async def process_financial(
                                 "actualValue": reason,
                                 "discrepancy": "Failed MOD-97 Checksum",
                                 "technicalDetails": Json({
+                                    "anchor_type": "DOCUMENT_HEADER",
                                     "raw_iban": raw_iban,
                                     "bank_name": bank_name,
                                     "validation_reason": reason,
@@ -1515,7 +1516,46 @@ async def process_financial(
                         discrepancy = stated_closing - previous_balance
                         last_page_num = len(pdf_doc)
 
+                        # Determine primary summary page for stated closing
+                        s_page = 1
+                        s_box = None
+                        if "closing_balance" in summary_bboxes:
+                            s_page, s_box = summary_bboxes["closing_balance"]
+                        else:
+                            closing_rects = []
+                            target_page_idx = last_page_num - 1
+                            for p_i in [target_page_idx, 0]:
+                                closing_rects = pdf_doc[p_i].search_for("Closing Balance") or pdf_doc[p_i].search_for(f"{stated_closing:,.2f}")
+                                if closing_rects:
+                                    target_page_idx = p_i
+                                    break
+                            s_page = target_page_idx + 1
+
                         title = f"Closing Balance Tampering Detected (+{discrepancy:,.2f} PKR Discrepancy)" if discrepancy > 0 else f"Closing Balance Mismatch ({discrepancy:+,.2f} PKR)"
+                        
+                        anchors = []
+                        if s_page != last_page_num:
+                            anchors = [
+                                {
+                                    "pageNumber": s_page,
+                                    "label": f"Stated Closing Summary (PKR {stated_closing:,.2f})",
+                                    "type": "STATEMENT_SUMMARY",
+                                },
+                                {
+                                    "pageNumber": last_page_num,
+                                    "label": f"Terminal Ledger Row (PKR {previous_balance:,.2f})",
+                                    "type": "LEDGER_TERMINAL",
+                                },
+                            ]
+                        else:
+                            anchors = [
+                                {
+                                    "pageNumber": last_page_num,
+                                    "label": f"Closing Balance Mismatch (PKR {stated_closing:,.2f} vs {previous_balance:,.2f})",
+                                    "type": "STATEMENT_SUMMARY",
+                                }
+                            ]
+
                         finding = await tx.evidenceitem.create(
                             data={
                                 "document": {"connect": {"id": doc.id}},
@@ -1526,12 +1566,12 @@ async def process_financial(
                                 "riskPoints": 50,
                                 "title": title,
                                 "description": (
-                                    f"The document states an ending/closing balance of PKR {stated_closing:,.2f} in the statement summary, "
-                                    f"but the transaction ledger concludes on Page {last_page_num} with a final balance of PKR {previous_balance:,.2f}. "
+                                    f"The document states an ending/closing balance of PKR {stated_closing:,.2f} in the statement summary (Page {s_page}), "
+                                    f"but the multi-page transaction ledger concludes on Page {last_page_num} with a final balance of PKR {previous_balance:,.2f}. "
                                     f"Discrepancy: PKR {discrepancy:+,.2f}. This proves closing balance manipulation or fabricated summary totals."
                                 ),
                                 "isDeterministic": True,
-                                "pageNumber": 1,
+                                "pageNumber": last_page_num,
                                 "expectedValue": f"PKR {previous_balance:,.2f}",
                                 "actualValue": f"PKR {stated_closing:,.2f}",
                                 "discrepancy": f"PKR {discrepancy:+,.2f}",
@@ -1539,14 +1579,18 @@ async def process_financial(
                                     "stated_closing_balance": str(stated_closing),
                                     "final_ledger_balance": str(previous_balance),
                                     "discrepancy": str(discrepancy),
+                                    "summary_page": s_page,
                                     "last_page": last_page_num,
+                                    "anchor_type": "MULTI_PAGE_SPAN" if last_page_num > 1 else "PAGE_REGION",
+                                    "page_start": 1,
+                                    "page_end": last_page_num,
+                                    "anchors": anchors,
                                 }),
                             }
                         )
 
-                        # Bounding box for closing balance: prioritize exact spatial coordinates from summary_bboxes
-                        if "closing_balance" in summary_bboxes:
-                            s_page, s_box = summary_bboxes["closing_balance"]
+                        # Bounding box 1: Stated closing balance on summary page
+                        if s_box:
                             s_meta = page_meta_map.get(s_page)
                             s_sx = (s_meta.widthPx / s_meta.widthPts) if (s_meta and s_meta.widthPts) else (150.0 / 72.0)
                             s_sy = (s_meta.heightPx / s_meta.heightPts) if (s_meta and s_meta.heightPts) else (150.0 / 72.0)
@@ -1562,43 +1606,77 @@ async def process_financial(
                                     "yPts": float(s_box[1]),
                                     "widthPts": float(s_box[2] - s_box[0]),
                                     "heightPts": float(s_box[3] - s_box[1]),
-                                    "label": "Stated Closing (Tampered)",
+                                    "label": f"Stated Closing (Tampered) PKR {stated_closing:,.2f}",
                                     "color": "#dc2626",
                                 }
                             )
                         else:
-                            closing_rects = []
-                            target_page_idx = last_page_num - 1
-                            for p_i in [target_page_idx, 0]:
-                                closing_rects = pdf_doc[p_i].search_for("Closing Balance") or pdf_doc[p_i].search_for(f"{stated_closing:,.2f}")
-                                if closing_rects:
-                                    target_page_idx = p_i
-                                    break
-
+                            closing_rects = pdf_doc[s_page - 1].search_for("Closing Balance") or pdf_doc[s_page - 1].search_for(f"{stated_closing:,.2f}")
                             if closing_rects:
                                 r = closing_rects[0]
-                                meta = page_meta_map.get(target_page_idx + 1)
+                                meta = page_meta_map.get(s_page)
                                 sx = (meta.widthPx / meta.widthPts) if (meta and meta.widthPts) else (150.0 / 72.0)
                                 sy = (meta.heightPx / meta.heightPts) if (meta and meta.heightPts) else (150.0 / 72.0)
-                                w_pts = r.x1 - r.x0
-                                h_pts = r.y1 - r.y0
                                 await tx.boundingbox.create(
                                     data={
                                         "evidenceItem": {"connect": {"id": finding.id}},
-                                        "pageNumber": target_page_idx + 1,
+                                        "pageNumber": s_page,
                                         "x": float(r.x0 * sx),
                                         "y": float(r.y0 * sy),
-                                        "width": float(w_pts * sx),
-                                        "height": float(h_pts * sy),
+                                        "width": float((r.x1 - r.x0) * sx),
+                                        "height": float((r.y1 - r.y0) * sy),
                                         "xPts": float(r.x0),
                                         "yPts": float(r.y0),
-                                        "widthPts": float(w_pts),
-                                        "heightPts": float(h_pts),
-                                        "label": "Closing Balance Mismatch",
+                                        "widthPts": float(r.x1 - r.x0),
+                                        "heightPts": float(r.y1 - r.y0),
+                                        "label": f"Closing Balance Mismatch PKR {stated_closing:,.2f}",
                                         "color": "#dc2626",
                                     }
                                 )
 
+                        # Bounding box 2: Terminal transaction row on last_page_num (if different page from summary)
+                        if last_page_num != s_page:
+                            term_rects = (
+                                pdf_doc[last_page_num - 1].search_for(f"{previous_balance:,.2f}")
+                                or pdf_doc[last_page_num - 1].search_for(f"{previous_balance:.2f}")
+                                or pdf_doc[last_page_num - 1].search_for("Balance")
+                            )
+                            meta_term = page_meta_map.get(last_page_num)
+                            t_sx = (meta_term.widthPx / meta_term.widthPts) if (meta_term and meta_term.widthPts) else (150.0 / 72.0)
+                            t_sy = (meta_term.heightPx / meta_term.heightPts) if (meta_term and meta_term.heightPts) else (150.0 / 72.0)
+                            if term_rects:
+                                tr = term_rects[-1]
+                                await tx.boundingbox.create(
+                                    data={
+                                        "evidenceItem": {"connect": {"id": finding.id}},
+                                        "pageNumber": last_page_num,
+                                        "x": float(tr.x0 * t_sx),
+                                        "y": float(tr.y0 * t_sy),
+                                        "width": float((tr.x1 - tr.x0) * t_sx),
+                                        "height": float((tr.y1 - tr.y0) * t_sy),
+                                        "xPts": float(tr.x0),
+                                        "yPts": float(tr.y0),
+                                        "widthPts": float(tr.x1 - tr.x0),
+                                        "heightPts": float(tr.y1 - tr.y0),
+                                        "label": f"Terminal Ledger PKR {previous_balance:,.2f}",
+                                        "color": "#dc2626",
+                                    }
+                                )
+                            else:
+                                p_w = meta_term.widthPx if meta_term else 1240.0
+                                p_h = meta_term.heightPx if meta_term else 1755.0
+                                await tx.boundingbox.create(
+                                    data={
+                                        "evidenceItem": {"connect": {"id": finding.id}},
+                                        "pageNumber": last_page_num,
+                                        "x": 50.0,
+                                        "y": float(p_h - 220.0),
+                                        "width": float(p_w - 100.0),
+                                        "height": 45.0,
+                                        "label": f"Terminal Ledger PKR {previous_balance:,.2f} (Page {last_page_num})",
+                                        "color": "#dc2626",
+                                    }
+                                )
 
                         stage_findings.append({
                             "id": finding.id,
@@ -1620,6 +1698,19 @@ async def process_financial(
                     if diff_macro > Decimal("0.01"):
                         discrepancy = stated_closing - expected_closing
 
+                        sum_rects = []
+                        target_sum_page = 0
+                        for p_i in range(len(pdf_doc)):
+                            sum_rects = (
+                                pdf_doc[p_i].search_for("Closing Balance")
+                                or pdf_doc[p_i].search_for("Total Credit")
+                                or pdf_doc[p_i].search_for("Total Debit")
+                            )
+                            if sum_rects:
+                                target_sum_page = p_i
+                                break
+                        summary_page_num = target_sum_page + 1
+
                         finding = await tx.evidenceitem.create(
                             data={
                                 "document": {"connect": {"id": doc.id}},
@@ -1638,37 +1729,26 @@ async def process_financial(
                                     f"Discrepancy: PKR {discrepancy:+,.2f}. This proves forged or tampered summary figures."
                                 ),
                                 "isDeterministic": True,
-                                "pageNumber": 1,
+                                "pageNumber": summary_page_num,
                                 "expectedValue": f"PKR {expected_closing:,.2f}",
                                 "actualValue": f"PKR {stated_closing:,.2f}",
                                 "discrepancy": f"PKR {discrepancy:+,.2f}",
                                 "technicalDetails": Json({
+                                    "anchor_type": "STATEMENT_SUMMARY",
                                     "stated_opening": str(stated_opening),
                                     "stated_credits": str(stated_credits),
                                     "stated_debits": str(stated_debits),
                                     "stated_closing": str(stated_closing),
                                     "expected_closing": str(expected_closing),
                                     "discrepancy": str(discrepancy),
+                                    "summary_page": summary_page_num,
                                 }),
                             }
                         )
 
-                        # Bounding box on summary
-                        sum_rects = []
-                        target_sum_page = 0
-                        for p_i in range(len(pdf_doc)):
-                            sum_rects = (
-                                pdf_doc[p_i].search_for("Closing Balance")
-                                or pdf_doc[p_i].search_for("Total Credit")
-                                or pdf_doc[p_i].search_for("Total Debit")
-                            )
-                            if sum_rects:
-                                target_sum_page = p_i
-                                break
-
                         if sum_rects:
                             r = sum_rects[0]
-                            meta = page_meta_map.get(target_sum_page + 1)
+                            meta = page_meta_map.get(summary_page_num)
                             sx = (meta.widthPx / meta.widthPts) if (meta and meta.widthPts) else (150.0 / 72.0)
                             sy = (meta.heightPx / meta.heightPts) if (meta and meta.heightPts) else (150.0 / 72.0)
                             w_pts = r.x1 - r.x0
@@ -1676,7 +1756,7 @@ async def process_financial(
                             await tx.boundingbox.create(
                                 data={
                                     "evidenceItem": {"connect": {"id": finding.id}},
-                                    "pageNumber": target_sum_page + 1,
+                                    "pageNumber": summary_page_num,
                                     "x": float(r.x0 * sx),
                                     "y": float(r.y0 * sy),
                                     "width": float(w_pts * sx),
@@ -1694,7 +1774,7 @@ async def process_financial(
                             "id": finding.id,
                             "rule_id": "RULE_PK_STATEMENT_SUMMARY_TAMPER",
                             "severity": finding.severity,
-                            "page": 1,
+                            "page": summary_page_num,
                             "title": finding.title,
                         })
 
@@ -1729,7 +1809,10 @@ async def process_financial(
                                     "expectedValue": aml_f.get("expected_value"),
                                     "actualValue": aml_f.get("actual_value"),
                                     "discrepancy": aml_f.get("discrepancy"),
-                                    "technicalDetails": Json(aml_f.get("technical_details", {})),
+                                    "technicalDetails": Json({
+                                        **aml_f.get("technical_details", {}),
+                                        "anchor_type": "DOCUMENT_HEADER",
+                                    }),
                                 }
                             )
                             stage_findings.append({
@@ -1800,7 +1883,12 @@ async def process_financial(
                                             "expectedValue": "Valid Pakistani CNIC (Province Code 1-8)",
                                             "actualValue": cnic_cand,
                                             "discrepancy": err,
-                                            "technicalDetails": Json({"cnic": cnic_cand, "error": err, "statutory_reference": "NADRA Ordinance 2000 Section 30"}),
+                                            "technicalDetails": Json({
+                                                "anchor_type": "DOCUMENT_HEADER",
+                                                "cnic": cnic_cand,
+                                                "error": err,
+                                                "statutory_reference": "NADRA Ordinance 2000 Section 30",
+                                            }),
                                         }
                                     )
                                     stage_findings.append({
@@ -1836,6 +1924,7 @@ async def process_financial(
                                                 "actualValue": f"CNIC check digit '{struct_res['check_digit']}' ({struct_res['gender_parity']})",
                                                 "discrepancy": parity_reason,
                                                 "technicalDetails": Json({
+                                                    "anchor_type": "DOCUMENT_HEADER",
                                                     "cnic": cnic_cand,
                                                     "title_hint": customer_title_hint,
                                                     "parity_reason": parity_reason,

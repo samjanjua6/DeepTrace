@@ -1,13 +1,25 @@
 "use client";
 
-import React from "react";
-import { Cpu, Eye, FileSearch, Scale, CheckCircle2, Loader2, Sparkles } from "lucide-react";
+import React, { useState } from "react";
+import {
+  Cpu,
+  Eye,
+  FileSearch,
+  Scale,
+  CheckCircle2,
+  Loader2,
+  Sparkles,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface AgentStatusBadgeProps {
   isStreaming?: boolean;
   activeModel?: string;
   totalTokens?: number;
   className?: string;
+  defaultCollapsed?: boolean;
 }
 
 export function AgentStatusBadge({
@@ -15,7 +27,10 @@ export function AgentStatusBadge({
   activeModel = "Groq LLaMA-3.3 / Lead Investigator v1",
   totalTokens = 0,
   className = "",
+  defaultCollapsed = false,
 }: AgentStatusBadgeProps) {
+  const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
+
   const agents = [
     {
       id: "A1",
@@ -51,8 +66,78 @@ export function AgentStatusBadge({
     },
   ];
 
+  // Minimized compact state: single-line bar saving over 90px of vertical space
+  if (isCollapsed) {
+    return (
+      <div
+        className={cn(
+          "border border-ink-900 bg-paper-1 px-3 py-1.5 font-mono text-xs",
+          className
+        )}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-ink-900 text-paper-0 font-bold uppercase tracking-wider text-[10px]">
+              <Sparkles className="w-2.5 h-2.5 text-amber-400" />
+              SWARM
+            </div>
+            <div className="flex items-center gap-1.5 text-[10px] text-ink-700">
+              <span className="inline-flex items-center gap-1 text-emerald-800 font-medium">
+                <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                A1-A3 SYNCED
+              </span>
+              <span className="text-rule">|</span>
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 font-semibold",
+                  isStreaming ? "text-amber-800" : "text-ink-800"
+                )}
+              >
+                {isStreaming ? (
+                  <>
+                    <Loader2 className="w-2.5 h-2.5 animate-spin text-amber-600" />
+                    A4 SYNTHESIZING
+                  </>
+                ) : (
+                  <>
+                    <Cpu className="w-2.5 h-2.5 text-ink-600" />
+                    A4 READY
+                  </>
+                )}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 text-[10px]">
+            {totalTokens > 0 && (
+              <span className="text-ink-600 hidden sm:inline">
+                Tokens:{" "}
+                <strong className="text-ink-900 font-semibold">
+                  {totalTokens.toLocaleString()}
+                </strong>
+              </span>
+            )}
+            <span className="bg-paper-2 border border-rule px-1.5 py-0.5 text-ink-700 font-medium hidden md:inline text-[9px]">
+              {activeModel}
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsCollapsed(false)}
+              className="flex items-center gap-1 px-1.5 py-0.5 hover:bg-paper-2 border border-rule text-ink-700 hover:text-ink-900 font-bold uppercase text-[9px] transition-colors cursor-pointer"
+              title="Expand full specialist telemetry grid"
+            >
+              <span>Details</span>
+              <ChevronDown className="w-3 h-3" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Expanded state: full telemetry with minimize toggle
   return (
-    <div className={`border border-ink-900 bg-paper-1 p-3 font-mono text-xs ${className}`}>
+    <div className={cn("border border-ink-900 bg-paper-1 p-3 font-mono text-xs", className)}>
       {/* Header bar */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-rule pb-2 mb-3">
         <div className="flex items-center gap-2">
@@ -65,15 +150,27 @@ export function AgentStatusBadge({
           </span>
         </div>
 
-        <div className="flex items-center gap-3 text-[11px]">
+        <div className="flex items-center gap-2 text-[11px]">
           {totalTokens > 0 && (
             <span className="text-ink-600">
-              Session Tokens: <strong className="text-ink-900 font-semibold">{totalTokens.toLocaleString()}</strong>
+              Tokens:{" "}
+              <strong className="text-ink-900 font-semibold">
+                {totalTokens.toLocaleString()}
+              </strong>
             </span>
           )}
           <span className="bg-paper-2 border border-rule px-2 py-0.5 text-ink-700 font-medium">
             {activeModel}
           </span>
+          <button
+            type="button"
+            onClick={() => setIsCollapsed(true)}
+            className="flex items-center gap-1 px-1.5 py-0.5 hover:bg-paper-2 border border-rule text-ink-700 hover:text-ink-900 font-bold uppercase text-[9px] transition-colors cursor-pointer ml-1"
+            title="Minimize telemetry to expand chat area"
+          >
+            <span>Minimize</span>
+            <ChevronUp className="w-3 h-3" />
+          </button>
         </div>
       </div>
 

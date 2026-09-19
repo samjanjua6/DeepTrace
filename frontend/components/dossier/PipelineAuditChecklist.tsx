@@ -129,8 +129,8 @@ export function PipelineAuditChecklist({
               );
             if (st === "FAILED")
               return <span className="text-forensic-red">✕ FAILED</span>;
-            const hasFontAnom = evidence.some((e) =>
-              (e.ruleId || "").includes("FONT")
+            const hasFontAnom = evidence.some(
+              (e) => (e.ruleId || "").includes("FONT") && e.severity !== "INFO"
             );
             return (
               <span
@@ -280,12 +280,13 @@ export function PipelineAuditChecklist({
             }
             const hasMathAnom = evidence.some(
               (e) =>
-                e.category === "MATHEMATICAL_MISMATCH" ||
-                e.category === "MATH_RECONCILIATION_FAIL" ||
-                (e.ruleId || "").includes("MATH") ||
-                (e.ruleId || "").includes("BALANCE") ||
-                (e.ruleId || "").includes("LEDGER") ||
-                (e.ruleId || "").includes("HOLIDAY")
+                e.severity !== "INFO" &&
+                (e.category === "MATHEMATICAL_MISMATCH" ||
+                  e.category === "MATH_RECONCILIATION_FAIL" ||
+                  (e.ruleId || "").includes("MATH") ||
+                  (e.ruleId || "").includes("BALANCE") ||
+                  (e.ruleId || "").includes("LEDGER") ||
+                  (e.ruleId || "").includes("HOLIDAY"))
             );
             if (hasMathAnom) {
               return (
@@ -311,6 +312,16 @@ export function PipelineAuditChecklist({
               return (
                 <span className="text-forensic-green">
                   ✓ FBR §149 & NTN COMPLIANT
+                </span>
+              );
+            }
+            const hasBankTemplateVerified = evidence.some((e) =>
+              (e.ruleId || "").includes("RULE_BANK_TEMPLATE_VERIFIED")
+            );
+            if (hasBankTemplateVerified && isFinancial) {
+              return (
+                <span className="text-forensic-green">
+                  ✓ CBS TEMPLATE & STATUTORY CLEARED
                 </span>
               );
             }

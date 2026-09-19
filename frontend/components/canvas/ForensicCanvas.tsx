@@ -42,7 +42,9 @@ export function ForensicCanvas({
     let financial = 0;
     let visual = 0;
     let dates = 0;
-    for (const ev of evidence) {
+    const adverseEvidence = evidence.filter((e) => e.severity !== "INFO");
+
+    for (const ev of adverseEvidence) {
       const rId = (ev.ruleId || "").toUpperCase();
       const cat = (ev.category || "").toUpperCase();
       if (
@@ -72,7 +74,7 @@ export function ForensicCanvas({
       }
     }
     return {
-      all: evidence.length,
+      all: adverseEvidence.length,
       financial,
       visual,
       dates,

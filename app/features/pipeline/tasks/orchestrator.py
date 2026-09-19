@@ -35,9 +35,10 @@ async def _async_finalize(pipeline_run_id: str, org_id: str, investigation_id: s
         )
 
         risk = await tx.riskassessment.find_unique(where={"investigationId": investigation_id})
+        adverse_count = (risk.criticalCount + risk.highCount + risk.mediumCount + risk.lowCount) if risk else 0
         new_status = (
             "AWAITING_REVIEW"
-            if (risk and (risk.overallScore > 20 or risk.totalEvidenceCount > 0))
+            if (risk and (risk.overallScore > 20 or adverse_count > 0))
             else "REVIEWED"
         )
         await tx.investigation.update(

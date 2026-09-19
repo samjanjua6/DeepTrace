@@ -63,7 +63,14 @@ export function SplitLedgerEvidenceViewer({
 
     // Find row matching this evidence item's page and value
     const matchIdx = displayRows.findIndex((r) => {
-      if (r.pageNumber && targetEv.pageNumber && r.pageNumber !== targetEv.pageNumber) return false;
+      const evPages = targetEv.boundingBoxes?.map((b) => b.pageNumber) || [];
+      if (targetEv.pageNumber) evPages.push(targetEv.pageNumber);
+      if (targetEv.technicalDetails?.anchors) {
+        for (const a of targetEv.technicalDetails.anchors) {
+          if (a.pageNumber) evPages.push(a.pageNumber);
+        }
+      }
+      if (r.pageNumber && evPages.length > 0 && !evPages.includes(r.pageNumber)) return false;
       const actualVal = (targetEv.actualValue || "").replace(/[^0-9.]/g, "");
       const recBal = String(r.recordedBalance);
       const disc = String(Math.abs(r.discrepancy));
@@ -82,10 +89,11 @@ export function SplitLedgerEvidenceViewer({
   const typographyFindings = useMemo(() => {
     return evidence.filter(
       (e) =>
-        e.category === "FONT_BASELINE_INCONSISTENCY" ||
-        (e.ruleId || "").includes("FONT") ||
-        (e.ruleId || "").includes("BASELINE") ||
-        (e.ruleId || "").includes("TEMPLATE_UNAUTHORIZED_FONT")
+        e.severity !== "INFO" &&
+        (e.category === "FONT_BASELINE_INCONSISTENCY" ||
+          (e.ruleId || "").includes("FONT") ||
+          (e.ruleId || "").includes("BASELINE") ||
+          (e.ruleId || "").includes("TEMPLATE_UNAUTHORIZED_FONT"))
     );
   }, [evidence]);
 
@@ -93,11 +101,12 @@ export function SplitLedgerEvidenceViewer({
   const mathFindings = useMemo(() => {
     return evidence.filter(
       (e) =>
-        e.category === "MATHEMATICAL_MISMATCH" ||
-        e.category === "MATH_RECONCILIATION_FAIL" ||
-        (e.ruleId || "").includes("BALANCE") ||
-        (e.ruleId || "").includes("LEDGER") ||
-        (e.ruleId || "").includes("MATH")
+        e.severity !== "INFO" &&
+        (e.category === "MATHEMATICAL_MISMATCH" ||
+          e.category === "MATH_RECONCILIATION_FAIL" ||
+          (e.ruleId || "").includes("BALANCE") ||
+          (e.ruleId || "").includes("LEDGER") ||
+          (e.ruleId || "").includes("MATH"))
     );
   }, [evidence]);
 
@@ -144,7 +153,14 @@ export function SplitLedgerEvidenceViewer({
 
     // If row is tampered or has math discrepancy, find corresponding evidence item
     const matchingEv = mathFindings.find((e) => {
-      if (row.pageNumber && e.pageNumber && row.pageNumber !== e.pageNumber) return false;
+      const evPages = e.boundingBoxes?.map((b) => b.pageNumber) || [];
+      if (e.pageNumber) evPages.push(e.pageNumber);
+      if (e.technicalDetails?.anchors) {
+        for (const a of e.technicalDetails.anchors) {
+          if (a.pageNumber) evPages.push(a.pageNumber);
+        }
+      }
+      if (row.pageNumber && evPages.length > 0 && !evPages.includes(row.pageNumber)) return false;
       return true;
     });
 

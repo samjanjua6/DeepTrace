@@ -122,9 +122,11 @@ async def process_evidence_fusion(
                                     if min_area > 0 and (inter / min_area) >= 0.15:
                                         splicing_synergy_pages.add(f_item.pageNumber)
 
-            # Group by category
+            # Group by category (only adverse findings contribute to fraud signals and co-occurrence synergy)
             category_groups: dict[str, list[Any]] = {}
             for item in evidence_items:
+                if item.severity == "INFO" or (item.riskPoints or 0) == 0:
+                    continue
                 cat = item.category
                 category_groups.setdefault(cat, []).append(item)
 

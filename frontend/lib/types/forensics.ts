@@ -13,7 +13,7 @@ export type PipelineStatus =
   | "FAILED"
   | "CANCELLED";
 
-export type FindingSeverity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+export type FindingSeverity = "INFO" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
 export interface BoundingBox {
   id: string;
@@ -31,6 +31,25 @@ export interface BoundingBox {
   color?: string;
 }
 
+export type AnchorType =
+  | "DOCUMENT_METADATA"
+  | "TABLE_ROW"
+  | "PAGE_REGION"
+  | "DOCUMENT_HEADER"
+  | "MULTI_PAGE_SPAN"
+  | "STATEMENT_SUMMARY"
+  | "LEDGER_TERMINAL";
+
+export interface EvidenceAnchor {
+  id?: string;
+  type: AnchorType | string;
+  pageNumber?: number | null;
+  pageEnd?: number | null;
+  rowNumber?: number | null;
+  label: string;
+  bboxId?: string;
+}
+
 export interface EvidenceItem {
   id: string;
   documentId: string;
@@ -43,6 +62,8 @@ export interface EvidenceItem {
   description: string;
   isDeterministic: boolean;
   pageNumber?: number;
+  anchorType?: AnchorType | string;
+  anchors?: EvidenceAnchor[];
   expectedValue?: string;
   actualValue?: string;
   discrepancy?: string;

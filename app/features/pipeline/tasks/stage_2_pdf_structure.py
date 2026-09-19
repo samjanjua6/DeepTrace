@@ -140,11 +140,12 @@ async def process_pdf_structure(
                                     "are compiled in a single pass with exactly 1 revision."
                                 ),
                                 "isDeterministic": True,
-                                "pageNumber": 1,
+                                "pageNumber": None,
                                 "expectedValue": "1 revision (single %%EOF)",
                                 "actualValue": f"{eof_count} revisions",
                                 "discrepancy": f"+{eof_count - 1} unauthorized revision(s)",
                                 "technicalDetails": Json({
+                                    "anchor_type": "DOCUMENT_METADATA",
                                     "eof_count": eof_count,
                                     "file_size_bytes": len(file_bytes),
                                 }),
@@ -154,6 +155,7 @@ async def process_pdf_structure(
                             "id": finding.id,
                             "rule_id": "RULE_PDF_INCREMENTAL_SAVE",
                             "severity": finding.severity,
+                            "page": None,
                             "title": finding.title,
                         })
 
@@ -183,11 +185,12 @@ async def process_pdf_structure(
                                             "core banking engines (e.g., JasperReports, Oracle FLEXCUBE, iText) and never consumer editors."
                                         ),
                                         "isDeterministic": True,
-                                        "pageNumber": 1,
+                                        "pageNumber": None,
                                         "expectedValue": "Core Banking Reporting Engine (JasperReports/Oracle/iText)",
                                         "actualValue": tool_name,
                                         "discrepancy": f"Generated or edited with {tool_name}",
                                         "technicalDetails": Json({
+                                            "anchor_type": "DOCUMENT_METADATA",
                                             "producer": producer,
                                             "creator": creator,
                                             "author": author,
@@ -199,6 +202,7 @@ async def process_pdf_structure(
                                     "id": finding.id,
                                     "rule_id": "RULE_PDF_TAMPER_PRODUCER",
                                     "severity": finding.severity,
+                                    "page": None,
                                     "title": finding.title,
                                 })
                                 break
@@ -225,11 +229,12 @@ async def process_pdf_structure(
                                             "Legitimate bank statements are generated in real-time with synchronized timestamps."
                                         ),
                                         "isDeterministic": True,
-                                        "pageNumber": 1,
+                                        "pageNumber": None,
                                         "expectedValue": creation_dt.isoformat(),
                                         "actualValue": mod_dt.isoformat(),
                                         "discrepancy": f"{hours_diff} hours modification gap",
                                         "technicalDetails": Json({
+                                            "anchor_type": "DOCUMENT_METADATA",
                                             "creation_date": creation_dt.isoformat(),
                                             "mod_date": mod_dt.isoformat(),
                                             "delta_seconds": delta_seconds,
@@ -240,6 +245,7 @@ async def process_pdf_structure(
                                     "id": finding.id,
                                     "rule_id": "RULE_METADATA_TIMESTAMP_DIVERGENCE",
                                     "severity": finding.severity,
+                                    "page": None,
                                     "title": finding.title,
                                 })
 
@@ -265,11 +271,14 @@ async def process_pdf_structure(
                                     "title": sf["title"],
                                     "description": sf["description"],
                                     "isDeterministic": True,
-                                    "pageNumber": 1,
+                                    "pageNumber": 1 if sf["severity"] == "CRITICAL" else None,
                                     "expectedValue": sf.get("expected_value"),
                                     "actualValue": sf.get("actual_value"),
                                     "discrepancy": sf.get("discrepancy"),
-                                    "technicalDetails": Json(sf.get("technical_details", {})),
+                                    "technicalDetails": Json({
+                                        **sf.get("technical_details", {}),
+                                        "anchor_type": "DOCUMENT_METADATA",
+                                    }),
                                 }
                             )
                             if sf["severity"] == "CRITICAL":

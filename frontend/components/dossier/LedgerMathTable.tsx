@@ -23,6 +23,7 @@ interface LedgerMathTableProps {
   evidence?: EvidenceItem[];
   onSelectRow?: (row: LedgerRow) => void;
   onSelectEvidence?: (evidenceId: string) => void;
+  onFocusCanvas?: (pageNumber: number) => void;
 }
 
 export function LedgerMathTable({
@@ -30,6 +31,7 @@ export function LedgerMathTable({
   evidence,
   onSelectRow,
   onSelectEvidence,
+  onFocusCanvas,
 }: LedgerMathTableProps) {
   const [currentPage, setCurrentPage] = React.useState(1);
   const pageSize = 25;
@@ -74,16 +76,27 @@ export function LedgerMathTable({
             {/* Opening Balance Card */}
             {openingMismatch ? (
               <div
-                onClick={() => onSelectEvidence?.(openingMismatch.id)}
+                onClick={() => {
+                  onSelectEvidence?.(openingMismatch.id);
+                  onFocusCanvas?.(openingMismatch.pageNumber || 1);
+                }}
                 className="bg-forensic-red/5 border border-forensic-red/40 p-3 hover:bg-forensic-red/10 cursor-pointer transition-colors space-y-2 group"
               >
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-forensic-red uppercase text-[10px] tracking-wider">
                     Opening Balance Discrepancy
                   </span>
-                  <span className="text-[10px] text-forensic-red flex items-center gap-1 group-hover:underline font-medium">
-                    Locate on PDF <ArrowRight className="w-3 h-3" />
-                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectEvidence?.(openingMismatch.id);
+                      onFocusCanvas?.(openingMismatch.pageNumber || 1);
+                    }}
+                    className="text-[10px] bg-forensic-red/15 hover:bg-forensic-red text-forensic-red hover:text-white px-2 py-0.5 rounded-sm transition-colors flex items-center gap-1 font-bold"
+                  >
+                    Locate P.{openingMismatch.pageNumber || 1} <ArrowRight className="w-3 h-3" />
+                  </button>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t border-forensic-red/20">
                   <div>
@@ -119,16 +132,42 @@ export function LedgerMathTable({
             {/* Closing Balance Card */}
             {closingMismatch ? (
               <div
-                onClick={() => onSelectEvidence?.(closingMismatch.id)}
+                onClick={() => {
+                  onSelectEvidence?.(closingMismatch.id);
+                  onFocusCanvas?.(closingMismatch.pageNumber || 23);
+                }}
                 className="bg-forensic-red/5 border border-forensic-red/40 p-3 hover:bg-forensic-red/10 cursor-pointer transition-colors space-y-2 group"
               >
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-forensic-red uppercase text-[10px] tracking-wider">
                     Closing Balance Discrepancy
                   </span>
-                  <span className="text-[10px] text-forensic-red flex items-center gap-1 group-hover:underline font-medium">
-                    Locate on PDF <ArrowRight className="w-3 h-3" />
-                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectEvidence?.(closingMismatch.id);
+                        onFocusCanvas?.(1);
+                      }}
+                      className="text-[9px] bg-forensic-red/15 hover:bg-forensic-red text-forensic-red hover:text-white px-1.5 py-0.5 rounded-sm transition-colors font-bold cursor-pointer"
+                      title="Jump to Stated Closing Balance on Page 1 Summary"
+                    >
+                      P.1 Stated ↗
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectEvidence?.(closingMismatch.id);
+                        onFocusCanvas?.(closingMismatch.pageNumber || 23);
+                      }}
+                      className="text-[9px] bg-forensic-red/15 hover:bg-forensic-red text-forensic-red hover:text-white px-1.5 py-0.5 rounded-sm transition-colors font-bold cursor-pointer"
+                      title="Jump to Final Transaction Balance on Page 23 Ledger Terminal"
+                    >
+                      P.{closingMismatch.pageNumber || 23} Terminal ↗
+                    </button>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t border-forensic-red/20">
                   <div>

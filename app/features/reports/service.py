@@ -168,12 +168,15 @@ async def generate_report(db: Prisma, investigation_id: str, options: dict | Non
     curr_y += 15
     stat_rect = pymupdf.Rect(40, curr_y, 555, curr_y + 45)
     p1.draw_rect(stat_rect, color=(0.85, 0.85, 0.85), fill=(1, 1, 1))
-    crit = risk.criticalCount if risk else 0
-    hi = risk.highCount if risk else 0
-    med = risk.mediumCount if risk else 0
-    tot = len(evidence_items)
-    p1.insert_text((55, curr_y + 18), f"Total Verified Findings: {tot}", fontsize=8.5, fontname="hebo")
-    p1.insert_text((55, curr_y + 34), f"Critical: {crit}  |  High: {hi}  |  Medium: {med}  |  Low: {tot - crit - hi - med}", fontsize=8, fontname="helv")
+    crit = risk.criticalCount if risk else sum(1 for e in evidence_items if e.severity == "CRITICAL")
+    hi = risk.highCount if risk else sum(1 for e in evidence_items if e.severity == "HIGH")
+    med = risk.mediumCount if risk else sum(1 for e in evidence_items if e.severity == "MEDIUM")
+    low = risk.lowCount if risk else sum(1 for e in evidence_items if e.severity == "LOW")
+    info_count = risk.infoCount if (risk and hasattr(risk, 'infoCount') and risk.infoCount is not None) else sum(1 for e in evidence_items if e.severity == "INFO")
+    adverse_tot = crit + hi + med + low
+
+    p1.insert_text((55, curr_y + 18), f"Forensic Deficiencies: {adverse_tot}  |  Verified Authentic Controls: {info_count}", fontsize=8.5, fontname="hebo")
+    p1.insert_text((55, curr_y + 34), f"Critical: {crit}  |  High: {hi}  |  Medium: {med}  |  Low: {low}", fontsize=8, fontname="helv")
 
     curr_y += 55
     has_nacta = any("NACTA" in (it.ruleId or "") for it in evidence_items)
@@ -238,6 +241,28 @@ async def generate_report(db: Prisma, investigation_id: str, options: dict | Non
     p1.draw_rect(pymupdf.Rect(40, curr_y, 555, curr_y + 18), color=fbr_col, fill=None, width=0.8)
     p1.insert_text((50, curr_y + 12), fbr_status_str, fontsize=7.0, fontname="hebo", color=fbr_col)
 
+    curr_y += 22
+    has_bank_template_fail = any(
+        ("RULE_BANK_TEMPLATE_COLUMN_MISALIGNMENT" in (it.ruleId or "")
+         or "RULE_BANK_TEMPLATE_DISCLAIMER_MISSING" in (it.ruleId or "")
+         or "RULE_BANK_TEMPLATE_UNAUTHORIZED_FONT" in (it.ruleId or ""))
+        for it in evidence_items
+    )
+    has_bank_template_verified = any("RULE_BANK_TEMPLATE_VERIFIED" in (it.ruleId or "") for it in evidence_items)
+
+    if has_bank_template_fail:
+        bank_status_str = "CBS BANKING TEMPLATE: TAMPERING DETECTED (Column Grid Misalignment / SBP Footers Missing)"
+        bank_col = (0.7, 0.1, 0.1)
+    elif has_bank_template_verified:
+        bank_status_str = "CBS BANKING TEMPLATE: VERIFIED AUTHENTIC (Canonical Grid Alignment, 0 pt Drift & SBP Compliance)"
+        bank_col = (0.05, 0.45, 0.15)
+    else:
+        bank_status_str = "CBS BANKING TEMPLATE: Standard Institutional Reporting Format Audited"
+        bank_col = (0.3, 0.35, 0.45)
+
+    p1.draw_rect(pymupdf.Rect(40, curr_y, 555, curr_y + 18), color=bank_col, fill=None, width=0.8)
+    p1.insert_text((50, curr_y + 12), bank_status_str, fontsize=7.0, fontname="hebo", color=bank_col)
+
     curr_y += 24
     # Regulatory statement snippet on Page 1
     p1.insert_text(
@@ -245,7 +270,6 @@ async def generate_report(db: Prisma, investigation_id: str, options: dict | Non
         "STATUTORY RECOGNITION: ETO 2002 §3 & §4  |  PECA 2016 §33/§34  |  SBP BPRD 1/2021  |  NADRA Ord 2000 §30  |  ITO 2001 §149/§181",
         fontsize=6.8,
         fontname="helv",
-        color=(0.3, 0.3, 0.3),
     )
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -259,28 +283,71 @@ async def generate_report(db: Prisma, investigation_id: str, options: dict | Non
     if not evidence_items:
         p2.insert_text((40, p2_y), "No tampering or anomalous forensic indicators detected. Document verified as clean.", fontsize=9, fontname="helv")
     else:
-        for idx, it in enumerate(evidence_items[:8], 1):
+        adverse_items = [it for it in evidence_items if it.severity != "INFO"]
+        verified_items = [it for it in evidence_items if it.severity == "INFO"]
+        ordered_items = [(idx, it, True) for idx, it in enumerate(adverse_items[:6], 1)] + [
+            (idx, it, False) for idx, it in enumerate(verified_items[:3], 1)
+        ]
+
+        for idx, it, is_adverse in ordered_items[:8]:
             sev = it.severity or "UNKNOWN"
             if sev == "CRITICAL":
                 badge_col, tag_col = (0.86, 0.15, 0.15), (0.7, 0.1, 0.1)
+                tag_label = f"[{sev}] {it.ruleId or 'RULE'}"
+                heading = f"#{idx}  {it.title or 'Forensic Finding'}"
             elif sev == "HIGH":
                 badge_col, tag_col = (0.9, 0.4, 0.1), (0.75, 0.3, 0.0)
+                tag_label = f"[{sev}] {it.ruleId or 'RULE'}"
+                heading = f"#{idx}  {it.title or 'Forensic Finding'}"
             elif sev == "MEDIUM":
                 badge_col, tag_col = (0.9, 0.7, 0.1), (0.6, 0.45, 0.0)
-            else:
+                tag_label = f"[{sev}] {it.ruleId or 'RULE'}"
+                heading = f"#{idx}  {it.title or 'Forensic Finding'}"
+            elif sev == "LOW":
                 badge_col, tag_col = (0.2, 0.5, 0.8), (0.1, 0.3, 0.6)
+                tag_label = f"[{sev}] {it.ruleId or 'RULE'}"
+                heading = f"#{idx}  {it.title or 'Forensic Finding'}"
+            else:
+                # INFO / Passing Verification Check
+                badge_col, tag_col = (0.05, 0.55, 0.20), (0.05, 0.45, 0.15)
+                tag_label = f"[VERIFIED AUTHENTIC] {it.ruleId or 'RULE'}"
+                heading = f"✓ {it.title or 'Verified Authentic Check'}"
 
             card_rect = pymupdf.Rect(40, p2_y, 555, p2_y + 80)
             p2.draw_rect(card_rect, color=(0.85, 0.85, 0.85), fill=(0.99, 0.99, 0.99), width=0.8)
             p2.draw_rect(pymupdf.Rect(40, p2_y, 44, p2_y + 80), color=badge_col, fill=badge_col)
 
-            p2.insert_text((55, p2_y + 18), f"#{idx}  {it.title or 'Forensic Finding'}", fontsize=8.5, fontname="hebo", color=(0.1, 0.1, 0.1))
-            p2.insert_text((440, p2_y + 18), f"[{sev}] {it.ruleId or 'RULE'}", fontsize=7.5, fontname="hebo", color=tag_col)
+            p2.insert_text((55, p2_y + 18), heading, fontsize=8.5, fontname="hebo", color=(0.1, 0.1, 0.1))
+            p2.insert_text((420, p2_y + 18), tag_label, fontsize=7.2, fontname="hebo", color=tag_col)
 
-            desc = it.description or "Deterministic rule violation detected."
+            desc = it.description or ("Deterministic rule violation detected." if is_adverse else "Statutory verification confirmed authentic.")
             p2.insert_textbox(pymupdf.Rect(55, p2_y + 24, 545, p2_y + 55), desc, fontsize=7.5, fontname="helv", color=(0.2, 0.2, 0.2))
 
-            meta_str = f"Page: {it.pageNumber or 1}  |  Category: {it.category or 'FORENSIC'}  |  Risk Points: {it.riskPoints or 0}"
+            t_details = it.technicalDetails if isinstance(it.technicalDetails, dict) else {}
+            anchor_type = t_details.get("anchor_type")
+            r_id = (it.ruleId or "").upper()
+            cat = (it.category or "").upper()
+            if (
+                anchor_type == "DOCUMENT_METADATA"
+                or cat == "METADATA_TIMESTAMP_MISMATCH"
+                or "METADATA" in r_id
+                or "INCREMENTAL" in r_id
+                or (not it.pageNumber and not it.boundingBoxes)
+            ):
+                loc_str = "Document Metadata (PDF Trailer / XMP)"
+            elif anchor_type == "MULTI_PAGE_SPAN" or (t_details.get("last_page") and t_details.get("last_page") > 1):
+                p_start = t_details.get("page_start", 1)
+                p_end = t_details.get("last_page") or t_details.get("page_end", 23)
+                loc_str = f"Pages {p_start}–{p_end} (Multi-Page Ledger)"
+            elif anchor_type == "DOCUMENT_HEADER" or "IBAN" in r_id or "CNIC" in r_id or "AML" in r_id:
+                loc_str = f"Page {it.pageNumber or 1} (Account Header)"
+            elif it.pageNumber:
+                loc_str = f"Page {it.pageNumber}"
+            else:
+                loc_str = "Document Level"
+
+            status_type = "Adverse Anomaly" if is_adverse else "Certified Authentic Baseline"
+            meta_str = f"Location: {loc_str}  |  Classification: {status_type}  |  Risk Points: {it.riskPoints or 0}"
             p2.insert_text((55, p2_y + 70), meta_str, fontsize=6.8, fontname="helv", color=(0.45, 0.45, 0.45))
 
             p2_y += 88

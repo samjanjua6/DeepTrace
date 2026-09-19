@@ -26,7 +26,8 @@ class VisualForensicAgent(BaseForensicAgent):
                 seen_ids.add(it_id)
                 visual_findings.append(it)
 
-        anomalies_count = len(visual_findings)
+        adverse_findings = [it for it in visual_findings if it.get("severity") != "INFO"]
+        anomalies_count = len(adverse_findings)
         citations = [it.get("ruleId") or it.get("rule_id", "") for it in visual_findings]
         citations = [c for c in citations if c]
 

@@ -33,7 +33,7 @@ class SemanticPKFinancialAgent(BaseForensicAgent):
         # Exclude benign/cleared verification markers from anomalies count
         adverse_findings = [
             it for it in financial_findings
-            if it.get("severity") in ("CRITICAL", "HIGH", "MEDIUM")
+            if it.get("severity") in ("CRITICAL", "HIGH", "MEDIUM", "LOW")
         ]
         anomalies_count = len(adverse_findings)
         citations = [it.get("ruleId") or it.get("rule_id", "") for it in financial_findings]

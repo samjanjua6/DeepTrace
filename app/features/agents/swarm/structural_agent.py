@@ -28,7 +28,8 @@ class StructuralForensicAgent(BaseForensicAgent):
                 seen_ids.add(it_id)
                 structural_findings.append(it)
 
-        anomalies_count = len(structural_findings)
+        adverse_findings = [it for it in structural_findings if it.get("severity") != "INFO"]
+        anomalies_count = len(adverse_findings)
         citations = [it.get("ruleId") or it.get("rule_id", "") for it in structural_findings]
         citations = [c for c in citations if c]
 

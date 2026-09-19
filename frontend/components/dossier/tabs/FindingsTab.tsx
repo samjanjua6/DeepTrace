@@ -9,28 +9,57 @@ interface FindingsTabProps {
   evidence: EvidenceItem[];
   activeEvidenceId: string | null;
   onSelectEvidence: (id: string | null) => void;
+  onFocusCanvas?: (pageNumber: number) => void;
 }
 
 export function FindingsTab({
   evidence,
   activeEvidenceId,
   onSelectEvidence,
+  onFocusCanvas,
 }: FindingsTabProps) {
-  if (evidence.length > 0) {
+  const adverseFindings = evidence.filter((e) => e.severity !== "INFO");
+  const verifiedChecks = evidence.filter((e) => e.severity === "INFO");
+
+  if (adverseFindings.length > 0) {
     return (
-      <div className="space-y-3">
-        <div className="flex items-center justify-between font-mono text-xs text-ink-500">
-          <span>DETECTED ANOMALIES ({evidence.length})</span>
-          <span className="text-[10px]">CLICK OR HOVER TO SYNC CANVAS</span>
+      <div className="space-y-4">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between font-mono text-xs text-ink-500">
+            <span>DETECTED ANOMALIES ({adverseFindings.length})</span>
+            <span className="text-[10px]">CLICK OR HOVER TO SYNC CANVAS</span>
+          </div>
+          {adverseFindings.map((item) => (
+            <AnomalyCard
+              key={item.id}
+              item={item}
+              isSelected={activeEvidenceId === item.id}
+              onSelect={onSelectEvidence}
+              onFocusCanvas={onFocusCanvas}
+            />
+          ))}
         </div>
-        {evidence.map((item) => (
-          <AnomalyCard
-            key={item.id}
-            item={item}
-            isSelected={activeEvidenceId === item.id}
-            onSelect={onSelectEvidence}
-          />
-        ))}
+
+        {verifiedChecks.length > 0 && (
+          <div className="space-y-3 pt-3 border-t border-rule">
+            <div className="flex items-center justify-between font-mono text-xs text-emerald-800">
+              <span className="font-bold flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                VERIFIED AUTHENTIC SPECIFICATIONS ({verifiedChecks.length})
+              </span>
+              <span className="text-[10px] text-ink-500">CANONICAL BASELINES SATISFIED</span>
+            </div>
+            {verifiedChecks.map((item) => (
+              <AnomalyCard
+                key={item.id}
+                item={item}
+                isSelected={activeEvidenceId === item.id}
+                onSelect={onSelectEvidence}
+                onFocusCanvas={onFocusCanvas}
+              />
+            ))}
+          </div>
+        )}
       </div>
     );
   }

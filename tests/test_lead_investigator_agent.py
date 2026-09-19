@@ -260,6 +260,66 @@ class TestLeadInvestigatorAgent(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Straight-Through Approval", res["english_summary"])
         self.assertIn("براہِ راست منظوری", res["urdu_summary"])
 
+    async def test_passing_verification_check_segregation(self):
+        """Test that passing checks (e.g. RULE_BANK_TEMPLATE_VERIFIED) are not listed as deficiencies."""
+        manifest_with_passing_check = {
+            "investigation": {
+                "id": "inv-test-seg",
+                "caseNumber": "DT-2026-TEST",
+                "title": "Audit With Passing CBS Check",
+            },
+            "risk_assessment": {
+                "overallScore": 65,
+                "riskTier": "HIGH",
+                "actionDirective": "MANUAL_SUPERVISOR_REVIEW",
+            },
+            "evidence_items": [
+                {
+                    "id": "ev-adverse-1",
+                    "category": "MATHEMATICAL_MISMATCH",
+                    "severity": "HIGH",
+                    "ruleId": "RULE_PK_LEDGER_RECONCILIATION_FAIL",
+                    "title": "Ledger Arithmetic Discrepancy",
+                    "description": "Row 2 balance formula mismatch",
+                    "expectedValue": "PKR 100,000",
+                    "actualValue": "PKR 120,000",
+                    "discrepancy": "PKR 20,000",
+                    "pageNumber": 1,
+                },
+                {
+                    "id": "ev-passing-cbs",
+                    "category": "TRANSACTION_FORMAT_VIOLATION",
+                    "severity": "INFO",
+                    "ruleId": "RULE_BANK_TEMPLATE_VERIFIED",
+                    "title": "CBS Reporting Template Verified (Meezan Bank Limited)",
+                    "description": "Canonical Temenos T24 layout confirmed with 0 pt column drift across 5 columns, 1 fonts verified",
+                    "expectedValue": "Canonical Temenos T24 Grid",
+                    "actualValue": "100% Match (MEZN-001)",
+                    "discrepancy": "0 pt column drift - Certified Authentic",
+                    "pageNumber": 1,
+                },
+            ],
+        }
+        agent = LeadInvestigatorAgent(manifest_with_passing_check)
+        res = await agent.analyze()
+
+        # Deficiencies section must contain adverse item
+        self.assertIn("Key Forensic Deficiencies Detected:", res["english_summary"])
+        self.assertIn("Ledger Arithmetic Discrepancy", res["english_summary"])
+
+        # Deficiencies section must NOT list CBS Reporting Template Verified as a deficiency
+        deficiencies_part = res["english_summary"].split("Key Forensic Deficiencies Detected:")[1]
+        if "Certified Authentic Controls:" in deficiencies_part:
+            deficiencies_part, controls_part = deficiencies_part.split("Certified Authentic Controls:")
+            self.assertIn("CBS Reporting Template Verified", controls_part)
+        self.assertNotIn("CBS Reporting Template Verified", deficiencies_part)
+
+        # Ensure no hallucinated font irregularity is added
+        self.assertNotIn("Font irregularity identified", res["english_summary"])
+
+        # Check credit_briefing list only includes adverse items
+        self.assertEqual(len(res["credit_briefing"]), 1)
+
     async def test_interactive_qa_history_service(self):
         """Test retrieving interactive QA history with sequence sorting."""
         from app.features.agents.service import get_interactive_qa_history

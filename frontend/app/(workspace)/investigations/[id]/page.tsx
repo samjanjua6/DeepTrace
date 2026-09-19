@@ -65,6 +65,11 @@ export default function InvestigationWorkspacePage() {
     getStageStatus,
   } = useInvestigationDocket(investigationId);
 
+  const adverseEvidenceCount = React.useMemo(
+    () => evidence.filter((e) => e.severity !== "INFO").length,
+    [evidence]
+  );
+
   if (isLoading) {
     return <DocketLoadingView documentType={documentType} />;
   }
@@ -195,13 +200,21 @@ export default function InvestigationWorkspacePage() {
                 risk?.actionDirective ?? "STRAIGHT_THROUGH_APPROVAL"
               }
               evidenceItems={evidence}
+              onFocusCanvas={(pageNum) => setFocusedPageNumber(pageNum)}
+              onSelectEvidence={(id) => {
+                setActiveEvidenceId(id);
+                const ev = evidence.find((e) => e.id === id);
+                if (ev && ev.pageNumber) {
+                  setFocusedPageNumber(ev.pageNumber);
+                }
+              }}
             />
 
             {/* Action Ribbon & Dynamic Domain-Aware Tabs */}
             <DossierActionRibbon
               activeTab={activeTab}
               onSelectTab={setActiveTab}
-              evidenceCount={evidence.length}
+              evidenceCount={adverseEvidenceCount}
               isFinancial={isFinancial}
               isIdentity={isIdentity}
               isTaxOrSalary={isTaxOrSalary}
@@ -219,7 +232,16 @@ export default function InvestigationWorkspacePage() {
               <FindingsTab
                 evidence={evidence}
                 activeEvidenceId={activeEvidenceId}
-                onSelectEvidence={setActiveEvidenceId}
+                onSelectEvidence={(id) => {
+                  setActiveEvidenceId(id);
+                  if (id) {
+                    const ev = evidence.find((e) => e.id === id);
+                    if (ev && ev.pageNumber) {
+                      setFocusedPageNumber(ev.pageNumber);
+                    }
+                  }
+                }}
+                onFocusCanvas={(pageNum) => setFocusedPageNumber(pageNum)}
               />
             )}
 
@@ -236,9 +258,19 @@ export default function InvestigationWorkspacePage() {
                         (e.ruleId || "").includes("BALANCE") ||
                         (e.ruleId || "").includes("LEDGER")
                     );
-                    if (mathEv) setActiveEvidenceId(mathEv.id);
+                    if (mathEv) {
+                      setActiveEvidenceId(mathEv.id);
+                      if (mathEv.pageNumber) setFocusedPageNumber(mathEv.pageNumber);
+                    }
                   }}
-                  onSelectEvidence={(id) => setActiveEvidenceId(id)}
+                  onSelectEvidence={(id) => {
+                    setActiveEvidenceId(id);
+                    const ev = evidence.find((e) => e.id === id);
+                    if (ev && ev.pageNumber) {
+                      setFocusedPageNumber(ev.pageNumber);
+                    }
+                  }}
+                  onFocusCanvas={(pageNum) => setFocusedPageNumber(pageNum)}
                 />
               </div>
             )}

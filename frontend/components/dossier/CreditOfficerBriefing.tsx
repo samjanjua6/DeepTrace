@@ -12,12 +12,15 @@ import {
   Sparkles,
   Info,
   Scale,
+  ExternalLink,
 } from "lucide-react";
-import { EvidenceItem } from "@/lib/types/forensics";
+import { EvidenceItem, EvidenceAnchor } from "@/lib/types/forensics";
 
 export interface CreditBriefingItem {
   page_number?: number;
   row_number?: number;
+  anchor_type?: string;
+  anchors?: EvidenceAnchor[];
   title: string;
   transaction_label?: string;
   expected_value?: string;
@@ -56,6 +59,8 @@ interface CreditOfficerBriefingProps {
   riskTier: string;
   actionDirective: string;
   evidenceItems: EvidenceItem[];
+  onFocusCanvas?: (pageNumber: number) => void;
+  onSelectEvidence?: (evidenceId: string) => void;
 }
 
 export function CreditOfficerBriefing({
@@ -64,6 +69,8 @@ export function CreditOfficerBriefing({
   riskTier,
   actionDirective,
   evidenceItems,
+  onFocusCanvas,
+  onSelectEvidence,
 }: CreditOfficerBriefingProps) {
   const [activeLang, setActiveLang] = useState<"en" | "ur">("en");
   const [copied, setCopied] = useState(false);
@@ -101,9 +108,12 @@ export function CreditOfficerBriefing({
   const isCriticalOrHigh = riskTier === "CRITICAL" || riskTier === "HIGH";
   const isMedium = riskTier === "MEDIUM";
 
+  const adverseEvidence = evidenceItems.filter((e) => e.severity !== "INFO");
+  const verifiedEvidence = evidenceItems.filter((e) => e.severity === "INFO");
+
   // Client-side deterministic fallback if API is not yet loaded or on sample exhibit
   const fallbackEnglishSummary =
-    overallScore > 0
+    overallScore > 0 && adverseEvidence.length > 0
       ? `CRITICAL BRIEFING FOR CREDIT UNDERWRITERS & LOAN APPROVAL OFFICERS:
 Action Directive: ${actionDirective.replace(
           /_/g,
@@ -112,26 +122,52 @@ Action Directive: ${actionDirective.replace(
 
 Key Forensic Deficiencies Detected:
 ` +
-        evidenceItems
+        adverseEvidence
           .slice(0, 6)
-          .map(
-            (it, idx) =>
-              `• Page ${it.pageNumber || 1}, Row ${idx + 1}: ${it.title}. ${
-                it.discrepancy ? `Discrepancy: ${it.discrepancy}.` : ""
-              } ${
-                it.description.toLowerCase().includes("font")
-                  ? "Font irregularity identified."
-                  : ""
-              }`
-          )
+          .map((it) => {
+            const hasFontAnomaly =
+              it.severity !== "INFO" &&
+              (it.category === "FONT_BASELINE_INCONSISTENCY" ||
+                (it.ruleId || "").includes("FONT") ||
+                Boolean(it.description.match(/([A-Za-z0-9_-]+)\s+instead/i)));
+            const details = [
+              it.discrepancy ? `Discrepancy: ${it.discrepancy}.` : "",
+              hasFontAnomaly ? "Font irregularity identified." : "",
+            ]
+              .filter(Boolean)
+              .join(" ");
+
+            const tech = it.technicalDetails || {};
+            const anchorType = it.anchorType || tech.anchor_type || (it.pageNumber ? "PAGE_REGION" : "DOCUMENT_METADATA");
+            let locStr = "Document Metadata";
+            if (anchorType === "MULTI_PAGE_SPAN") {
+              locStr = `Pages 1–${it.pageNumber || 23} (Summary vs Terminal Ledger)`;
+            } else if (anchorType === "DOCUMENT_HEADER" && it.pageNumber) {
+              locStr = `Page ${it.pageNumber} Header`;
+            } else if (tech.row_number && it.pageNumber) {
+              locStr = `Page ${it.pageNumber}, Row ${tech.row_number}`;
+            } else if (it.pageNumber) {
+              locStr = `Page ${it.pageNumber}`;
+            }
+            return `• [${locStr}]: ${it.title}.${details ? ` ${details}` : ""}`;
+          })
           .join("\n") +
+        (verifiedEvidence.length > 0
+          ? `\n\nCertified Authentic Controls:\n` +
+            verifiedEvidence
+              .map((it) => {
+                const loc = it.pageNumber ? `Page ${it.pageNumber}` : "Document Metadata";
+                return `✓ [${loc}]: ${it.title}. ${it.discrepancy || "Verified Authentic."}`;
+              })
+              .join("\n")
+          : "") +
         "\n\nCredit Risk Advisory: The financial figures in this statement have been artificially inflated or modified post-generation. Loan application should be halted immediately."
       : `EXECUTIVE BRIEFING FOR CREDIT OFFICERS:
 Verdict: ${riskTier} RISK (Score: ${overallScore}/100) — Straight-Through Approval.
 Forensic validation confirms 100% document authenticity across all pages. All transaction figures reconcile with the core banking ledger without font, visual, or mathematical anomalies. State Bank of Pakistan (SBP) IBAN validation passed.`;
 
   const fallbackUrduSummary =
-    overallScore > 0
+    overallScore > 0 && adverseEvidence.length > 0
       ? `کریڈٹ آفیسر اور لون انڈر رائٹر کے لیے فوری خلاصہ:
 سفارشی ہدایت: ${actionDirective.replace(
           /_/g,
@@ -140,15 +176,35 @@ Forensic validation confirms 100% document authenticity across all pages. All tr
 
 اہم فرانزک شواہد اور خامیاں:
 ` +
-        evidenceItems
+        adverseEvidence
           .slice(0, 6)
-          .map(
-            (it, idx) =>
-              `• صفحہ ${it.pageNumber || 1}، قطار ${idx + 1}: ${it.title}۔ ${
-                it.discrepancy ? `مالیاتی فرق: ${it.discrepancy}۔` : ""
-              }`
-          )
+          .map((it) => {
+            const tech = it.technicalDetails || {};
+            const anchorType = it.anchorType || tech.anchor_type || (it.pageNumber ? "PAGE_REGION" : "DOCUMENT_METADATA");
+            let locStr = "دستاویز میٹا ڈیٹا";
+            if (anchorType === "MULTI_PAGE_SPAN") {
+              locStr = `صفحات 1 تا ${it.pageNumber || 23} لیجر`;
+            } else if (anchorType === "DOCUMENT_HEADER" && it.pageNumber) {
+              locStr = `صفحہ ${it.pageNumber} ہیڈر`;
+            } else if (tech.row_number && it.pageNumber) {
+              locStr = `صفحہ ${it.pageNumber}، قطار ${tech.row_number}`;
+            } else if (it.pageNumber) {
+              locStr = `صفحہ ${it.pageNumber}`;
+            }
+            return `• [${locStr}]: ${it.title}۔ ${
+              it.discrepancy ? `مالیاتی فرق: ${it.discrepancy}۔` : ""
+            }`;
+          })
           .join("\n") +
+        (verifiedEvidence.length > 0
+          ? `\n\nمصدقہ سسٹم کنٹرولز (بغیر کسی تضاد کے):\n` +
+            verifiedEvidence
+              .map((it) => {
+                const loc = it.pageNumber ? `صفحہ ${it.pageNumber}` : "دستاویز میٹا ڈیٹا";
+                return `✓ [${loc}]: ${it.title}۔`;
+              })
+              .join("\n")
+          : "") +
         "\n\nکریڈٹ رسک ایڈوائزری: اس بینک سٹیٹمنٹ کے اعداد و شمار میں کمپیوٹر سافٹ ویئر کے ذریعے ردوبدل کر کے بیلنس بڑھایا گیا ہے۔ یہ درخواست فوری طور پر مسترد کی جائے۔"
       : `کریڈٹ آفیسر کے لیے تفصیلی خلاصہ:
 فیصلہ: کم خطرہ (${riskTier} RISK, سکور: ${overallScore}/100) — براہِ راست منظوری۔
@@ -162,27 +218,57 @@ Forensic validation confirms 100% document authenticity across all pages. All tr
   const briefingItems: CreditBriefingItem[] =
     analysis?.credit_briefing_items && analysis.credit_briefing_items.length > 0
       ? analysis.credit_briefing_items
-      : evidenceItems.map((it, idx) => ({
-          page_number: it.pageNumber || 1,
-          row_number: idx + 1,
-          title: it.title,
-          transaction_label: it.title,
-          expected_value: it.expectedValue,
-          actual_value: it.actualValue,
-          discrepancy: it.discrepancy,
-          font_detected: it.description.match(/([A-Za-z0-9_-]+)\s+instead/i)?.[1],
-          expected_font: it.description.match(/instead of\s+([A-Za-z0-9_-]+)/i)?.[1],
-          visual_cue: it.ruleId.includes("CV_") ? "Local ELA compression divergence" : undefined,
-          summary_en: `Page ${it.pageNumber || 1}, Row ${idx + 1}: ${it.title}. ${
-            it.discrepancy ? `Discrepancy: ${it.discrepancy}.` : ""
-          }`,
-          summary_ur: `صفحہ ${it.pageNumber || 1}، قطار ${idx + 1}: ${it.title}۔ ${
-            it.discrepancy ? `${it.discrepancy} کا فرق۔` : ""
-          }`,
-          severity: it.severity,
-          rule_id: it.ruleId,
-          evidence_id: it.id,
-        }));
+      : evidenceItems.map((it) => {
+          const isInfo = it.severity === "INFO" || (it.ruleId || "").endsWith("_VERIFIED");
+          const tech = it.technicalDetails || {};
+          const anchorType = it.anchorType || tech.anchor_type || (it.pageNumber ? "PAGE_REGION" : "DOCUMENT_METADATA");
+          const rowNum = tech.row_number || (tech.anchors && tech.anchors[0]?.rowNumber) || undefined;
+          const anchors = tech.anchors || it.anchors || (it.pageNumber ? [{ type: anchorType, pageNumber: it.pageNumber, label: `Page ${it.pageNumber}` }] : [{ type: "DOCUMENT_METADATA", label: "Document Metadata" }]);
+
+          let locLabelEn = "Document Metadata";
+          let locLabelUr = "دستاویز میٹا ڈیٹا";
+          if (anchorType === "MULTI_PAGE_SPAN") {
+            locLabelEn = `Pages 1–${it.pageNumber || 23} Ledger`;
+            locLabelUr = `صفحات 1 تا ${it.pageNumber || 23} لیجر`;
+          } else if (anchorType === "DOCUMENT_HEADER" && it.pageNumber) {
+            locLabelEn = `Page ${it.pageNumber} Header`;
+            locLabelUr = `صفحہ ${it.pageNumber} ہیڈر`;
+          } else if (rowNum && it.pageNumber) {
+            locLabelEn = `Page ${it.pageNumber}, Row ${rowNum}`;
+            locLabelUr = `صفحہ ${it.pageNumber}، قطار ${rowNum}`;
+          } else if (it.pageNumber) {
+            locLabelEn = `Page ${it.pageNumber}`;
+            locLabelUr = `صفحہ ${it.pageNumber}`;
+          }
+
+          return {
+            page_number: it.pageNumber,
+            row_number: rowNum,
+            anchor_type: anchorType,
+            anchors: anchors,
+            title: it.title,
+            transaction_label: it.title,
+            expected_value: it.expectedValue,
+            actual_value: it.actualValue,
+            discrepancy: it.discrepancy,
+            font_detected: it.description.match(/([A-Za-z0-9_-]+)\s+instead/i)?.[1],
+            expected_font: it.description.match(/instead of\s+([A-Za-z0-9_-]+)/i)?.[1],
+            visual_cue: it.ruleId.includes("CV_") ? "Local ELA compression divergence" : undefined,
+            summary_en: isInfo
+              ? `${locLabelEn}: ${it.title}. ${it.discrepancy || "Verified Authentic."}`
+              : `${locLabelEn}: ${it.title}. ${
+                  it.discrepancy ? `Discrepancy: ${it.discrepancy}.` : ""
+                }`,
+            summary_ur: isInfo
+              ? `${locLabelUr}: ${it.title} (مصدقہ کنٹرول)۔`
+              : `${locLabelUr}: ${it.title}۔ ${
+                  it.discrepancy ? `${it.discrepancy} کا فرق۔` : ""
+                }`,
+            severity: it.severity,
+            rule_id: it.ruleId,
+            evidence_id: it.id,
+          };
+        });
 
   const correlations =
     analysis?.cross_signal_correlations &&
@@ -360,7 +446,8 @@ Forensic validation confirms 100% document authenticity across all pages. All tr
                   : "Verified Evidence Coordinates (Page, Row & Typography Discrepancies)"}
               </span>
               <span className="font-mono text-[11px] text-ink-500">
-                {briefingItems.length} finding(s) cataloged
+                {briefingItems.filter((i) => i.severity !== "INFO").length} anomaly(ies) ·{" "}
+                {briefingItems.filter((i) => i.severity === "INFO").length} verified check(s)
               </span>
             </div>
 
@@ -371,10 +458,108 @@ Forensic validation confirms 100% document authenticity across all pages. All tr
                   className="p-3 hover:bg-paper-1/40 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-3"
                 >
                   <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="px-1.5 py-0.5 text-[10px] font-bold bg-ink-900 text-paper-0">
-                        P.{item.page_number} R.{item.row_number}
-                      </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* Anchor Badge & Jump Links */}
+                      {item.anchor_type === "DOCUMENT_METADATA" || (!item.page_number && !item.row_number) ? (
+                        <span className="px-1.5 py-0.5 text-[10px] font-bold bg-ink-800 text-paper-0">
+                          DOC METADATA
+                        </span>
+                      ) : item.anchor_type === "MULTI_PAGE_SPAN" ? (
+                        <div className="flex items-center gap-1">
+                          <span className="px-1.5 py-0.5 text-[10px] font-bold bg-forensic-red text-white">
+                            P.1–{item.page_number || 23} LEDGER
+                          </span>
+                          {item.anchors && item.anchors.length > 0 ? (
+                            item.anchors.map((anc, aIdx) => (
+                              <button
+                                key={aIdx}
+                                type="button"
+                                onClick={() => {
+                                  if (anc.pageNumber) onFocusCanvas?.(anc.pageNumber);
+                                  if (item.evidence_id) onSelectEvidence?.(item.evidence_id);
+                                }}
+                                className="px-1.5 py-0.5 text-[9px] font-bold bg-paper-2 hover:bg-ink-900 hover:text-white text-ink-900 border border-ink-900/20 rounded-sm transition-colors flex items-center gap-0.5 cursor-pointer"
+                                title={`Jump to ${anc.label}`}
+                              >
+                                {anc.label} ↗
+                              </button>
+                            ))
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onFocusCanvas?.(1);
+                                  if (item.evidence_id) onSelectEvidence?.(item.evidence_id);
+                                }}
+                                className="px-1.5 py-0.5 text-[9px] font-bold bg-paper-2 hover:bg-ink-900 hover:text-white text-ink-900 border border-ink-900/20 rounded-sm transition-colors cursor-pointer"
+                              >
+                                P.1 Summary ↗
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onFocusCanvas?.(item.page_number || 23);
+                                  if (item.evidence_id) onSelectEvidence?.(item.evidence_id);
+                                }}
+                                className="px-1.5 py-0.5 text-[9px] font-bold bg-paper-2 hover:bg-ink-900 hover:text-white text-ink-900 border border-ink-900/20 rounded-sm transition-colors cursor-pointer"
+                              >
+                                P.{item.page_number || 23} Terminal ↗
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      ) : item.row_number ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (item.page_number) onFocusCanvas?.(item.page_number);
+                            if (item.evidence_id) onSelectEvidence?.(item.evidence_id);
+                          }}
+                          className={`px-1.5 py-0.5 text-[10px] font-bold transition-colors flex items-center gap-1 cursor-pointer ${
+                            item.severity === "INFO"
+                              ? "bg-emerald-700 hover:bg-emerald-800 text-white"
+                              : "bg-ink-900 hover:bg-forensic-blue text-paper-0"
+                          }`}
+                        >
+                          P.{item.page_number} · ROW {item.row_number} ↗
+                        </button>
+                      ) : item.anchor_type === "DOCUMENT_HEADER" ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (item.page_number) onFocusCanvas?.(item.page_number);
+                            if (item.evidence_id) onSelectEvidence?.(item.evidence_id);
+                          }}
+                          className={`px-1.5 py-0.5 text-[10px] font-bold transition-colors flex items-center gap-1 cursor-pointer ${
+                            item.severity === "INFO"
+                              ? "bg-emerald-700 hover:bg-emerald-800 text-white"
+                              : "bg-ink-900 hover:bg-forensic-blue text-paper-0"
+                          }`}
+                        >
+                          P.{item.page_number} HEADER ↗
+                        </button>
+                      ) : item.page_number ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onFocusCanvas?.(item.page_number!);
+                            if (item.evidence_id) onSelectEvidence?.(item.evidence_id);
+                          }}
+                          className={`px-1.5 py-0.5 text-[10px] font-bold transition-colors flex items-center gap-1 cursor-pointer ${
+                            item.severity === "INFO"
+                              ? "bg-emerald-700 hover:bg-emerald-800 text-white"
+                              : "bg-ink-900 hover:bg-forensic-blue text-paper-0"
+                          }`}
+                        >
+                          {item.severity === "INFO" ? `P.${item.page_number} VERIFIED ↗` : `PAGE ${item.page_number} ↗`}
+                        </button>
+                      ) : (
+                        <span className="px-1.5 py-0.5 text-[10px] font-bold bg-ink-800 text-paper-0">
+                          {item.severity === "INFO" ? "VERIFIED" : "AUDIT FINDING"}
+                        </span>
+                      )}
+
                       <span className="font-serif text-sm font-semibold text-ink-900">
                         {item.title}
                       </span>
@@ -384,10 +569,12 @@ Forensic validation confirms 100% document authenticity across all pages. All tr
                             ? "border-forensic-red/40 bg-forensic-red/10 text-forensic-red"
                             : item.severity === "HIGH"
                             ? "border-forensic-amber/40 bg-forensic-amber/10 text-forensic-amber"
+                            : item.severity === "INFO"
+                            ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700"
                             : "border-rule text-ink-600"
                         }`}
                       >
-                        {item.severity}
+                        {item.severity === "INFO" ? "VERIFIED" : item.severity}
                       </span>
                     </div>
 
