@@ -25,6 +25,7 @@ export const metadata: Metadata = {
 };
 
 import { AuthProvider } from "@/context/AuthContext";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 export default function RootLayout({
   children,
@@ -41,7 +42,9 @@ export default function RootLayout({
         suppressHydrationWarning
         className="min-h-full flex flex-col bg-paper-0 text-ink-900 selection:bg-forensic-red selection:text-white"
       >
-        <AuthProvider>{children}</AuthProvider>
+        <ErrorBoundary>
+          <AuthProvider>{children}</AuthProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );
