@@ -4,6 +4,8 @@ import React, { useState, useEffect } from "react";
 import { X, ShieldAlert, Shield, Check, AlertCircle, Loader2, UserCheck } from "lucide-react";
 import { updateUserRole } from "@/lib/api/client";
 import { OrgMemberItem, OrgUserRole } from "@/lib/types/forensics";
+import { useFocusTrap } from "@/lib/hooks/useFocusTrap";
+import { useScrollLock } from "@/lib/hooks/useScrollLock";
 
 interface ChangeRoleModalProps {
   isOpen: boolean;
@@ -60,12 +62,23 @@ export function ChangeRoleModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const containerRef = useFocusTrap<HTMLDivElement>(isOpen);
+  useScrollLock(isOpen);
+
   useEffect(() => {
     if (member) {
       setSelectedRole(member.role);
       setError(null);
     }
   }, [member]);
+
+  // Escape key to close
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isOpen, onClose]);
 
   if (!isOpen || !member) return null;
 
@@ -95,8 +108,18 @@ export function ChangeRoleModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 font-mono">
-      <div className="w-full max-w-xl bg-paper-0 border-2 border-ink-900 shadow-2xl p-6 relative max-h-[90vh] overflow-y-auto">
+    <div
+      ref={containerRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Modify Clearance Level"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 font-mono"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-xl bg-paper-0 border-2 border-ink-900 shadow-2xl p-6 relative max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Close Button */}
         <button
           type="button"

@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X, UserPlus, Key, Copy, Check, ShieldCheck, AlertCircle, Loader2, FileText, Lock } from "lucide-react";
 import { inviteOrgUser } from "@/lib/api/client";
 import { InviteUserResponse, OrgUserRole } from "@/lib/types/forensics";
+import { useFocusTrap } from "@/lib/hooks/useFocusTrap";
+import { useScrollLock } from "@/lib/hooks/useScrollLock";
 
 interface InviteUserModalProps {
   isOpen: boolean;
@@ -25,7 +27,19 @@ export function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUserModalP
   const [copiedMemo, setCopiedMemo] = useState(false);
   const [copiedPassword, setCopiedPassword] = useState(false);
 
+  const containerRef = useFocusTrap<HTMLDivElement>(isOpen);
+  useScrollLock(isOpen);
+
+  // Escape key to close
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
+
 
   const generateSecurePassword = () => {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%&*";
@@ -106,8 +120,18 @@ export function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUserModalP
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 font-mono">
-      <div className="w-full max-w-2xl bg-paper-0 border-2 border-ink-900 shadow-2xl p-6 relative max-h-[92vh] overflow-y-auto">
+    <div
+      ref={containerRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Onboard Personnel"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 font-mono"
+      onClick={handleClose}
+    >
+      <div
+        className="w-full max-w-2xl bg-paper-0 border-2 border-ink-900 shadow-2xl p-6 relative max-h-[92vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Close Button */}
         <button
           type="button"
@@ -146,10 +170,11 @@ export function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUserModalP
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="block font-bold uppercase tracking-wider text-ink-800">
+                <label htmlFor="invite-first-name" className="block font-bold uppercase tracking-wider text-ink-800">
                   First Name <span className="text-rose-600">*</span>
                 </label>
                 <input
+                  id="invite-first-name"
                   type="text"
                   required
                   value={firstName}
@@ -160,10 +185,11 @@ export function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUserModalP
               </div>
 
               <div className="space-y-1.5">
-                <label className="block font-bold uppercase tracking-wider text-ink-800">
+                <label htmlFor="invite-last-name" className="block font-bold uppercase tracking-wider text-ink-800">
                   Last Name <span className="text-rose-600">*</span>
                 </label>
                 <input
+                  id="invite-last-name"
                   type="text"
                   required
                   value={lastName}
@@ -175,10 +201,11 @@ export function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUserModalP
             </div>
 
             <div className="space-y-1.5">
-              <label className="block font-bold uppercase tracking-wider text-ink-800">
+              <label htmlFor="invite-email" className="block font-bold uppercase tracking-wider text-ink-800">
                 Institutional Email Address <span className="text-rose-600">*</span>
               </label>
               <input
+                id="invite-email"
                 type="text"
                 required
                 value={email}
@@ -192,23 +219,24 @@ export function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUserModalP
             </div>
 
             <div className="space-y-1.5">
-              <label className="block font-bold uppercase tracking-wider text-ink-800">
+              <label htmlFor="invite-role" className="block font-bold uppercase tracking-wider text-ink-800">
                 Clearance Tier / Role <span className="text-rose-600">*</span>
               </label>
               <select
+                id="invite-role"
                 value={role}
                 onChange={(e) => setRole(e.target.value as OrgUserRole)}
                 className="w-full px-3 py-2 bg-paper-1 border border-ink-900/30 text-ink-900 focus:outline-none focus:border-ink-900 text-xs font-mono"
               >
-                <option value="ANALYST">ANALYST - Case Investigation & Forensic Assessment</option>
+                <option value="ANALYST">ANALYST - Case Investigation &amp; Forensic Assessment</option>
                 <option value="VIEWER">VIEWER - Read-Only Dossier Inspection</option>
-                <option value="ADMIN">ADMIN - Full Personnel & Integration Administration</option>
+                <option value="ADMIN">ADMIN - Full Personnel &amp; Integration Administration</option>
               </select>
             </div>
 
             <div className="space-y-1.5 pt-1">
               <div className="flex items-center justify-between">
-                <label className="block font-bold uppercase tracking-wider text-ink-800">
+                <label htmlFor="invite-temp-password" className="block font-bold uppercase tracking-wider text-ink-800">
                   Temporary Access Credential (Optional)
                 </label>
                 <button
@@ -220,6 +248,7 @@ export function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUserModalP
                 </button>
               </div>
               <input
+                id="invite-temp-password"
                 type="text"
                 value={tempPassword}
                 onChange={(e) => setTempPassword(e.target.value)}

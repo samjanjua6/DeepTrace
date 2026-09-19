@@ -16,6 +16,8 @@ import {
   AlertTriangle,
   Smartphone,
 } from "lucide-react";
+import { useFocusTrap } from "@/lib/hooks/useFocusTrap";
+import { useScrollLock } from "@/lib/hooks/useScrollLock";
 
 interface TwoFactorSetupModalProps {
   isOpen: boolean;
@@ -46,6 +48,17 @@ export function TwoFactorSetupModal({ isOpen, onClose }: TwoFactorSetupModalProp
       setSetupData(null);
     }
   }, [isOpen]);
+
+  const containerRef = useFocusTrap<HTMLDivElement>(isOpen);
+  useScrollLock(isOpen);
+
+  // Escape key to close
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isOpen, onClose]);
 
   if (!isOpen || !user) return null;
 
@@ -113,8 +126,18 @@ export function TwoFactorSetupModal({ isOpen, onClose }: TwoFactorSetupModalProp
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-      <div className="w-full max-w-lg bg-paper-0 border-2 border-ink-900 shadow-2xl p-6 sm:p-8 font-sans">
+    <div
+      ref={containerRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Two-Factor Authentication"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg bg-paper-0 border-2 border-ink-900 shadow-2xl p-6 sm:p-8 font-sans"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-start justify-between border-b border-rule pb-4 mb-5">
           <div className="flex items-center gap-3">

@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X, Globe, Shield, AlertTriangle, Loader2 } from "lucide-react";
 import { createWebhook } from "@/lib/api/client";
 import { WebhookEndpointCreated } from "@/lib/types/forensics";
+import { useFocusTrap } from "@/lib/hooks/useFocusTrap";
+import { useScrollLock } from "@/lib/hooks/useScrollLock";
 
 interface CreateWebhookModalProps {
   isOpen: boolean;
@@ -47,6 +49,17 @@ export function CreateWebhookModal({ isOpen, onClose, onSuccess }: CreateWebhook
   ]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const containerRef = useFocusTrap<HTMLDivElement>(isOpen);
+  useScrollLock(isOpen);
+
+  // Escape key to close
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -99,8 +112,18 @@ export function CreateWebhookModal({ isOpen, onClose, onSuccess }: CreateWebhook
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 font-mono">
-      <div className="w-full max-w-xl bg-paper-0 border-2 border-ink-900 shadow-2xl p-6 relative">
+    <div
+      ref={containerRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Register Webhook Endpoint"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 font-mono"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-xl bg-paper-0 border-2 border-ink-900 shadow-2xl p-6 relative"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Close Button */}
         <button
           type="button"
@@ -137,10 +160,11 @@ export function CreateWebhookModal({ isOpen, onClose, onSuccess }: CreateWebhook
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* URL Input */}
           <div>
-            <label className="block text-[11px] font-bold uppercase text-ink-800 mb-1">
+            <label htmlFor="webhook-url" className="block text-[11px] font-bold uppercase text-ink-800 mb-1">
               Destination URL (HTTPS Enforced in Production)
             </label>
             <input
+              id="webhook-url"
               type="text"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
@@ -153,10 +177,11 @@ export function CreateWebhookModal({ isOpen, onClose, onSuccess }: CreateWebhook
 
           {/* Description Input */}
           <div>
-            <label className="block text-[11px] font-bold uppercase text-ink-800 mb-1">
+            <label htmlFor="webhook-description" className="block text-[11px] font-bold uppercase text-ink-800 mb-1">
               Endpoint Description / Consumer System
             </label>
             <input
+              id="webhook-description"
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}

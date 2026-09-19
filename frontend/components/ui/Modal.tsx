@@ -1,6 +1,8 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useId } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useFocusTrap } from "@/lib/hooks/useFocusTrap";
+import { useScrollLock } from "@/lib/hooks/useScrollLock";
 
 export interface ModalProps {
   isOpen: boolean;
@@ -21,15 +23,16 @@ export function Modal({
   children,
   className,
 }: ModalProps) {
+  const titleId = useId();
+  const containerRef = useFocusTrap<HTMLDivElement>(isOpen);
+  useScrollLock(isOpen);
+
+  // Escape key to close
   useEffect(() => {
     if (!isOpen) return;
-
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
+      if (e.key === "Escape") onClose();
     };
-
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
@@ -47,17 +50,23 @@ export function Modal({
   };
 
   return (
+    /* Backdrop — clicking it closes the modal */
     <div
+      ref={containerRef}
       role="dialog"
       aria-modal="true"
+      aria-labelledby={title ? titleId : undefined}
       className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-mono select-none"
+      onClick={onClose}
     >
+      {/* Inner panel — stop clicks propagating to backdrop */}
       <div
         className={cn(
           "bg-paper-0 border-2 border-ink-900 shadow-2xl w-full p-6 relative",
           maxWidthStyles[maxWidth],
           className
         )}
+        onClick={(e) => e.stopPropagation()}
       >
         {(title || category) && (
           <div className="flex items-start justify-between border-b border-rule pb-3 mb-4">
@@ -68,7 +77,10 @@ export function Modal({
                 </span>
               )}
               {title && (
-                <h2 className="font-serif text-xl text-ink-900 font-semibold tracking-tight">
+                <h2
+                  id={titleId}
+                  className="font-serif text-xl text-ink-900 font-semibold tracking-tight"
+                >
                   {title}
                 </h2>
               )}

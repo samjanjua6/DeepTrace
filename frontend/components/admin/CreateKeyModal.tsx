@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X, Key, Shield, AlertTriangle, Loader2 } from "lucide-react";
 import { createApiKey } from "@/lib/api/client";
 import { ApiKeyCreatedResponse } from "@/lib/types/forensics";
+import { useFocusTrap } from "@/lib/hooks/useFocusTrap";
+import { useScrollLock } from "@/lib/hooks/useScrollLock";
 
 interface CreateKeyModalProps {
   isOpen: boolean;
@@ -56,6 +58,17 @@ export function CreateKeyModal({ isOpen, onClose, onSuccess }: CreateKeyModalPro
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const containerRef = useFocusTrap<HTMLDivElement>(isOpen);
+  useScrollLock(isOpen);
+
+  // Escape key to close
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const handleToggleScope = (scopeId: string) => {
@@ -97,8 +110,18 @@ export function CreateKeyModal({ isOpen, onClose, onSuccess }: CreateKeyModalPro
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 font-mono">
-      <div className="w-full max-w-xl bg-paper-0 border-2 border-ink-900 shadow-2xl p-6 relative">
+    <div
+      ref={containerRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Issue Machine-to-Machine API Key"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 font-mono"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-xl bg-paper-0 border-2 border-ink-900 shadow-2xl p-6 relative"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Close Button */}
         <button
           type="button"
@@ -135,10 +158,11 @@ export function CreateKeyModal({ isOpen, onClose, onSuccess }: CreateKeyModalPro
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Key Identifier */}
           <div>
-            <label className="block text-[11px] font-bold uppercase text-ink-800 mb-1">
+            <label htmlFor="apikey-name" className="block text-[11px] font-bold uppercase text-ink-800 mb-1">
               Credential Identifier / Consumer System
             </label>
             <input
+              id="apikey-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -151,10 +175,11 @@ export function CreateKeyModal({ isOpen, onClose, onSuccess }: CreateKeyModalPro
 
           {/* Expiration Policy */}
           <div>
-            <label className="block text-[11px] font-bold uppercase text-ink-800 mb-1">
+            <label htmlFor="apikey-expiry" className="block text-[11px] font-bold uppercase text-ink-800 mb-1">
               Cryptographic Expiration Policy
             </label>
             <select
+              id="apikey-expiry"
               value={expirationDays}
               onChange={(e) => setExpirationDays(Number(e.target.value))}
               disabled={loading}
