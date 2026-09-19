@@ -9,6 +9,8 @@ interface AnalystOverrideModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentScore: number;
+  authenticityScore?: number;
+  transactionRiskScore?: number;
   onSave: (newScore: number, reason: string) => Promise<void>;
 }
 
@@ -16,6 +18,8 @@ export function AnalystOverrideModal({
   isOpen,
   onClose,
   currentScore,
+  authenticityScore,
+  transactionRiskScore,
   onSave,
 }: AnalystOverrideModalProps) {
   const [score, setScore] = useState<number>(currentScore);
@@ -52,12 +56,34 @@ export function AnalystOverrideModal({
       maxWidth="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+        {/* Baseline Forensic Radar Badges */}
+        <div className="grid grid-cols-2 gap-2 p-2.5 bg-paper-1 border border-rule">
+          <div>
+            <span className="text-[10px] text-ink-500 uppercase block font-mono">
+              Document Authenticity
+            </span>
+            <span className="font-mono text-sm font-bold text-ink-900">
+              {authenticityScore !== undefined ? `${authenticityScore}%` : `${Math.max(0, 100 - currentScore)}%`}
+            </span>
+          </div>
+          <div>
+            <span className="text-[10px] text-ink-500 uppercase block font-mono">
+              Transaction & AML Risk
+            </span>
+            <span className="font-mono text-sm font-bold text-ink-900">
+              {transactionRiskScore !== undefined ? `${transactionRiskScore}/100` : "0/100"}
+            </span>
+          </div>
+        </div>
+
         <div>
-          <label className="block text-ink-700 uppercase tracking-wider mb-1 font-semibold">
-            Adjusted Fraud Risk Score (0 - 100):
+          <label htmlFor="override-score" className="block text-ink-700 uppercase tracking-wider mb-1 font-semibold">
+            Adjusted Composite Fraud Risk Score (0 - 100):
           </label>
+
           <div className="flex items-center gap-3">
             <Input
+              id="override-score"
               type="number"
               min={0}
               max={100}
@@ -73,10 +99,11 @@ export function AnalystOverrideModal({
         </div>
 
         <div>
-          <label className="block text-ink-700 uppercase tracking-wider mb-1 font-semibold">
+          <label htmlFor="override-reason" className="block text-ink-700 uppercase tracking-wider mb-1 font-semibold">
             Mandatory Compliance Justification:
           </label>
           <textarea
+            id="override-reason"
             rows={3}
             required
             value={reason}

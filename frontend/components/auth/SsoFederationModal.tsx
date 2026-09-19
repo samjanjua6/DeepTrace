@@ -132,17 +132,18 @@ export function SsoFederationModal({
 
           {/* Institutional Domain Input */}
           <div>
-            <label className="block text-[11px] font-bold text-ink-700 uppercase tracking-wider mb-1">
+            <label htmlFor="sso-domain" className="block text-[11px] font-bold text-ink-700 uppercase tracking-wider mb-1">
               Institutional Email Domain (Optional for Auto-Routing):
             </label>
             <Input
+              id="sso-domain"
               type="text"
               placeholder="e.g. meezanbank.com, hbl.com, ubl.com.pk"
               value={domain}
               onChange={(e) => setDomain(e.target.value)}
             />
             <span className="text-[10px] text-ink-500 mt-1 block">
-              Directs SAML AuthnRequest to your bank’s dedicated single sign-on realm.
+              Directs SAML AuthnRequest to your bank's dedicated single sign-on realm.
             </span>
           </div>
 

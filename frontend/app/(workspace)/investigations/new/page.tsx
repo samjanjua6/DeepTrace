@@ -133,31 +133,33 @@ export default function NewCaseIntakePage() {
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Document Type Selector */}
           <div>
-            <label className="block font-mono text-xs uppercase tracking-wider text-ink-700 mb-2">
-              Document Category & Forensic Module:
+            <label htmlFor="new-doc-type" className="block font-mono text-xs uppercase tracking-wider text-ink-700 mb-2">
+              Document Category &amp; Forensic Module:
             </label>
             <select
+              id="new-doc-type"
               value={documentType}
               onChange={(e) => handleDocTypeChange(e.target.value)}
               className="w-full bg-paper-1 border border-rule px-4 py-3 text-sm text-ink-900 font-mono focus:outline-none focus:border-ink-900 cursor-pointer"
             >
               <option value="AUTO">Auto-Detect via Stage 0 Classifier (Bank, Salary, K-Electric, FBR, CNIC)</option>
-              <option value="OTHER">Academic & Educational (Matric / Inter / University Degree / BISE)</option>
-              <option value="BANK_STATEMENT">Bank Statement & Financial Ledger (Lakh/Crore & IBAN)</option>
-              <option value="SALARY_SLIP">Salary Slip & Employment Certificate</option>
+              <option value="OTHER">Academic &amp; Educational (Matric / Inter / University Degree / BISE)</option>
+              <option value="BANK_STATEMENT">Bank Statement &amp; Financial Ledger (Lakh/Crore &amp; IBAN)</option>
+              <option value="SALARY_SLIP">Salary Slip &amp; Employment Certificate</option>
               <option value="UTILITY_BILL">Utility Consumer Bill (Electricity / Gas / Water)</option>
-              <option value="TAX_CERTIFICATE">Tax Certificate & FBR Return</option>
-              <option value="IDENTITY_DOCUMENT">Identity Document & Official Credential</option>
-              <option value="COMMERCIAL_INVOICE">Commercial Invoice & Trade Bill</option>
+              <option value="TAX_CERTIFICATE">Tax Certificate &amp; FBR Return</option>
+              <option value="IDENTITY_DOCUMENT">Identity Document &amp; Official Credential</option>
+              <option value="COMMERCIAL_INVOICE">Commercial Invoice &amp; Trade Bill</option>
             </select>
           </div>
 
           {/* Case Title Input */}
           <div>
-            <label className="block font-mono text-xs uppercase tracking-wider text-ink-700 mb-2">
+            <label htmlFor="new-case-title" className="block font-mono text-xs uppercase tracking-wider text-ink-700 mb-2">
               Case Docket Title:
             </label>
             <input
+              id="new-case-title"
               type="text"
               required
               value={title}
@@ -168,7 +170,7 @@ export default function NewCaseIntakePage() {
 
           {/* Drag & Drop Custody Area */}
           <div>
-            <label className="block font-mono text-xs uppercase tracking-wider text-ink-700 mb-2">
+            <label htmlFor="file-input" className="block font-mono text-xs uppercase tracking-wider text-ink-700 mb-2">
               Forensic Evidence File (PDF, PNG, JPEG):
             </label>
 

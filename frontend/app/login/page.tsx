@@ -399,7 +399,7 @@ function LoginFormContent() {
               {/* Institutional Email Field with Regex Validation */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-[11px] font-bold text-ink-700 uppercase tracking-wider">
+                  <label htmlFor="login-email" className="block text-[11px] font-bold text-ink-700 uppercase tracking-wider">
                     Institutional Email / Clearance ID
                   </label>
                   {email && (
@@ -413,6 +413,7 @@ function LoginFormContent() {
                   )}
                 </div>
                 <Input
+                  id="login-email"
                   type="email"
                   required
                   value={email}
@@ -430,7 +431,7 @@ function LoginFormContent() {
               {/* Password Field with Regex & Security Criteria Validation */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-[11px] font-bold text-ink-700 uppercase tracking-wider">
+                  <label htmlFor="login-password" className="block text-[11px] font-bold text-ink-700 uppercase tracking-wider">
                     Clearance Password
                   </label>
                   {password && (
@@ -444,6 +445,7 @@ function LoginFormContent() {
                   )}
                 </div>
                 <Input
+                  id="login-password"
                   type="password"
                   required
                   value={password}
@@ -578,13 +580,14 @@ function LoginFormContent() {
 
               {/* Segmented 6-digit input */}
               <div>
-                <label className="block text-[11px] font-bold text-ink-700 uppercase tracking-wider mb-2 text-center">
+                <label htmlFor="mfa-digit-0" className="block text-[11px] font-bold text-ink-700 uppercase tracking-wider mb-2 text-center">
                   6-Digit Cryptographic Authenticator Token
                 </label>
                 <div className="flex justify-center gap-2">
                   {mfaCode.map((digit, idx) => (
                     <input
                       key={idx}
+                      id={idx === 0 ? "mfa-digit-0" : undefined}
                       ref={(el) => {
                         digitRefs.current[idx] = el;
                       }}
@@ -592,6 +595,7 @@ function LoginFormContent() {
                       inputMode="numeric"
                       maxLength={1}
                       value={digit}
+                      aria-label={`Digit ${idx + 1} of 6`}
                       onChange={(e) => handleDigitChange(idx, e.target.value)}
                       onKeyDown={(e) => handleDigitKeyDown(idx, e)}
                       className="w-11 h-12 text-center text-lg font-bold bg-paper-1 border-2 border-ink-900 text-ink-900 focus:outline-none focus:bg-paper-0 tabular-nums transition-colors"

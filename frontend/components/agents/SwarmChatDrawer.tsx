@@ -360,7 +360,11 @@ export function SwarmChatDrawer({
           className="flex flex-col gap-2"
         >
           <div className="relative">
+            <label htmlFor="swarm-query-input" className="sr-only">
+              Forensic question
+            </label>
             <textarea
+              id="swarm-query-input"
               ref={textareaRef}
               rows={2}
               value={inputQuery}
