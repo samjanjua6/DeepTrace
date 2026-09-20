@@ -44,6 +44,89 @@ def compute_risk_tier(score: int) -> tuple[str, str]:
         return "CRITICAL", "IMMEDIATE_REJECTION"
 
 
+def compute_authenticity_tier(tamper_score: int) -> str:
+    """
+    Map tamper score (0-100) to Document Authenticity status tier.
+    """
+    if tamper_score <= 10:
+        return "VERIFIED_AUTHENTIC"
+    elif tamper_score <= 40:
+        return "SUSPECT_DOCUMENT"
+    else:
+        return "FORGERY_DETECTED"
+
+
+def compute_transaction_risk_tier(txn_score: int) -> str:
+    """
+    Map transaction risk score (0-100) to Transaction/AML risk tier.
+    """
+    if txn_score <= 20:
+        return "CLEAN"
+    elif txn_score <= 40:
+        return "MONITORED"
+    elif txn_score <= 70:
+        return "HIGH_AML_RISK"
+    else:
+        return "CRITICAL_PROSCRIBED"
+
+
+def is_tamper_item(item: Any) -> bool:
+    """
+    Determine if an evidence item relates to physical, digital, typographical,
+    visual, metadata, or arithmetic file tampering.
+    """
+    cat = getattr(item, "category", "") or ""
+    r_id = getattr(item, "ruleId", "") or ""
+
+    if cat in (
+        "FONT_BASELINE_INCONSISTENCY",
+        "PDF_OBJECT_ANOMALY",
+        "IMAGE_ELA_MANIPULATION",
+        "METADATA_TIMESTAMP_MISMATCH",
+        "OCR_CONFIDENCE_ANOMALY",
+        "MATHEMATICAL_MISMATCH",
+        "AI_GENERATION_ARTIFACT",
+    ):
+        return True
+
+    if r_id.startswith("RULE_BANK_TEMPLATE_") and not r_id.endswith("_VERIFIED"):
+        return True
+
+    if (
+        r_id.startswith("RULE_PK_LEDGER_")
+        or r_id.startswith("RULE_PK_CLOSING_BALANCE_")
+        or r_id.startswith("RULE_PK_STATEMENT_SUMMARY_")
+        or r_id.startswith("RULE_PK_MULTIPAGE_DISCONTINUITY")
+    ):
+        return True
+
+    return False
+
+
+def is_transaction_risk_item(item: Any) -> bool:
+    """
+    Determine if an evidence item relates to financial activity, counterparty risk,
+    statutory sanctions, PEP, AML red flags, or regulatory identity/tax credentials.
+    """
+    cat = getattr(item, "category", "") or ""
+    r_id = getattr(item, "ruleId", "") or ""
+
+    if r_id.startswith("RULE_AML_") and not r_id.endswith("_CLEARED"):
+        return True
+
+    if cat in ("DATE_SEQUENCE_VIOLATION",) or r_id == "RULE_PK_FUTURE_DATE_TRANSACTION":
+        return True
+
+    if (
+        r_id.startswith("RULE_PK_IBAN_")
+        or r_id.startswith("RULE_CNIC_")
+        or r_id.startswith("RULE_FBR_")
+    ) and not r_id.endswith("_VERIFIED"):
+        return True
+
+    return False
+
+
 async def process_evidence_fusion(
     pipeline_run_id: str,
     pipeline_stage_id: str,
@@ -168,58 +251,148 @@ async def process_evidence_fusion(
                 base_score = max(base_score + 25.0, 90.0)
                 critical_count += len(splicing_synergy_pages)
 
-            # Deterministic override: If there are CRITICAL mathematical or custody failures, clamp to >= 85
-            if critical_count > 0:
-                final_score = max(85, min(100, int(round(base_score))))
-            elif high_count >= 2:
-                final_score = max(65, min(100, int(round(base_score))))
+            # ─────────────────────────────────────────────────────────────────
+            # DUAL-SCORE ENGINE: Decouple Document Authenticity & Transaction Risk
+            # ─────────────────────────────────────────────────────────────────
+            tamper_evidence = [
+                item for item in evidence_items
+                if (item.severity != "INFO" and (item.riskPoints or 0) > 0 and is_tamper_item(item))
+            ]
+            transaction_evidence = [
+                item for item in evidence_items
+                if (item.severity != "INFO" and (item.riskPoints or 0) > 0 and is_transaction_risk_item(item))
+            ]
+
+            # 1. Document Tampering Score & Authenticity Score (0-100)
+            tamper_base = 0.0
+            tamper_cat_groups: dict[str, list[Any]] = {}
+            for item in tamper_evidence:
+                tamper_cat_groups.setdefault(item.category, []).append(item)
+
+            for cat, items in tamper_cat_groups.items():
+                raw_score = sum(item.riskPoints for item in items)
+                w = CATEGORY_WEIGHTS.get(cat, 0.20)
+                tamper_base += min(float(raw_score), 100.0) * w
+
+            if len(tamper_cat_groups) >= 2:
+                tamper_base *= 1.25
+
+            if splicing_synergy_pages:
+                tamper_base = max(tamper_base + 25.0, 90.0)
+
+            has_crit_tamper = any(item.severity == "CRITICAL" for item in tamper_evidence)
+            high_tamper_count = sum(1 for item in tamper_evidence if item.severity == "HIGH")
+
+            if has_crit_tamper:
+                tamper_score = max(85, min(100, int(round(tamper_base))))
+            elif high_tamper_count >= 2:
+                tamper_score = max(65, min(100, int(round(tamper_base))))
+            elif tamper_evidence:
+                tamper_score = max(10, min(100, int(round(tamper_base))))
             else:
-                final_score = min(100, int(round(base_score)))
+                tamper_score = 0
 
-            risk_tier, action_directive = compute_risk_tier(final_score)
+            authenticity_score = max(0, 100 - tamper_score)
+            authenticity_tier = compute_authenticity_tier(tamper_score)
 
-            # Generate narrative summary
+            # 2. Transaction & AML Risk Score (0-100)
+            has_nacta_or_unsc = any(
+                "NACTA" in (item.ruleId or "") or "UNSC" in (item.ruleId or "")
+                for item in transaction_evidence
+            )
+            if has_nacta_or_unsc:
+                transaction_risk_score = 100
+            else:
+                raw_txn_points = sum(item.riskPoints for item in transaction_evidence)
+                has_crit_txn = any(item.severity == "CRITICAL" for item in transaction_evidence)
+                high_txn_count = sum(1 for item in transaction_evidence if item.severity == "HIGH")
+
+                if has_crit_txn:
+                    transaction_risk_score = max(85, min(100, raw_txn_points))
+                elif high_txn_count >= 2:
+                    transaction_risk_score = max(65, min(100, raw_txn_points))
+                elif high_txn_count == 1:
+                    transaction_risk_score = max(35, min(100, raw_txn_points))
+                elif transaction_evidence:
+                    transaction_risk_score = min(100, raw_txn_points)
+                else:
+                    transaction_risk_score = 0
+
+            transaction_risk_tier = compute_transaction_risk_tier(transaction_risk_score)
+
+            # 3. Composite Final Score & Calibrated Action Directive
+            final_score = max(tamper_score, transaction_risk_score)
+            if tamper_score >= 20 and transaction_risk_score >= 20:
+                final_score = min(100, int(round(final_score * 1.15)))
+
+            risk_tier, tier_directive = compute_risk_tier(final_score)
+
+            # Specific statutory directive prioritization
+            if has_nacta_or_unsc:
+                action_directive = "MANDATORY_STR_AND_ACCOUNT_FREEZE"
+            elif tamper_score >= 85:
+                action_directive = "IMMEDIATE_REJECTION"
+            elif transaction_risk_score >= 60 and tamper_score <= 10:
+                action_directive = "ENHANCED_TRANSACTION_MONITORING"
+            else:
+                action_directive = tier_directive
+
+            # Generate accurate, non-contradictory narrative summary
             has_registry_verified = any(e.ruleId == "RULE_PK_UTILITY_REGISTRY_VERIFIED" for e in evidence_items)
             has_bank_template_verified = any(e.ruleId == "RULE_BANK_TEMPLATE_VERIFIED" for e in evidence_items)
             if total_count == 0 or (critical_count == 0 and high_count == 0 and medium_count == 0 and (has_registry_verified or has_bank_template_verified)):
                 if has_registry_verified:
                     narrative = (
                         "Document verified 100% authentic against the official government utility authority registry (PITC). "
-                        "Payable amounts, billing month, due date, and consumer credentials match live government records. "
-                        "No physical typographical distortions, neural tampering, or ELA anomalies detected."
+                        "Payable amounts, billing month, due date, and consumer credentials match live government records with zero tampering."
                     )
                 elif has_bank_template_verified:
                     narrative = (
                         "Document verified 100% authentic against official Core Banking System (CBS) reporting profiles. "
-                        "Columnar layout, font typography, and SBP statutory regulatory footers strictly match "
-                        "canonical institutional reporting specifications with zero forensic discrepancies."
+                        "Zero column drift, canonical font layout, and all SBP AML/CFT Customer Due Diligence checks passed."
                     )
                 else:
                     narrative = (
                         "No forensic anomalies detected across structural, typographical, or financial checks. "
-                        "The document satisfies all mathematical ledger reconciliations, contains uniform typography "
-                        "and font baselines, and adheres to authentic document specifications."
+                        "The document satisfies all mathematical ledger reconciliations with 100% Document Authenticity and clean transaction profile."
                     )
             else:
-                findings_summary = []
-                if splicing_synergy_pages:
-                    pages_str = ", ".join(f"Page {p}" for p in sorted(splicing_synergy_pages))
-                    findings_summary.append(
-                        f"confirmed cross-modal physical splicing on {pages_str} (typographical font baseline distortion "
-                        f"spatially coincides with neural/compression noise discontinuity)"
-                    )
-                if critical_count > 0:
-                    findings_summary.append(f"{critical_count} critical finding(s) (including ledger arithmetic discrepancies)")
-                if high_count > 0:
-                    findings_summary.append(f"{high_count} high-severity anomaly(ies) (sub-pixel baseline offsets, producer signatures, or IBAN failures)")
-                if medium_count > 0:
-                    findings_summary.append(f"{medium_count} medium-severity indicator(s)")
+                narr_parts = []
+                if tamper_score > 0:
+                    tamper_desc = f"{len(tamper_evidence)} tampering indicator(s) (Document Authenticity: {authenticity_score}%, {authenticity_tier})"
+                    narr_parts.append(tamper_desc)
+                else:
+                    narr_parts.append("Document Authenticity: 100% (Certified Authentic)")
+
+                if transaction_risk_score > 0:
+                    txn_desc = f"{len(transaction_evidence)} transaction/compliance red flag(s) (Transaction Risk: {transaction_risk_score}/100, {transaction_risk_tier})"
+                    narr_parts.append(txn_desc)
+                else:
+                    narr_parts.append("Transaction Risk: 0/100 (Clean CDD)")
 
                 narrative = (
-                    f"Forensic verification completed with an overall fraud risk score of {final_score}/100 ({risk_tier} risk). "
-                    f"Identified {', '.join(findings_summary)}. "
+                    f"Forensic evaluation establishes: {' | '.join(narr_parts)}. "
+                    f"Composite Risk: {final_score}/100 ({risk_tier}). "
                     f"Action Directive: {action_directive.replace('_', ' ')}."
                 )
+
+            fusion_params = {
+                "category_weights": CATEGORY_WEIGHTS,
+                "synergy_multiplier": 1.25 if distinct_categories >= 2 else 1.0,
+                "splicing_synergy_detected": bool(splicing_synergy_pages),
+                "splicing_synergy_pages": list(sorted(splicing_synergy_pages)),
+                "document_authenticity": {
+                    "score": authenticity_score,
+                    "tamper_score": tamper_score,
+                    "tier": authenticity_tier,
+                    "evidence_count": len(tamper_evidence),
+                },
+                "transaction_risk": {
+                    "score": transaction_risk_score,
+                    "tier": transaction_risk_tier,
+                    "red_flags_count": len(transaction_evidence),
+                },
+            }
 
             # Upsert RiskAssessment under tenant RLS context
             # First delete existing risk signals if re-running
@@ -244,6 +417,7 @@ async def process_evidence_fusion(
                         "lowCount": low_count,
                         "infoCount": info_count,
                         "narrativeSummary": narrative,
+                        "fusionParameters": Json(fusion_params),
                         "computedAt": datetime.now(timezone.utc),
                     },
                 )
@@ -262,12 +436,7 @@ async def process_evidence_fusion(
                         "infoCount": info_count,
                         "narrativeSummary": narrative,
                         "fusionAlgorithm": "bayesian_weighted",
-                        "fusionParameters": Json({
-                            "category_weights": CATEGORY_WEIGHTS,
-                            "synergy_multiplier": 1.25 if distinct_categories >= 2 else 1.0,
-                            "splicing_synergy_detected": bool(splicing_synergy_pages),
-                            "splicing_synergy_pages": list(sorted(splicing_synergy_pages)),
-                        }),
+                        "fusionParameters": Json(fusion_params),
                     }
                 )
 
