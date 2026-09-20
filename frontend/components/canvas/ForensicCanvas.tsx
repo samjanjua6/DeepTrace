@@ -327,6 +327,7 @@ export function ForensicCanvas({
               canvasHeight={heightPx}
               activeEvidenceId={activeEvidenceId}
               onSelectEvidence={onSelectEvidence}
+              onNavigatePage={(p) => setCurrentPage(p)}
               showRuler={showRuler}
               mousePos={mousePos}
               pinnedBaselines={pinnedBaselines}

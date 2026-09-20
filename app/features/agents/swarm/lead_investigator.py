@@ -737,9 +737,19 @@ class LeadInvestigatorAgent(BaseForensicAgent):
                     "with mathematical balance manipulation."
                 )
             if has_visual and has_financial:
-                correlations.append(
-                    "Visual-Arithmetic Coupling: Localized ELA compression anomalies align with manipulated ledger rows."
+                manifest = state.get("manifest", self.evidence_manifest)
+                ev_items = manifest.get("evidence_items", [])
+                has_raster_ela = any(
+                    it.get("category") == "IMAGE_ELA_MANIPULATION" for it in ev_items
                 )
+                if has_raster_ela:
+                    correlations.append(
+                        "Visual-Arithmetic Coupling: Localized raster compression anomalies align with manipulated ledger rows."
+                    )
+                else:
+                    correlations.append(
+                        "Dual-Anchor Reconciliation: Header balance assertions contradict derived running ledger transactions."
+                    )
             if has_structural and has_visual:
                 correlations.append(
                     "Structural-Visual Concurrence: External editor signatures concur with pixel-level re-compression boundaries."

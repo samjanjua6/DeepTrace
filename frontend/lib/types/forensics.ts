@@ -84,6 +84,14 @@ export interface EvidenceAnchor {
   bboxId?: string;
 }
 
+export interface EvidenceEndpoint {
+  role: "stated" | "derived";
+  page: number;
+  bbox: [number, number, number, number]; // [x0, y0, x1, y1] in PDF points
+  label: string;
+  relation: "intra_page" | "cross_page";
+}
+
 export interface EvidenceItem {
   id: string;
   documentId: string;
@@ -103,6 +111,11 @@ export interface EvidenceItem {
   riskPoints: number;
   isDeterministic?: boolean;
   technicalDetails?: Record<string, any>;
+  pattern?: string;
+  multiplier?: number;
+  ruleVersion?: number;
+  endpoints?: EvidenceEndpoint[];
+  corroboration?: Record<string, any>;
   boundingBoxes?: BoundingBox[];
   createdAt: string;
 }

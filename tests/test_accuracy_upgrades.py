@@ -799,9 +799,10 @@ class TestCrossPageLedgerStateMachine(unittest.TestCase):
         sm = CrossPageLedgerStateMachine(stated_opening=Decimal("500000.00"))
         sm.start_page(1)
         finding = sm.process_opening_row(1, Decimal("200000.00"))
-        self.assertIsNotNone(finding)
         self.assertEqual(finding["rule_id"], "RULE_PK_OPENING_BALANCE_MISMATCH")
-        self.assertEqual(finding["discrepancy"], "PKR -300,000.00")
+        self.assertEqual(finding["discrepancy"], "PKR +300,000.00")
+        self.assertEqual(finding["expected_value"], "PKR 200,000.00")
+        self.assertEqual(finding["actual_value"], "PKR 500,000.00")
 
     def test_finalize_closing_and_macro_summary_mismatch(self):
         """Finalize must catch closing balance tampering and macro identity arithmetic violation."""

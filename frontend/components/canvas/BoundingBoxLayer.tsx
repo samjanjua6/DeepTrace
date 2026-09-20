@@ -10,6 +10,7 @@ interface BoundingBoxLayerProps {
   canvasHeight: number;
   activeEvidenceId: string | null;
   onSelectEvidence: (id: string | null) => void;
+  onNavigatePage?: (page: number) => void;
   showRuler: boolean;
   mousePos?: { x: number; y: number } | null;
   pinnedBaselines?: number[];
@@ -23,6 +24,7 @@ export function BoundingBoxLayer({
   canvasHeight,
   activeEvidenceId,
   onSelectEvidence,
+  onNavigatePage,
   showRuler,
   mousePos,
   pinnedBaselines = [],
@@ -247,6 +249,64 @@ export function BoundingBoxLayer({
               })()
             )}
 
+            {/* Intra-Page Outer Margin Connector (Dual-Anchor Reconciliation / In-Place Tampering) */}
+            {ev.ruleId !== "RULE_CV_COPY_MOVE_FORGERY" && boxes.length >= 2 && (
+              (() => {
+                const sorted = [...boxes].sort((a, b) => a.y - b.y);
+                const topBox = sorted[0];
+                const bottomBox = sorted[sorted.length - 1];
+                const marginX = 20; // 20px = ~9.6 pt, safely in outer document margin (x <= 15 pt)
+                const ty = topBox.y + topBox.height / 2;
+                const by = bottomBox.y + bottomBox.height / 2;
+                const strokeColor = ev.severity === "CRITICAL" ? "#BA2518" : "#C27803";
+
+                return (
+                  <g
+                    className={`select-none pointer-events-none transition-opacity ${
+                      isSelected
+                        ? "opacity-100"
+                        : "opacity-45 group-hover:opacity-100"
+                    }`}
+                  >
+                    {/* Orthogonal connector path routed along outer margin gutter */}
+                    <path
+                      d={`M ${topBox.x} ${ty} L ${marginX} ${ty} L ${marginX} ${by} L ${bottomBox.x} ${by}`}
+                      fill="none"
+                      stroke={strokeColor}
+                      strokeWidth={isSelected ? 2.5 : 1.5}
+                      strokeDasharray={isSelected ? "none" : "5 3"}
+                    />
+                    <circle cx={topBox.x} cy={ty} r={3.5} fill={strokeColor} />
+                    <circle cx={bottomBox.x} cy={by} r={3.5} fill={strokeColor} />
+
+                    {/* Margin Gutter Proof Tag */}
+                    <g transform={`translate(${marginX + 4}, ${(ty + by) / 2 - 8})`}>
+                      <rect
+                        x={0}
+                        y={0}
+                        width={ev.pattern ? 120 : 100}
+                        height={16}
+                        fill="#141413"
+                        rx={2}
+                      />
+                      <text
+                        x={4}
+                        y={11}
+                        fill="#FBF9F5"
+                        fontSize="8"
+                        fontFamily="monospace"
+                        fontWeight="bold"
+                      >
+                        {ev.pattern
+                          ? `PROOF: ${ev.pattern.replace(/_/g, " ").toUpperCase()}`
+                          : "RECONCILIATION ↔"}
+                      </text>
+                    </g>
+                  </g>
+                );
+              })()
+            )}
+
             {boxes.map((box) => {
               const strokeColor =
                 ev.severity === "CRITICAL"
@@ -337,6 +397,44 @@ export function BoundingBoxLayer({
                       {box.label || ev.ruleId}
                     </text>
                   </g>
+
+                  {/* Cross-Page Proof Target Jump Pill */}
+                  {(() => {
+                    const remoteEndpoint = ev.endpoints?.find(
+                      (ep) => ep.page !== currentPage
+                    );
+                    if (!remoteEndpoint) return null;
+                    return (
+                      <g
+                        className="cursor-pointer select-none"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectEvidence(ev.id);
+                          onNavigatePage?.(remoteEndpoint.page);
+                        }}
+                      >
+                        <rect
+                          x={x}
+                          y={y + h + 2}
+                          width={Math.max(130, (remoteEndpoint.label?.length || 10) * 5.2)}
+                          height={16}
+                          fill="#BA2518"
+                          rx={2}
+                          className="hover:fill-red-800 transition-colors"
+                        />
+                        <text
+                          x={x + 4}
+                          y={y + h + 13}
+                          fill="#FFFFFF"
+                          fontSize="8.5"
+                          fontFamily="monospace"
+                          fontWeight="bold"
+                        >
+                          [Proof Target: P.{remoteEndpoint.page} {remoteEndpoint.role === "stated" ? "Stated" : "Terminal"} ↗]
+                        </text>
+                      </g>
+                    );
+                  })()}
 
                   {/* Bottom Baseline Projection on Selected Box */}
                   {isSelected && (

@@ -18,7 +18,16 @@ from app.config import get_settings
 from app.core.celery_app import celery_app
 from app.core.storage import storage
 from app.db.client import db, set_org_context
-from app.features.pipeline.tasks.ledger_state_machine import CrossPageLedgerStateMachine
+from app.features.pipeline.tasks.ledger_state_machine import (
+    CrossPageLedgerStateMachine,
+    analyze_magnitude_pattern,
+)
+from app.features.pipeline.tasks.inplace_tampering_engine import (
+    detect_stream_displacement,
+    detect_comma_inconsistency,
+    detect_slot_width_overflow,
+    detect_whiteout_patch,
+)
 from app.features.pipeline.tasks.pk_calendar import (
     parse_transaction_date,
     evaluate_transaction_date,
@@ -493,6 +502,46 @@ def extract_spatial_summary(page: Any) -> dict[str, dict[str, Any]]:
                             }
     return results
 
+
+def resolve_stated_opening_bbox(
+    pdf_doc: Any,
+    summary_bboxes: dict[str, tuple[int, tuple[float, float, float, float]]],
+    stated_opening: Decimal | None,
+) -> tuple[int, tuple[float, float, float, float], bool]:
+    """
+    Resolve stated opening balance bounding box with robust fallback.
+    Returns (page_number, bbox_tuple, is_label_only).
+    """
+    if "opening_balance" in summary_bboxes:
+        s_page, s_box = summary_bboxes["opening_balance"]
+        return s_page, s_box, False
+
+    # Fallback search on Page 1 (and Page 2)
+    for p_idx in range(min(2, len(pdf_doc))):
+        page = pdf_doc[p_idx]
+        p_num = p_idx + 1
+        label_rects = page.search_for("Opening Balance") or page.search_for("Opening")
+        if label_rects:
+            lbl_rect = label_rects[0]
+            if stated_opening is not None:
+                str_cands = [
+                    f"{stated_opening:,.2f}",
+                    f"{stated_opening:.2f}",
+                    f"PKR{stated_opening:,.2f}",
+                    f"PKR{stated_opening:.2f}",
+                    f"PKR {stated_opening:,.2f}",
+                    str(stated_opening),
+                ]
+                for sc in str_cands:
+                    amt_rects = page.search_for(sc)
+                    for ar in amt_rects:
+                        if (0 <= ar.y0 - lbl_rect.y0 <= 45 or abs(ar.y0 - lbl_rect.y0) <= 10) and (ar.x0 >= lbl_rect.x0 - 20):
+                            return p_num, (ar.x0, ar.y0, ar.x1, ar.y1), False
+
+            # If amount token not specifically found, return label box as fallback
+            return p_num, (lbl_rect.x0, lbl_rect.y0, lbl_rect.x1, lbl_rect.y1), True
+
+    return 1, (0.0, 0.0, 0.0, 0.0), True
 
 
 def validate_pk_iban(iban_str: str) -> tuple[bool, str, str | None]:
@@ -1036,6 +1085,7 @@ async def process_financial(
                     stated_debits=stated_debits,
                 )
                 previous_balance: Decimal | None = stated_opening
+                tracked_opening_finding: dict[str, Any] | None = None
 
                 # Column geometry discovered dynamically from table headers across pages
                 doc_column_geometry: dict[str, Any] = {
@@ -1162,6 +1212,30 @@ async def process_financial(
                                 line_bbox_x1 = max([w[2] for w in line_words])
                                 line_bbox_y1 = max([w[3] for w in line_words])
 
+                                tech_details = dict(finding_data.get("technical_details", {}))
+                                s_page, s_box, is_lbl_only = resolve_stated_opening_bbox(pdf_doc, summary_bboxes, stated_opening)
+                                if finding_data["rule_id"] == "RULE_PK_OPENING_BALANCE_MISMATCH":
+                                    endpoints = [
+                                        {
+                                            "role": "stated",
+                                            "page": s_page,
+                                            "bbox": [float(s_box[0]), float(s_box[1]), float(s_box[2]), float(s_box[3])],
+                                            "label": f"Stated Opening Header ({finding_data.get('actual_value')})" if not is_lbl_only else "Stated Opening (Label)",
+                                            "relation": "intra_page" if s_page == page_num else "cross_page",
+                                        },
+                                        {
+                                            "role": "derived",
+                                            "page": page_num,
+                                            "bbox": [float(line_bbox_x0), float(line_bbox_y0), float(line_bbox_x1), float(line_bbox_y1)],
+                                            "label": f"Ledger Opening Row ({finding_data.get('expected_value')})",
+                                            "relation": "intra_page" if s_page == page_num else "cross_page",
+                                        },
+                                    ]
+                                    tech_details["endpoints"] = endpoints
+                                    tech_details["rule_version"] = 2
+                                    if is_lbl_only:
+                                        tech_details["is_label_only"] = True
+
                                 finding = await tx.evidenceitem.create(
                                     data={
                                         "document": {"connect": {"id": doc.id}},
@@ -1177,11 +1251,16 @@ async def process_financial(
                                         "expectedValue": finding_data.get("expected_value"),
                                         "actualValue": finding_data.get("actual_value"),
                                         "discrepancy": finding_data.get("discrepancy"),
-                                        "technicalDetails": Json(finding_data.get("technical_details", {})),
+                                        "technicalDetails": Json(tech_details),
                                     }
                                 )
-                                if "opening_balance" in summary_bboxes and finding_data["rule_id"] == "RULE_PK_OPENING_BALANCE_MISMATCH":
-                                    s_page, s_box = summary_bboxes["opening_balance"]
+                                if finding_data["rule_id"] == "RULE_PK_OPENING_BALANCE_MISMATCH":
+                                    tracked_opening_finding = {
+                                        "id": finding.id,
+                                        "multiplier": finding_data.get("multiplier"),
+                                        "pattern": finding_data.get("pattern"),
+                                        "technical_details": tech_details,
+                                    }
                                     s_meta = page_meta_map.get(s_page)
                                     s_sx = (s_meta.widthPx / s_meta.widthPts) if (s_meta and s_meta.widthPts) else (150.0 / 72.0)
                                     s_sy = (s_meta.heightPx / s_meta.heightPts) if (s_meta and s_meta.heightPts) else (150.0 / 72.0)
@@ -1197,7 +1276,7 @@ async def process_financial(
                                             "yPts": float(s_box[1]),
                                             "widthPts": float(s_box[2] - s_box[0]),
                                             "heightPts": float(s_box[3] - s_box[1]),
-                                            "label": "Stated Opening (Tampered)",
+                                            "label": "Stated Opening (Tampered)" if not is_lbl_only else "Opening Balance (Label Only)",
                                             "color": "#dc2626",
                                         }
                                     )
@@ -1455,6 +1534,34 @@ async def process_financial(
                                 line_bbox_x1 = max([w[2] for w in line_words])
                                 line_bbox_y1 = max([w[3] for w in line_words])
 
+                                tech_details = dict(sm_finding.get("technical_details", {}))
+                                s_page = page_num
+                                s_box = None
+                                is_lbl_only = False
+
+                                if sm_finding["rule_id"] == "RULE_PK_OPENING_BALANCE_MISMATCH":
+                                    s_page, s_box, is_lbl_only = resolve_stated_opening_bbox(pdf_doc, summary_bboxes, stated_opening)
+                                    endpoints = [
+                                        {
+                                            "role": "stated",
+                                            "page": s_page,
+                                            "bbox": [float(s_box[0]), float(s_box[1]), float(s_box[2]), float(s_box[3])],
+                                            "label": f"Stated Opening Header ({sm_finding.get('actual_value')})" if not is_lbl_only else "Stated Opening (Label)",
+                                            "relation": "intra_page" if s_page == page_num else "cross_page",
+                                        },
+                                        {
+                                            "role": "derived",
+                                            "page": page_num,
+                                            "bbox": [float(line_bbox_x0), float(line_bbox_y0), float(line_bbox_x1), float(line_bbox_y1)],
+                                            "label": f"Ledger Origin Row ({sm_finding.get('expected_value')})",
+                                            "relation": "intra_page" if s_page == page_num else "cross_page",
+                                        },
+                                    ]
+                                    tech_details["endpoints"] = endpoints
+                                    tech_details["rule_version"] = 2
+                                    if is_lbl_only:
+                                        tech_details["is_label_only"] = True
+
                                 finding = await tx.evidenceitem.create(
                                     data={
                                         "document": {"connect": {"id": doc.id}},
@@ -1470,9 +1577,37 @@ async def process_financial(
                                         "expectedValue": sm_finding.get("expected_value"),
                                         "actualValue": sm_finding.get("actual_value"),
                                         "discrepancy": sm_finding.get("discrepancy"),
-                                        "technicalDetails": Json(sm_finding.get("technical_details", {})),
+                                        "technicalDetails": Json(tech_details),
                                     }
                                 )
+
+                                if sm_finding["rule_id"] == "RULE_PK_OPENING_BALANCE_MISMATCH":
+                                    tracked_opening_finding = {
+                                        "id": finding.id,
+                                        "multiplier": sm_finding.get("multiplier"),
+                                        "pattern": sm_finding.get("pattern"),
+                                        "technical_details": tech_details,
+                                    }
+                                    if s_box:
+                                        s_meta = page_meta_map.get(s_page)
+                                        s_sx = (s_meta.widthPx / s_meta.widthPts) if (s_meta and s_meta.widthPts) else (150.0 / 72.0)
+                                        s_sy = (s_meta.heightPx / s_meta.heightPts) if (s_meta and s_meta.heightPts) else (150.0 / 72.0)
+                                        await tx.boundingbox.create(
+                                            data={
+                                                "evidenceItem": {"connect": {"id": finding.id}},
+                                                "pageNumber": s_page,
+                                                "x": float(s_box[0] * s_sx),
+                                                "y": float(s_box[1] * s_sy),
+                                                "width": float((s_box[2] - s_box[0]) * s_sx),
+                                                "height": float((s_box[3] - s_box[1]) * s_sy),
+                                                "xPts": float(s_box[0]),
+                                                "yPts": float(s_box[1]),
+                                                "widthPts": float(s_box[2] - s_box[0]),
+                                                "heightPts": float(s_box[3] - s_box[1]),
+                                                "label": "Stated Opening (Tampered)" if not is_lbl_only else "Opening Balance (Label Only)",
+                                                "color": "#dc2626",
+                                            }
+                                        )
 
                                 w_pts = line_bbox_x1 - line_bbox_x0
                                 h_pts = line_bbox_y1 - line_bbox_y0
@@ -1488,8 +1623,8 @@ async def process_financial(
                                         "yPts": float(line_bbox_y0),
                                         "widthPts": float(w_pts),
                                         "heightPts": float(h_pts),
-                                        "label": sm_finding.get("label", "Math Mismatch"),
-                                        "color": sm_finding.get("color", "#dc2626"),
+                                        "label": sm_finding.get("label", "Ledger Origin Row"),
+                                        "color": sm_finding.get("color", "#f59e0b"),
                                     }
                                 )
 
@@ -1531,8 +1666,18 @@ async def process_financial(
                                     break
                             s_page = target_page_idx + 1
 
-                        title = f"Closing Balance Tampering Detected (+{discrepancy:,.2f} PKR Discrepancy)" if discrepancy > 0 else f"Closing Balance Mismatch ({discrepancy:+,.2f} PKR)"
-                        
+                        pattern, multiplier = analyze_magnitude_pattern(expected=previous_balance, detected=stated_closing)
+                        if pattern == "magnitude_power_of_ten":
+                            title = f"Closing Balance Magnitude Inflation ({multiplier:g}×) (+{discrepancy:,.2f} PKR)"
+                        elif pattern == "digits_appended":
+                            title = f"Closing Balance Digits Appended (+{discrepancy:,.2f} PKR)"
+                        elif pattern == "digits_inserted":
+                            title = f"Closing Balance Digits Inserted (+{discrepancy:,.2f} PKR)"
+                        elif discrepancy > 0:
+                            title = f"Closing Balance Tampering Detected (+{discrepancy:,.2f} PKR Discrepancy)"
+                        else:
+                            title = f"Closing Balance Mismatch ({discrepancy:+,.2f} PKR)"
+
                         anchors = []
                         if s_page != last_page_num:
                             anchors = [
@@ -1556,6 +1701,40 @@ async def process_financial(
                                 }
                             ]
 
+                        # Build typed endpoints
+                        endpoints = [
+                            {
+                                "role": "stated",
+                                "page": s_page,
+                                "bbox": [float(s_box[0]), float(s_box[1]), float(s_box[2]), float(s_box[3])] if s_box else [0.0, 0.0, 0.0, 0.0],
+                                "label": f"Stated Closing Summary (PKR {stated_closing:,.2f})",
+                                "relation": "cross_page" if s_page != last_page_num else "intra_page",
+                            },
+                            {
+                                "role": "derived",
+                                "page": last_page_num,
+                                "bbox": [50.0, 1500.0, 500.0, 1540.0],
+                                "label": f"Terminal Ledger Row (PKR {previous_balance:,.2f})",
+                                "relation": "cross_page" if s_page != last_page_num else "intra_page",
+                            },
+                        ]
+
+                        closing_tech_details = {
+                            "stated_closing_balance": str(stated_closing),
+                            "final_ledger_balance": str(previous_balance),
+                            "discrepancy": str(discrepancy),
+                            "summary_page": s_page,
+                            "last_page": last_page_num,
+                            "anchor_type": "MULTI_PAGE_SPAN" if last_page_num > 1 else "PAGE_REGION",
+                            "page_start": 1,
+                            "page_end": last_page_num,
+                            "anchors": anchors,
+                            "endpoints": endpoints,
+                            "pattern": pattern,
+                            "multiplier": multiplier,
+                            "rule_version": 2,
+                        }
+
                         finding = await tx.evidenceitem.create(
                             data={
                                 "document": {"connect": {"id": doc.id}},
@@ -1575,19 +1754,35 @@ async def process_financial(
                                 "expectedValue": f"PKR {previous_balance:,.2f}",
                                 "actualValue": f"PKR {stated_closing:,.2f}",
                                 "discrepancy": f"PKR {discrepancy:+,.2f}",
-                                "technicalDetails": Json({
-                                    "stated_closing_balance": str(stated_closing),
-                                    "final_ledger_balance": str(previous_balance),
-                                    "discrepancy": str(discrepancy),
-                                    "summary_page": s_page,
-                                    "last_page": last_page_num,
-                                    "anchor_type": "MULTI_PAGE_SPAN" if last_page_num > 1 else "PAGE_REGION",
-                                    "page_start": 1,
-                                    "page_end": last_page_num,
-                                    "anchors": anchors,
-                                }),
+                                "technicalDetails": Json(closing_tech_details),
                             }
                         )
+
+                        # Corroboration cross-check with opening balance finding
+                        if tracked_opening_finding and pattern and multiplier:
+                            open_mult = tracked_opening_finding.get("multiplier")
+                            if open_mult and abs(float(open_mult) - float(multiplier)) < 0.001:
+                                close_corr = {
+                                    "correlated_rule": "RULE_PK_OPENING_BALANCE_MISMATCH",
+                                    "shared_factor": float(multiplier),
+                                    "type": "symmetric_magnitude_inflation",
+                                }
+                                open_corr = {
+                                    "correlated_rule": "RULE_PK_CLOSING_BALANCE_MISMATCH",
+                                    "shared_factor": float(open_mult),
+                                    "type": "symmetric_magnitude_inflation",
+                                }
+                                closing_tech_details["corroboration"] = close_corr
+                                await tx.evidenceitem.update(
+                                    where={"id": finding.id},
+                                    data={"technicalDetails": Json(closing_tech_details)},
+                                )
+                                open_td = dict(tracked_opening_finding.get("technical_details", {}))
+                                open_td["corroboration"] = open_corr
+                                await tx.evidenceitem.update(
+                                    where={"id": tracked_opening_finding["id"]},
+                                    data={"technicalDetails": Json(open_td)},
+                                )
 
                         # Bounding box 1: Stated closing balance on summary page
                         if s_box:
@@ -2027,6 +2222,74 @@ async def process_financial(
                                     })
                         except Exception as fbr_err:
                             logger.warning(f"FBR tax verification in bank statement error: {fbr_err}")
+
+                # ─────────────────────────────────────────────────────────────
+                # 7. In-Place Statement Tampering Detection
+                # ─────────────────────────────────────────────────────────────
+                if doc.documentType in ("BANK_STATEMENT", "DIGITAL_WALLET_LEDGER"):
+                    try:
+                        b_code = "MEEZAN" if ("MEEZAN" in all_text.upper() or (primary_iban_info and primary_iban_info.get("bank_code") == "MEZN")) else "OTHER"
+                        for p_idx in range(len(pdf_doc)):
+                            page_obj = pdf_doc[p_idx]
+                            curr_page_num = p_idx + 1
+                            inplace_findings = []
+                            inplace_findings.extend(detect_stream_displacement(page_obj, curr_page_num))
+                            inplace_findings.extend(detect_whiteout_patch(page_obj, curr_page_num))
+                            inplace_findings.extend(detect_comma_inconsistency(page_obj, curr_page_num, bank_code=b_code))
+                            inplace_findings.extend(detect_slot_width_overflow(page_obj, curr_page_num, bank_code=b_code))
+
+                            for ip_f in inplace_findings:
+                                finding = await tx.evidenceitem.create(
+                                    data={
+                                        "document": {"connect": {"id": doc.id}},
+                                        "pipelineStage": {"connect": {"id": pipeline_stage_id}},
+                                        "category": ip_f["category"],
+                                        "severity": ip_f["severity"],
+                                        "ruleId": ip_f["rule_id"],
+                                        "riskPoints": ip_f["risk_points"],
+                                        "title": ip_f["title"],
+                                        "description": ip_f["description"],
+                                        "isDeterministic": ip_f.get("is_deterministic", False),
+                                        "confidence": ip_f.get("confidence", 0.8),
+                                        "pageNumber": curr_page_num,
+                                        "expectedValue": ip_f.get("expected_value"),
+                                        "actualValue": ip_f.get("actual_value"),
+                                        "discrepancy": ip_f.get("discrepancy"),
+                                        "technicalDetails": Json(ip_f.get("technical_details", {})),
+                                    }
+                                )
+                                bbox = ip_f.get("bbox")
+                                if bbox:
+                                    p_meta = page_meta_map.get(curr_page_num)
+                                    p_sx = (p_meta.widthPx / p_meta.widthPts) if (p_meta and p_meta.widthPts) else (150.0 / 72.0)
+                                    p_sy = (p_meta.heightPx / p_meta.heightPts) if (p_meta and p_meta.heightPts) else (150.0 / 72.0)
+                                    w_pts = bbox[2] - bbox[0]
+                                    h_pts = bbox[3] - bbox[1]
+                                    await tx.boundingbox.create(
+                                        data={
+                                            "evidenceItem": {"connect": {"id": finding.id}},
+                                            "pageNumber": curr_page_num,
+                                            "x": float(bbox[0] * p_sx),
+                                            "y": float(bbox[1] * p_sy),
+                                            "width": float(w_pts * p_sx),
+                                            "height": float(h_pts * p_sy),
+                                            "xPts": float(bbox[0]),
+                                            "yPts": float(bbox[1]),
+                                            "widthPts": float(w_pts),
+                                            "heightPts": float(h_pts),
+                                            "label": ip_f.get("title"),
+                                            "color": "#f59e0b" if ip_f["severity"] in ("LOW", "MEDIUM") else "#dc2626",
+                                        }
+                                    )
+                                stage_findings.append({
+                                    "id": finding.id,
+                                    "rule_id": ip_f["rule_id"],
+                                    "severity": finding.severity,
+                                    "page": curr_page_num,
+                                    "title": finding.title,
+                                })
+                    except Exception as inplace_err:
+                        logger.warning(f"In-place tampering detection error: {inplace_err}")
 
                 pdf_doc.close()
 

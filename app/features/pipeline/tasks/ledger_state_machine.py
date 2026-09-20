@@ -30,6 +30,48 @@ class PageLedgerRecord:
     has_discontinuity: bool = False
     discontinuity_amount: Optional[Decimal] = None
 
+def analyze_magnitude_pattern(expected: Decimal, detected: Decimal) -> tuple[str | None, float | None]:
+    """
+    Analyze discrepancy between expected (trusted ledger) and detected (document header claim)
+    using digit-string comparison.
+    Returns (pattern, multiplier) or (None, None).
+    """
+    if detected <= expected or expected <= Decimal("0"):
+        return None, None
+
+    def to_digit_str(val: Decimal) -> str:
+        s = f"{val:.2f}"
+        if s.endswith(".00"):
+            s = s[:-3]
+        elif "." in s:
+            s = s.replace(".", "")
+        return s.replace(",", "").replace("-", "").strip()
+
+    exp_digits = to_digit_str(expected)
+    det_digits = to_digit_str(detected)
+
+    if not exp_digits or not det_digits:
+        return None, None
+
+    try:
+        ratio = float(detected / expected)
+    except Exception:
+        ratio = None
+
+    # 1. Check if det_digits starts with exp_digits
+    if det_digits.startswith(exp_digits) and len(det_digits) > len(exp_digits):
+        remainder = det_digits[len(exp_digits):]
+        if set(remainder) == {"0"}:
+            return "magnitude_power_of_ten", ratio
+        else:
+            return "digits_appended", ratio
+
+    # 2. Check if exp_digits is substring within det_digits
+    if exp_digits in det_digits and len(det_digits) > len(exp_digits):
+        return "digits_inserted", ratio
+
+    return None, None
+
 
 class CrossPageLedgerStateMachine:
     """
@@ -94,26 +136,47 @@ class CrossPageLedgerStateMachine:
                 self.pages[page_num].opening_type = "EXPLICIT_PAGE_OPENING"
 
             if self.stated_opening is not None and abs(amount - self.stated_opening) > self.tolerance:
-                discrepancy = amount - self.stated_opening
+                expected_opening = amount
+                detected_opening = self.stated_opening
+                discrepancy = detected_opening - expected_opening
+                pattern, multiplier = analyze_magnitude_pattern(expected=expected_opening, detected=detected_opening)
+                if pattern == "magnitude_power_of_ten":
+                    title = f"Opening Balance Magnitude Inflation ({multiplier:g}×) (+{discrepancy:,.2f} PKR)"
+                elif pattern == "digits_appended":
+                    title = f"Opening Balance Digits Appended (+{discrepancy:,.2f} PKR)"
+                elif pattern == "digits_inserted":
+                    title = f"Opening Balance Digits Inserted (+{discrepancy:,.2f} PKR)"
+                elif discrepancy > 0:
+                    title = f"Opening Balance Tampering Detected (+{discrepancy:,.2f} PKR Discrepancy)"
+                else:
+                    title = f"Opening Balance Mismatch ({discrepancy:+,.2f} PKR)"
+
                 finding = {
                     "category": "MATHEMATICAL_MISMATCH",
                     "severity": "CRITICAL" if abs(discrepancy) > Decimal("1000") else "HIGH",
                     "rule_id": "RULE_PK_OPENING_BALANCE_MISMATCH",
                     "risk_points": 50 if abs(discrepancy) > Decimal("1000") else 30,
-                    "title": f"Opening Balance Tampering Detected (+{discrepancy:,.2f} PKR Discrepancy)" if discrepancy > 0 else f"Opening Balance Mismatch ({discrepancy:+,.2f} PKR)",
+                    "title": title,
                     "description": (
-                        f"Document header states Opening Balance of PKR {self.stated_opening:,.2f}, "
-                        f"but transaction table starts with PKR {amount:,.2f}. "
+                        f"Document header claims Opening Balance of PKR {detected_opening:,.2f}, "
+                        f"but transaction ledger establishes true origin as PKR {expected_opening:,.2f}. "
                         f"Discrepancy: PKR {discrepancy:+,.2f}. This indicates ledger origin manipulation."
                     ),
-                    "expected_value": f"PKR {self.stated_opening:,.2f}",
-                    "actual_value": f"PKR {amount:,.2f}",
+                    "expected_value": f"PKR {expected_opening:,.2f}",
+                    "actual_value": f"PKR {detected_opening:,.2f}",
                     "discrepancy": f"PKR {discrepancy:+,.2f}",
+                    "pattern": pattern,
+                    "multiplier": multiplier,
+                    "rule_version": 2,
                     "technical_details": {
-                        "stated_opening": str(self.stated_opening),
-                        "table_opening": str(amount),
+                        "stated_opening": str(detected_opening),
+                        "ledger_origin": str(expected_opening),
+                        "table_opening": str(expected_opening),
                         "discrepancy": str(discrepancy),
                         "page_number": page_num,
+                        "pattern": pattern,
+                        "multiplier": multiplier,
+                        "rule_version": 2,
                     },
                     "label": "Ledger Opening Row",
                     "color": "#f59e0b",
@@ -125,9 +188,9 @@ class CrossPageLedgerStateMachine:
                 "particulars": "Opening Balance",
                 "debit": None,
                 "credit": None,
-                "expectedBalance": float(self.stated_opening if self.stated_opening is not None else amount),
-                "recordedBalance": float(amount),
-                "discrepancy": float(amount - (self.stated_opening or amount)),
+                "expectedBalance": float(amount),
+                "recordedBalance": float(self.stated_opening if self.stated_opening is not None else amount),
+                "discrepancy": float(discrepancy if finding is not None else 0.0),
                 "isTampered": finding is not None,
                 "pageNumber": page_num,
                 "rowType": "OPENING",
@@ -308,26 +371,47 @@ class CrossPageLedgerStateMachine:
                 self.pages[page_num].opening_type = "IMPLIED_ORIGIN"
 
             if self.stated_opening is not None and abs(table_origin - self.stated_opening) > self.tolerance:
-                discrepancy = table_origin - self.stated_opening
+                expected_opening = table_origin
+                detected_opening = self.stated_opening
+                discrepancy = detected_opening - expected_opening
+                pattern, multiplier = analyze_magnitude_pattern(expected=expected_opening, detected=detected_opening)
+                if pattern == "magnitude_power_of_ten":
+                    title = f"Opening Balance Magnitude Inflation ({multiplier:g}×) (+{discrepancy:,.2f} PKR)"
+                elif pattern == "digits_appended":
+                    title = f"Opening Balance Digits Appended (+{discrepancy:,.2f} PKR)"
+                elif pattern == "digits_inserted":
+                    title = f"Opening Balance Digits Inserted (+{discrepancy:,.2f} PKR)"
+                elif discrepancy > 0:
+                    title = f"Opening Balance Tampering Detected (+{discrepancy:,.2f} PKR Discrepancy)"
+                else:
+                    title = f"Opening Balance Mismatch ({discrepancy:+,.2f} PKR)"
+
                 finding = {
                     "category": "MATHEMATICAL_MISMATCH",
                     "severity": "CRITICAL" if abs(discrepancy) > Decimal("1000") else "HIGH",
                     "rule_id": "RULE_PK_OPENING_BALANCE_MISMATCH",
                     "risk_points": 50 if abs(discrepancy) > Decimal("1000") else 30,
-                    "title": f"Opening Balance Tampering Detected (+{discrepancy:,.2f} PKR Discrepancy)" if discrepancy > 0 else f"Opening Balance Mismatch ({discrepancy:+,.2f} PKR)",
+                    "title": title,
                     "description": (
-                        f"Document header states Opening Balance of PKR {self.stated_opening:,.2f}, "
-                        f"but back-calculated ledger origin from first transaction is PKR {table_origin:,.2f}. "
+                        f"Document header claims Opening Balance of PKR {detected_opening:,.2f}, "
+                        f"but back-calculated ledger origin from first transaction is PKR {expected_opening:,.2f}. "
                         f"Discrepancy: PKR {discrepancy:+,.2f}. This indicates ledger origin manipulation."
                     ),
-                    "expected_value": f"PKR {self.stated_opening:,.2f}",
-                    "actual_value": f"PKR {table_origin:,.2f}",
+                    "expected_value": f"PKR {expected_opening:,.2f}",
+                    "actual_value": f"PKR {detected_opening:,.2f}",
                     "discrepancy": f"PKR {discrepancy:+,.2f}",
+                    "pattern": pattern,
+                    "multiplier": multiplier,
+                    "rule_version": 2,
                     "technical_details": {
-                        "stated_opening": str(self.stated_opening),
-                        "table_origin": str(table_origin),
+                        "stated_opening": str(detected_opening),
+                        "table_origin": str(expected_opening),
+                        "ledger_origin": str(expected_opening),
                         "discrepancy": str(discrepancy),
                         "page_number": page_num,
+                        "pattern": pattern,
+                        "multiplier": multiplier,
+                        "rule_version": 2,
                     },
                     "label": "Ledger Origin Row",
                     "color": "#f59e0b",
@@ -550,11 +634,18 @@ class CrossPageLedgerStateMachine:
             diff_closing = abs(cl - self.running_balance)
             if diff_closing > self.tolerance:
                 discrepancy = cl - self.running_balance
-                title = (
-                    f"Closing Balance Tampering Detected (+{discrepancy:,.2f} PKR Discrepancy)"
-                    if discrepancy > 0
-                    else f"Closing Balance Mismatch ({discrepancy:+,.2f} PKR)"
-                )
+                pattern, multiplier = analyze_magnitude_pattern(expected=self.running_balance, detected=cl)
+                if pattern == "magnitude_power_of_ten":
+                    title = f"Closing Balance Magnitude Inflation ({multiplier:g}×) (+{discrepancy:,.2f} PKR)"
+                elif pattern == "digits_appended":
+                    title = f"Closing Balance Digits Appended (+{discrepancy:,.2f} PKR)"
+                elif pattern == "digits_inserted":
+                    title = f"Closing Balance Digits Inserted (+{discrepancy:,.2f} PKR)"
+                elif discrepancy > 0:
+                    title = f"Closing Balance Tampering Detected (+{discrepancy:,.2f} PKR Discrepancy)"
+                else:
+                    title = f"Closing Balance Mismatch ({discrepancy:+,.2f} PKR)"
+
                 final_findings.append({
                     "category": "MATHEMATICAL_MISMATCH",
                     "severity": "CRITICAL",
@@ -569,10 +660,16 @@ class CrossPageLedgerStateMachine:
                     "expected_value": f"PKR {self.running_balance:,.2f}",
                     "actual_value": f"PKR {cl:,.2f}",
                     "discrepancy": f"PKR {discrepancy:+,.2f}",
+                    "pattern": pattern,
+                    "multiplier": multiplier,
+                    "rule_version": 2,
                     "technical_details": {
                         "stated_closing": str(cl),
                         "calculated_closing": str(self.running_balance),
                         "discrepancy": str(discrepancy),
+                        "pattern": pattern,
+                        "multiplier": multiplier,
+                        "rule_version": 2,
                     },
                     "label": "Closing Balance Tampered",
                     "color": "#dc2626",

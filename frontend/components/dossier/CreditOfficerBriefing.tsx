@@ -368,7 +368,7 @@ Advisory Notice: Final credit decisions rest with authorized underwriting office
       : overallScore > 50
       ? [
           "Multi-Vector Convergence: Post-creation PDF structural/font tampering directly correlates with mathematical balance manipulation.",
-          "Visual-Arithmetic Coupling: Localized ELA compression anomalies align with manipulated ledger rows.",
+          "Dual-Anchor Reconciliation: Header balance assertions contradict derived running ledger transactions.",
         ]
       : [];
 

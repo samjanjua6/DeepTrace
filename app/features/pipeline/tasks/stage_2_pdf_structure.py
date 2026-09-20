@@ -17,6 +17,7 @@ from app.core.celery_app import celery_app
 from app.core.storage import storage
 from app.db.client import db, set_org_context
 from app.features.pipeline.tasks.pdf_signature_forensics import inspect_pdf_signatures
+from app.features.pipeline.tasks.inplace_tampering_engine import detect_incremental_revision_diff
 
 settings = get_settings()
 
@@ -122,38 +123,30 @@ async def process_pdf_structure(
                     continue
 
                 if is_pdf:
-                    # 1. Incremental Save Detection (%%EOF count)
-                    eof_count = file_bytes.count(b"%%EOF")
-                    if eof_count > 1:
+                    # 1. Incremental Save & /Prev Cross-Reference Chain Detection
+                    incr_findings = detect_incremental_revision_diff(file_bytes)
+                    for incr_data in incr_findings:
                         finding = await tx.evidenceitem.create(
                             data={
                                 "document": {"connect": {"id": doc.id}},
                                 "pipelineStage": {"connect": {"id": pipeline_stage_id}},
-                                "category": "PDF_OBJECT_ANOMALY",
-                                "severity": "CRITICAL" if eof_count > 2 else "HIGH",
-                                "ruleId": "RULE_PDF_INCREMENTAL_SAVE",
-                                "riskPoints": 35,
-                                "title": "Incremental PDF Revisions Detected (Post-Generation Tampering)",
-                                "description": (
-                                    f"The document contains {eof_count} %%EOF trailer markers indicating that the file "
-                                    "was modified and re-saved after its initial export. Legitimate bank e-statements "
-                                    "are compiled in a single pass with exactly 1 revision."
-                                ),
-                                "isDeterministic": True,
-                                "pageNumber": None,
-                                "expectedValue": "1 revision (single %%EOF)",
-                                "actualValue": f"{eof_count} revisions",
-                                "discrepancy": f"+{eof_count - 1} unauthorized revision(s)",
-                                "technicalDetails": Json({
-                                    "anchor_type": "DOCUMENT_METADATA",
-                                    "eof_count": eof_count,
-                                    "file_size_bytes": len(file_bytes),
-                                }),
+                                "category": incr_data["category"],
+                                "severity": incr_data["severity"],
+                                "ruleId": incr_data["rule_id"],
+                                "riskPoints": incr_data["risk_points"],
+                                "title": incr_data["title"],
+                                "description": incr_data["description"],
+                                "isDeterministic": incr_data.get("is_deterministic", True),
+                                "pageNumber": incr_data.get("page_number"),
+                                "expectedValue": incr_data.get("expected_value"),
+                                "actualValue": incr_data.get("actual_value"),
+                                "discrepancy": incr_data.get("discrepancy"),
+                                "technicalDetails": Json(incr_data.get("technical_details", {})),
                             }
                         )
                         stage_findings.append({
                             "id": finding.id,
-                            "rule_id": "RULE_PDF_INCREMENTAL_SAVE",
+                            "rule_id": incr_data["rule_id"],
                             "severity": finding.severity,
                             "page": None,
                             "title": finding.title,

@@ -83,20 +83,61 @@ export function LedgerMathTable({
                 className="bg-forensic-red/5 border border-forensic-red/40 p-3 hover:bg-forensic-red/10 cursor-pointer transition-colors space-y-2 group"
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-forensic-red uppercase text-[10px] tracking-wider">
-                    Opening Balance Discrepancy
-                  </span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSelectEvidence?.(openingMismatch.id);
-                      onFocusCanvas?.(openingMismatch.pageNumber || 1);
-                    }}
-                    className="text-[10px] bg-forensic-red/15 hover:bg-forensic-red text-forensic-red hover:text-white px-2 py-0.5 rounded-sm transition-colors flex items-center gap-1 font-bold"
-                  >
-                    Locate P.{openingMismatch.pageNumber || 1} <ArrowRight className="w-3 h-3" />
-                  </button>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-bold text-forensic-red uppercase text-[10px] tracking-wider">
+                      Opening Balance Discrepancy
+                    </span>
+                    <span className="bg-forensic-red/20 text-forensic-red border border-forensic-red/40 px-1 py-0.2 text-[8.5px] font-bold rounded-xs">
+                      {(() => {
+                        const sPage = openingMismatch.endpoints?.find((ep) => ep.role === "stated")?.page || 1;
+                        const dPage = openingMismatch.endpoints?.find((ep) => ep.role === "derived")?.page || openingMismatch.pageNumber || 1;
+                        return sPage !== dPage ? `P.${sPage} ↔ P.${dPage}` : `P.${sPage} (Header ↔ Ledger)`;
+                      })()}
+                    </span>
+                    {openingMismatch.pattern && (
+                      <span className="bg-forensic-red/20 text-forensic-red border border-forensic-red/40 px-1 py-0.2 text-[8.5px] font-bold rounded-xs">
+                        {openingMismatch.pattern === "magnitude_power_of_ten"
+                          ? `MAGNITUDE (${openingMismatch.multiplier}×)`
+                          : openingMismatch.pattern.replace(/_/g, " ").toUpperCase()}
+                      </span>
+                    )}
+                    {openingMismatch.corroboration && (
+                      <span className="bg-blue-900/30 text-blue-400 border border-blue-700/40 px-1 py-0.2 text-[8.5px] font-bold rounded-xs">
+                        {openingMismatch.corroboration.shared_factor}× SYMMETRIC
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {openingMismatch.endpoints && openingMismatch.endpoints.length > 0 ? (
+                      openingMismatch.endpoints.map((ep, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectEvidence?.(openingMismatch.id);
+                            onFocusCanvas?.(ep.page);
+                          }}
+                          className="text-[9px] bg-forensic-red/15 hover:bg-forensic-red text-forensic-red hover:text-white px-1.5 py-0.5 rounded-sm transition-colors font-bold cursor-pointer"
+                          title={ep.label}
+                        >
+                          P.{ep.page} {ep.role === "stated" ? "Stated" : "Origin"} ↗
+                        </button>
+                      ))
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectEvidence?.(openingMismatch.id);
+                          onFocusCanvas?.(openingMismatch.pageNumber || 1);
+                        }}
+                        className="text-[10px] bg-forensic-red/15 hover:bg-forensic-red text-forensic-red hover:text-white px-2 py-0.5 rounded-sm transition-colors flex items-center gap-1 font-bold"
+                      >
+                        Locate P.{openingMismatch.pageNumber || 1} <ArrowRight className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t border-forensic-red/20">
                   <div>
@@ -139,34 +180,75 @@ export function LedgerMathTable({
                 className="bg-forensic-red/5 border border-forensic-red/40 p-3 hover:bg-forensic-red/10 cursor-pointer transition-colors space-y-2 group"
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-forensic-red uppercase text-[10px] tracking-wider">
-                    Closing Balance Discrepancy
-                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-bold text-forensic-red uppercase text-[10px] tracking-wider">
+                      Closing Balance Discrepancy
+                    </span>
+                    <span className="bg-forensic-red/20 text-forensic-red border border-forensic-red/40 px-1 py-0.2 text-[8.5px] font-bold rounded-xs">
+                      {(() => {
+                        const sPage = closingMismatch.endpoints?.find((ep) => ep.role === "stated")?.page || 1;
+                        const dPage = closingMismatch.endpoints?.find((ep) => ep.role === "derived")?.page || closingMismatch.pageNumber || 23;
+                        return sPage !== dPage ? `P.${sPage} ↔ P.${dPage}` : `P.${sPage} (Header ↔ Ledger)`;
+                      })()}
+                    </span>
+                    {closingMismatch.pattern && (
+                      <span className="bg-forensic-red/20 text-forensic-red border border-forensic-red/40 px-1 py-0.2 text-[8.5px] font-bold rounded-xs">
+                        {closingMismatch.pattern === "magnitude_power_of_ten"
+                          ? `MAGNITUDE (${closingMismatch.multiplier}×)`
+                          : closingMismatch.pattern.replace(/_/g, " ").toUpperCase()}
+                      </span>
+                    )}
+                    {closingMismatch.corroboration && (
+                      <span className="bg-blue-900/30 text-blue-400 border border-blue-700/40 px-1 py-0.2 text-[8.5px] font-bold rounded-xs">
+                        {closingMismatch.corroboration.shared_factor}× SYMMETRIC
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSelectEvidence?.(closingMismatch.id);
-                        onFocusCanvas?.(1);
-                      }}
-                      className="text-[9px] bg-forensic-red/15 hover:bg-forensic-red text-forensic-red hover:text-white px-1.5 py-0.5 rounded-sm transition-colors font-bold cursor-pointer"
-                      title="Jump to Stated Closing Balance on Page 1 Summary"
-                    >
-                      P.1 Stated ↗
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSelectEvidence?.(closingMismatch.id);
-                        onFocusCanvas?.(closingMismatch.pageNumber || 23);
-                      }}
-                      className="text-[9px] bg-forensic-red/15 hover:bg-forensic-red text-forensic-red hover:text-white px-1.5 py-0.5 rounded-sm transition-colors font-bold cursor-pointer"
-                      title="Jump to Final Transaction Balance on Page 23 Ledger Terminal"
-                    >
-                      P.{closingMismatch.pageNumber || 23} Terminal ↗
-                    </button>
+                    {closingMismatch.endpoints && closingMismatch.endpoints.length > 0 ? (
+                      closingMismatch.endpoints.map((ep, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectEvidence?.(closingMismatch.id);
+                            onFocusCanvas?.(ep.page);
+                          }}
+                          className="text-[9px] bg-forensic-red/15 hover:bg-forensic-red text-forensic-red hover:text-white px-1.5 py-0.5 rounded-sm transition-colors font-bold cursor-pointer"
+                          title={ep.label}
+                        >
+                          P.{ep.page} {ep.role === "stated" ? "Stated" : "Terminal"} ↗
+                        </button>
+                      ))
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectEvidence?.(closingMismatch.id);
+                            onFocusCanvas?.(1);
+                          }}
+                          className="text-[9px] bg-forensic-red/15 hover:bg-forensic-red text-forensic-red hover:text-white px-1.5 py-0.5 rounded-sm transition-colors font-bold cursor-pointer"
+                          title="Jump to Stated Closing Balance on Page 1 Summary"
+                        >
+                          P.1 Stated ↗
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectEvidence?.(closingMismatch.id);
+                            onFocusCanvas?.(closingMismatch.pageNumber || 23);
+                          }}
+                          className="text-[9px] bg-forensic-red/15 hover:bg-forensic-red text-forensic-red hover:text-white px-1.5 py-0.5 rounded-sm transition-colors font-bold cursor-pointer"
+                          title="Jump to Final Transaction Balance on Page 23 Ledger Terminal"
+                        >
+                          P.{closingMismatch.pageNumber || 23} Terminal ↗
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t border-forensic-red/20">

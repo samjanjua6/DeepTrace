@@ -33,6 +33,16 @@ class EvidenceArtifactResponse(BaseModel):
     file_size_bytes: int | None = Field(default=None, validation_alias=AliasChoices("file_size_bytes", "fileSizeBytes"))
 
 
+class EvidenceEndpointResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    role: str  # 'stated' | 'derived'
+    page: int
+    bbox: list[float]  # [x0, y0, x1, y1] in points
+    label: str
+    relation: str  # 'intra_page' | 'cross_page'
+
+
 class EvidenceItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
@@ -50,6 +60,10 @@ class EvidenceItemResponse(BaseModel):
     actual_value: str | None = Field(default=None, validation_alias=AliasChoices("actual_value", "actualValue"))
     discrepancy: str | None = None
     technical_details: dict[str, Any] | None = Field(default=None, validation_alias=AliasChoices("technical_details", "technicalDetails"))
+    pattern: str | None = None
+    multiplier: float | None = None
+    rule_version: int | None = Field(default=None, validation_alias=AliasChoices("rule_version", "ruleVersion"))
+    endpoints: list[EvidenceEndpointResponse] = Field(default=[], validation_alias=AliasChoices("endpoints"))
     bounding_boxes: list[BoundingBoxResponse] = Field(default=[], validation_alias=AliasChoices("bounding_boxes", "boundingBoxes"))
     artifacts: list[EvidenceArtifactResponse] = []
     created_at: datetime = Field(validation_alias=AliasChoices("created_at", "createdAt"))

@@ -14,6 +14,27 @@ from app.features.evidence import schemas
 
 def _to_response(item) -> schemas.EvidenceItemResponse:
     resp = schemas.EvidenceItemResponse.model_validate(item)
+    if resp.technical_details:
+        td = resp.technical_details
+        if resp.pattern is None and "pattern" in td:
+            resp.pattern = td["pattern"]
+        if resp.multiplier is None and "multiplier" in td:
+            try:
+                resp.multiplier = float(td["multiplier"])
+            except (ValueError, TypeError):
+                pass
+        if resp.rule_version is None and "rule_version" in td:
+            try:
+                resp.rule_version = int(td["rule_version"])
+            except (ValueError, TypeError):
+                pass
+        if not resp.endpoints and "endpoints" in td and isinstance(td["endpoints"], list):
+            valid_endpoints = []
+            for ep in td["endpoints"]:
+                if isinstance(ep, dict) and "role" in ep and "page" in ep and "bbox" in ep:
+                    valid_endpoints.append(schemas.EvidenceEndpointResponse(**ep))
+            resp.endpoints = valid_endpoints
+
     for art in resp.artifacts:
         if art.storage_path:
             art.storage_url = storage.get_url(settings.s3_bucket_artifacts, art.storage_path)

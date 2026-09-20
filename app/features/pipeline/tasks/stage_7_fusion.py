@@ -26,6 +26,13 @@ CATEGORY_WEIGHTS: dict[str, float] = {
     "OCR_CONFIDENCE_ANOMALY": 0.25,
 }
 
+CIRCUMSTANTIAL_INPLACE_RULES: set[str] = {
+    "RULE_INPLACE_STREAM_DISPLACEMENT_OPENING",
+    "RULE_INPLACE_STREAM_DISPLACEMENT_CLOSING",
+    "RULE_INPLACE_COMMA_FORMAT_INCONSISTENCY",
+    "RULE_INPLACE_SLOT_WIDTH_OVERFLOW",
+}
+
 
 def compute_risk_tier(score: int) -> tuple[str, str]:
     """
@@ -95,8 +102,11 @@ def is_tamper_item(item: Any) -> bool:
     if (
         r_id.startswith("RULE_PK_LEDGER_")
         or r_id.startswith("RULE_PK_CLOSING_BALANCE_")
+        or r_id.startswith("RULE_PK_OPENING_BALANCE_")
         or r_id.startswith("RULE_PK_STATEMENT_SUMMARY_")
         or r_id.startswith("RULE_PK_MULTIPAGE_DISCONTINUITY")
+        or r_id.startswith("RULE_INPLACE_")
+        or r_id.startswith("RULE_PDF_INCREMENTAL_")
     ):
         return True
 
@@ -205,10 +215,25 @@ async def process_evidence_fusion(
                                     if min_area > 0 and (inter / min_area) >= 0.15:
                                         splicing_synergy_pages.add(f_item.pageNumber)
 
+            # Gating of weak circumstantial in-place findings:
+            # Require at least 2 distinct circumstantial rules OR at least 1 deterministic finding
+            has_deterministic_finding = any(
+                item.isDeterministic for item in evidence_items
+                if item.severity != "INFO" and (item.riskPoints or 0) > 0
+            )
+            circumstantial_found = [
+                item for item in evidence_items
+                if item.ruleId in CIRCUMSTANTIAL_INPLACE_RULES and item.severity != "INFO" and (item.riskPoints or 0) > 0
+            ]
+            distinct_circumstantial_rules = set(item.ruleId for item in circumstantial_found)
+            circumstantial_gated = not (len(distinct_circumstantial_rules) >= 2 or has_deterministic_finding)
+
             # Group by category (only adverse findings contribute to fraud signals and co-occurrence synergy)
             category_groups: dict[str, list[Any]] = {}
             for item in evidence_items:
                 if item.severity == "INFO" or (item.riskPoints or 0) == 0:
+                    continue
+                if item.ruleId in CIRCUMSTANTIAL_INPLACE_RULES and circumstantial_gated:
                     continue
                 cat = item.category
                 category_groups.setdefault(cat, []).append(item)
@@ -218,7 +243,10 @@ async def process_evidence_fusion(
             base_score = 0.0
 
             for cat, items in category_groups.items():
-                raw_score = sum(item.riskPoints for item in items)
+                circ_items = [it for it in items if it.ruleId in CIRCUMSTANTIAL_INPLACE_RULES]
+                non_circ_items = [it for it in items if it.ruleId not in CIRCUMSTANTIAL_INPLACE_RULES]
+                circ_score = min(10, sum(it.riskPoints for it in circ_items))
+                raw_score = sum(it.riskPoints for it in non_circ_items) + circ_score
                 weight = CATEGORY_WEIGHTS.get(cat, 0.10)
                 # Weighted score capped at 100 per category contribution
                 weighted_cat_score = min(float(raw_score), 100.0) * weight
@@ -256,7 +284,12 @@ async def process_evidence_fusion(
             # ─────────────────────────────────────────────────────────────────
             tamper_evidence = [
                 item for item in evidence_items
-                if (item.severity != "INFO" and (item.riskPoints or 0) > 0 and is_tamper_item(item))
+                if (
+                    item.severity != "INFO"
+                    and (item.riskPoints or 0) > 0
+                    and is_tamper_item(item)
+                    and not (item.ruleId in CIRCUMSTANTIAL_INPLACE_RULES and circumstantial_gated)
+                )
             ]
             transaction_evidence = [
                 item for item in evidence_items
@@ -270,7 +303,10 @@ async def process_evidence_fusion(
                 tamper_cat_groups.setdefault(item.category, []).append(item)
 
             for cat, items in tamper_cat_groups.items():
-                raw_score = sum(item.riskPoints for item in items)
+                circ_items = [it for it in items if it.ruleId in CIRCUMSTANTIAL_INPLACE_RULES]
+                non_circ_items = [it for it in items if it.ruleId not in CIRCUMSTANTIAL_INPLACE_RULES]
+                circ_score = min(10, sum(it.riskPoints for it in circ_items))
+                raw_score = sum(it.riskPoints for it in non_circ_items) + circ_score
                 w = CATEGORY_WEIGHTS.get(cat, 0.20)
                 tamper_base += min(float(raw_score), 100.0) * w
 
