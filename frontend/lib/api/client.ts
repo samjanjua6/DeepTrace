@@ -396,6 +396,23 @@ export async function getInvestigations(): Promise<Investigation[]> {
     organizationId: data.organization_id || data.organizationId || "",
     createdAt: data.created_at || data.createdAt,
     updatedAt: data.updated_at || data.updatedAt,
+    riskAssessment: (data.riskAssessment || data.risk_assessment)
+      ? normalizeRiskAssessment(data.riskAssessment || data.risk_assessment, data.id)
+      : data.risk_score !== undefined && data.risk_score !== null
+      ? {
+          id: "",
+          investigationId: data.id,
+          overallScore: data.risk_score,
+          riskTier: data.risk_tier || "LOW",
+          actionDirective: "STRAIGHT_THROUGH_APPROVAL",
+          recommendedAction: "Recommend: Straight-Through Approval (Standard Underwriting)",
+          authenticityScore: Math.max(0, 100 - data.risk_score),
+          transactionRiskScore: 0,
+          createdAt: data.created_at || data.createdAt,
+          updatedAt: data.updated_at || data.updatedAt,
+        }
+      : undefined,
+    documents: data.documents,
   }));
 }
 
@@ -717,30 +734,28 @@ export async function getEvidence(
   }));
 }
 
-export async function getRiskAssessment(
-  investigationId: string
-): Promise<RiskAssessment> {
-  await ensureAuth().catch(() => {});
-  const res = await fetch(
-    `${API_BASE}/investigations/${investigationId}/risk`,
-    {
-      headers: getAuthHeaders(),
-    }
-  );
-  if (!res.ok) throw new Error("Failed to fetch risk assessment");
-  const r = await res.json();
+function normalizeRiskAssessment(r: any, fallbackInvestigationId: string): RiskAssessment {
   return {
     id: r.id,
-    investigationId: r.investigation_id || r.investigationId || investigationId,
+    investigationId: r.investigation_id || r.investigationId || fallbackInvestigationId,
     overallScore: r.overall_score ?? r.overallScore ?? 0,
     riskTier: r.risk_tier || r.riskTier || "LOW",
     actionDirective: r.action_directive || r.actionDirective || "STRAIGHT_THROUGH_APPROVAL",
+    recommendedAction: r.recommended_action || r.recommendedAction,
     confidenceScore: r.confidence_score ?? r.confidenceScore ?? 1.0,
     isDeterministicOverride: r.is_deterministic_override ?? r.isDeterministicOverride ?? false,
     overriddenScore: r.overridden_score ?? r.overriddenScore,
     overriddenTier: r.overridden_tier || r.overriddenTier,
     overrideReason: r.override_reason || r.overrideReason,
+    overriddenById: r.overridden_by_id || r.overriddenById,
+    overriddenAt: r.overridden_at || r.overriddenAt,
     computedAt: r.computed_at || r.computedAt || new Date().toISOString(),
+    authenticityScore: r.authenticity_score ?? r.authenticityScore ?? (r.overall_score !== undefined ? Math.max(0, 100 - (r.overall_score ?? 0)) : 100),
+    tamperScore: r.tamper_score ?? r.tamperScore ?? (r.overall_score ?? 0),
+    authenticityTier: r.authenticity_tier || r.authenticityTier || ((r.overall_score ?? 0) <= 10 ? "VERIFIED_AUTHENTIC" : ((r.overall_score ?? 0) <= 40 ? "SUSPECT_DOCUMENT" : "FORGERY_DETECTED")),
+    transactionRiskScore: r.transaction_risk_score ?? r.transactionRiskScore ?? 0,
+    transactionRiskTier: r.transaction_risk_tier || r.transactionRiskTier || "CLEAN",
+    fusionParameters: r.fusion_parameters || r.fusionParameters,
     riskSignals: (r.risk_signals || r.riskSignals || []).map((s: any) => ({
       id: s.id || s.signal_category || s.signalCategory || "signal",
       category: s.signal_category || s.signalCategory || "GENERAL",
@@ -753,6 +768,22 @@ export async function getRiskAssessment(
     })),
   };
 }
+
+export async function getRiskAssessment(
+  investigationId: string
+): Promise<RiskAssessment> {
+  await ensureAuth().catch(() => {});
+  const res = await fetch(
+    `${API_BASE}/investigations/${investigationId}/risk`,
+    {
+      headers: getAuthHeaders(),
+    }
+  );
+  if (!res.ok) throw new Error("Failed to fetch risk assessment");
+  const r = await res.json();
+  return normalizeRiskAssessment(r, investigationId);
+}
+
 
 export async function overrideRiskScore(
   investigationId: string,
@@ -768,8 +799,12 @@ export async function overrideRiskScore(
       body: JSON.stringify({ score, reason }),
     }
   );
-  if (!res.ok) throw new Error("Failed to override risk score");
-  return res.json();
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.detail || "Failed to override risk score");
+  }
+  const r = await res.json();
+  return normalizeRiskAssessment(r, investigationId);
 }
 
 export async function getLeadInvestigatorAnalysis(

@@ -4,7 +4,39 @@ export type ActionDirective =
   | "STRAIGHT_THROUGH_APPROVAL"
   | "MANUAL_SUPERVISOR_REVIEW"
   | "ENHANCED_DUE_DILIGENCE"
-  | "IMMEDIATE_REJECTION";
+  | "IMMEDIATE_REJECTION"
+  | "MANDATORY_STR_AND_ACCOUNT_FREEZE"
+  | "ENHANCED_TRANSACTION_MONITORING"
+  | "SECONDARY_SCAN"
+  | "HUMAN_REVIEW"
+  | "ESCALATION_REQUIRED"
+  | (string & {});
+
+export const RECOMMENDATION_MAP: Record<string, string> = {
+  IMMEDIATE_REJECTION: "Recommend: Reject / Escalate to Fraud Unit",
+  MANDATORY_STR_AND_ACCOUNT_FREEZE: "Recommend: Mandatory STR Escalation & Freeze Review",
+  ENHANCED_TRANSACTION_MONITORING: "Recommend: Enhanced Due Diligence / Compliance Review",
+  ESCALATION_REQUIRED: "Recommend: Escalate to Senior Underwriter",
+  HUMAN_REVIEW: "Recommend: Human Review & Operational Verification",
+  SECONDARY_SCAN: "Recommend: Secondary Branch / Counterfoil Verification",
+  STRAIGHT_THROUGH_APPROVAL: "Recommend: Straight-Through Approval (Standard Underwriting)",
+  MANUAL_SUPERVISOR_REVIEW: "Recommend: Human Review & Operational Verification",
+  ENHANCED_DUE_DILIGENCE: "Recommend: Enhanced Due Diligence / Compliance Review",
+};
+
+export function formatRecommendation(directive?: string | null, tier?: string | null): string {
+  if (!directive) return "Recommend: Operational Verification";
+  const norm = directive.trim().toUpperCase();
+  if (RECOMMENDATION_MAP[norm]) {
+    return RECOMMENDATION_MAP[norm];
+  }
+  if (norm.includes("REJECT")) return "Recommend: Reject / Escalate to Fraud Unit";
+  if (norm.includes("FREEZE") || norm.includes("STR")) return "Recommend: Mandatory STR Escalation & Freeze Review";
+  if (norm.includes("MONITOR") || norm.includes("EDD")) return "Recommend: Enhanced Due Diligence / Compliance Review";
+  if (norm.includes("APPROV") || norm.includes("STRAIGHT")) return "Recommend: Straight-Through Processing (Standard Underwriting)";
+  const cleaned = norm.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+  return `Recommend: ${cleaned}`;
+}
 
 export type PipelineStatus =
   | "QUEUED"
@@ -29,6 +61,8 @@ export interface BoundingBox {
   heightPts?: number;
   label?: string;
   color?: string;
+  source?: string;
+  createdAt?: string;
 }
 
 export type AnchorType =
@@ -53,22 +87,23 @@ export interface EvidenceAnchor {
 export interface EvidenceItem {
   id: string;
   documentId: string;
-  pipelineStageId: string;
+  pipelineStageId?: string;
+  ruleId: string;
   category: string;
   severity: FindingSeverity;
-  ruleId: string;
-  riskPoints: number;
   title: string;
   description: string;
-  isDeterministic: boolean;
   pageNumber?: number;
-  anchorType?: AnchorType | string;
+  rowNumber?: number;
+  anchorType?: "DOCUMENT_METADATA" | "PAGE_REGION" | "DOCUMENT_HEADER" | "LEDGER_ROW" | "MULTI_PAGE_SPAN" | string;
   anchors?: EvidenceAnchor[];
   expectedValue?: string;
   actualValue?: string;
   discrepancy?: string;
+  riskPoints: number;
+  isDeterministic?: boolean;
   technicalDetails?: Record<string, any>;
-  boundingBoxes: BoundingBox[];
+  boundingBoxes?: BoundingBox[];
   createdAt: string;
 }
 
@@ -83,12 +118,16 @@ export interface RiskSignal {
   isDeterministic: boolean;
 }
 
+export type AuthenticityTier = "VERIFIED_AUTHENTIC" | "SUSPECT_DOCUMENT" | "FORGERY_DETECTED";
+export type TransactionRiskTier = "CLEAN" | "MONITORED" | "HIGH_AML_RISK" | "CRITICAL_PROSCRIBED";
+
 export interface RiskAssessment {
   id: string;
   investigationId: string;
   overallScore: number;
   riskTier: RiskTier;
   actionDirective: ActionDirective;
+  recommendedAction?: string;
   confidenceScore: number;
   isDeterministicOverride: boolean;
   overriddenById?: string;
@@ -98,7 +137,14 @@ export interface RiskAssessment {
   overriddenAt?: string;
   computedAt: string;
   riskSignals: RiskSignal[];
+  authenticityScore?: number;
+  tamperScore?: number;
+  authenticityTier?: AuthenticityTier | string;
+  transactionRiskScore?: number;
+  transactionRiskTier?: TransactionRiskTier | string;
+  fusionParameters?: Record<string, unknown>;
 }
+
 
 export interface DocumentPage {
   id: string;

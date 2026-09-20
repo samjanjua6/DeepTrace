@@ -150,10 +150,20 @@ def _build_structured_credit_briefing_items(
                 ]
             page_num = page_num or tech_details.get("last_page") or 1
         elif (
+            anchor_type == "TABLE_ROW"
+            or (row_num is not None and "AML" not in r_id)
+            or (r_id == "RULE_AML_HIGH_RISK_NARRATION" and anchor_type == "TABLE_ROW")
+        ):
+            anchor_type = "TABLE_ROW"
+            page_num = page_num or 1
+            anchors = tech_details.get("anchors") or [
+                {"pageNumber": page_num, "rowNumber": row_num, "label": f"Page {page_num}, Row {row_num}", "type": "TABLE_ROW"}
+            ]
+        elif (
             anchor_type == "DOCUMENT_HEADER"
             or "IBAN" in r_id
             or "CNIC" in r_id
-            or "AML" in r_id
+            or ("AML" in r_id and r_id != "RULE_AML_HIGH_RISK_NARRATION")
         ):
             anchor_type = "DOCUMENT_HEADER"
             page_num = page_num or 1
@@ -244,7 +254,18 @@ def _build_structured_credit_briefing_items(
         is_bank_template_verified = "RULE_BANK_TEMPLATE_VERIFIED" in (it.get("ruleId") or "")
         is_utility_verified = "RULE_PK_UTILITY_REGISTRY_VERIFIED" in (it.get("ruleId") or "")
 
-        p_label_ur = f"صفحہ {page_num}" if page_num else "دستاویز"
+        if anchor_type == "DOCUMENT_METADATA":
+            p_label_ur = "دستاویز کا میٹا ڈیٹا"
+        elif anchor_type == "MULTI_PAGE_SPAN":
+            p_start = tech_details.get("page_start", 1)
+            p_end = tech_details.get("last_page") or (anchors[-1].get("pageNumber") if anchors else None) or 23
+            p_label_ur = f"صفحات {p_start} تا {p_end}"
+        elif anchor_type == "TABLE_ROW" and row_num is not None:
+            p_label_ur = f"صفحہ {page_num or 1}، قطار {row_num}"
+        elif page_num:
+            p_label_ur = f"صفحہ {page_num}"
+        else:
+            p_label_ur = "دستاویز"
 
         if is_cnic_tamper:
             parts_ur = [f"{p_label_ur}: نادرا شناختی کارڈ کے نمبر میں صوبائی کوڈ یا ساخت کی سنگین خلاف ورزی پائی گئی ہے۔"]
@@ -267,7 +288,14 @@ def _build_structured_credit_briefing_items(
         elif is_aml_pep:
             parts_ur = [f"{p_label_ur}: سیاسی طور پر بااثر شخصیت (PEP) کی شناخت (اسٹیٹ بینک BPRD سرکلر 1/2021)۔ اعلیٰ انتظامیہ کی منظوری (SMA) اور اضافی چھان بین (EDD) لازمی ہے۔"]
         elif is_aml_hawala:
-            parts_ur = [f"{p_label_ur}: حوالہ/ہنڈی/کرپٹو غیر قانونی رقم کی منتقلی کے ممنوعہ الفاظ کی شناخت (اسٹیٹ بینک BPRD سرکلر 3/2018 کی خلاف ورزی)۔"]
+            is_crypto = tech_details.get("is_crypto")
+            is_hawala_only = tech_details.get("is_hawala") and not is_crypto
+            if is_crypto and not tech_details.get("is_hawala"):
+                parts_ur = [f"{p_label_ur}: غیر قانونی کرپٹو / پی ٹو پی (P2P) ورچوئل اثاثوں کی منتقلی کے ممنوعہ الفاظ کی شناخت (اسٹیٹ بینک BPRD سرکلر 3/2018 کی خلاف ورزی)۔"]
+            elif is_hawala_only:
+                parts_ur = [f"{p_label_ur}: غیر قانونی حوالہ / ہنڈی کے ذریعے رقوم کی منتقلی کے ممنوعہ الفاظ کی شناخت (اسٹیٹ بینک ضوابط و AML ایکٹ 2010 کی خلاف ورزی)۔"]
+            else:
+                parts_ur = [f"{p_label_ur}: حوالہ/ہنڈی یا کرپٹو غیر قانونی رقم کی منتقلی کے ممنوعہ الفاظ کی شناخت (اسٹیٹ بینک BPRD سرکلر 3/2018 کی خلاف ورزی)۔"]
         elif is_sig_invalidated:
             parts_ur = [f"{p_label_ur}: ڈیجیٹل دستخط اور سرٹیفکیٹ کی تصدیق ناکام (ETO 2002 کی خلاف ورزی)۔ فائل پر بینک کا ڈیجیٹل سرٹیفکیٹ موجود ہے مگر حسابی ردوبدل کی وجہ سے ہیش میش نہیں ہوا۔"]
         elif is_sig_mod:
@@ -303,6 +331,19 @@ def _build_structured_credit_briefing_items(
 
         summary_ur = " ".join(parts_ur)
 
+        boxes = it.get("boundingBoxes") or it.get("bounding_boxes") or []
+        primary_box = None
+        if boxes:
+            b = boxes[0]
+            primary_box = {
+                "page_number": b.get("pageNumber") or b.get("page_number", page_num or 1),
+                "x_pts": b.get("xPts") or b.get("x_pts") or b.get("x", 0),
+                "y_pts": b.get("yPts") or b.get("y_pts") or b.get("y", 0),
+                "width_pts": b.get("widthPts") or b.get("width_pts") or b.get("width", 0),
+                "height_pts": b.get("heightPts") or b.get("height_pts") or b.get("height", 0),
+                "label": b.get("label", "Anomaly Anchor"),
+            }
+
         items.append({
             "page_number": page_num,
             "row_number": row_num,
@@ -316,6 +357,7 @@ def _build_structured_credit_briefing_items(
             "font_detected": font_detected,
             "expected_font": expected_font,
             "visual_cue": visual_cue,
+            "primary_bounding_box": primary_box,
             "summary_en": summary_en,
             "summary_ur": summary_ur,
             "severity": it.get("severity", "MEDIUM"),
@@ -327,6 +369,36 @@ def _build_structured_credit_briefing_items(
     return items
 
 
+from app.features.agents.swarm.semantic_pk_agent import SemanticPKFinancialAgent
+from app.features.risk.schemas import format_recommendation
+
+logger = logging.getLogger(__name__)
+settings = get_settings()
+
+
+class LeadInvestigatorState(TypedDict, total=False):
+    """LangGraph state representation for forensic synthesis."""
+    investigation_id: str
+    manifest: dict
+    findings: list
+    evidence_items: list
+    cross_signal_correlations: list
+    credit_briefing: list[str]
+    credit_briefing_items: list
+    english_summary: str
+    urdu_summary: str
+    narrative: str
+    action_directive: str
+    confidence_score: float
+    overall_score: int
+    risk_tier: str
+    model_provider: str
+    model_name: str
+    anomalies_detected: int
+    evidence_citations: list
+    specialist_reports: dict
+
+
 def _generate_deterministic_briefing(
     overall_score: int,
     risk_tier: str,
@@ -334,34 +406,92 @@ def _generate_deterministic_briefing(
     evidence_items: list[dict],
     cross_signal_correlations: list[str],
     briefing_items: list[dict],
+    authenticity_score: int = 100,
+    tamper_score: int = 0,
+    authenticity_tier: str = "VERIFIED_AUTHENTIC",
+    transaction_risk_score: int = 0,
+    transaction_risk_tier: str = "CLEAN",
+    overridden_score: Optional[int] = None,
+    overridden_tier: Optional[str] = None,
+    override_reason: Optional[str] = None,
+    overridden_by: Optional[str] = None,
 ) -> Tuple[str, str, str]:
     """
     Generate deterministic English and Urdu summaries directly from verified evidence.
-    Ensures zero downtime, 100% offline safety, and Zero Hallucination.
+    Ensures zero downtime, 100% offline safety, Zero Hallucination, and human-in-the-loop framing.
     """
     adverse_briefing = [b for b in briefing_items if b.get("severity") != "INFO" and b.get("is_adverse", True)]
     verified_briefing = [b for b in briefing_items if b.get("severity") == "INFO" or not b.get("is_adverse", True)]
 
+    effective_score = overridden_score if overridden_score is not None else overall_score
+    effective_tier = overridden_tier if overridden_tier is not None else risk_tier
+    rec_action_en = format_recommendation(action_directive, effective_tier)
+
+    rec_ur_map = {
+        "Recommend: Reject / Escalate to Fraud Unit": "سفارش: درخواست مسترد / اینٹی فراڈ یونٹ کو بھیجیں",
+        "Recommend: Mandatory STR Escalation & Freeze Review": "سفارش: لازمی ایس ٹی آر رپورٹنگ اور منجمد کرنے کا جائزہ",
+        "Recommend: Enhanced Due Diligence / Compliance Review": "سفارش: اضافی تصدیق (EDD) اور منی لانڈرنگ جائزہ",
+        "Recommend: Escalate to Senior Underwriter": "سفارش: سینیئر انڈر رائٹر کو برائے فیصلہ پیش کریں",
+        "Recommend: Human Review & Operational Verification": "سفارش: آپریشنل و کاغذی شواہد کی دستی جانچ",
+        "Recommend: Secondary Branch / Counterfoil Verification": "سفارش: برانچ کاؤنٹر سے تصدیق",
+        "Recommend: Straight-Through Approval (Standard Underwriting)": "سفارش: براہِ راست منظوری (معیاری انڈر رائٹنگ)",
+        "Recommend: Straight-Through Processing (Standard Underwriting)": "سفارش: براہِ راست منظوری (معیاری انڈر رائٹنگ)",
+    }
+    rec_action_ur = rec_ur_map.get(rec_action_en, f"سفارش: {rec_action_en}")
+
+    tier_ur_map = {
+        "VERIFIED_AUTHENTIC": "مصدقہ اصل",
+        "SUSPECT_DOCUMENT": "مشکوک دستاویز",
+        "FORGERY_DETECTED": "جعل سازی ثابت",
+        "CLEAN": "محفوظ",
+        "MONITORED": "زیرِ نگرانی",
+        "HIGH_AML_RISK": "زیادہ رسک",
+        "CRITICAL_PROSCRIBED": "کالعدم / پابندی",
+    }
+    auth_tier_ur = tier_ur_map.get(authenticity_tier, authenticity_tier)
+    txn_tier_ur = tier_ur_map.get(transaction_risk_tier, transaction_risk_tier)
+
+    override_notice_en = ""
+    override_notice_ur = ""
+    if overridden_score is not None:
+        override_notice_en = (
+            f"\n\n[HUMAN ADJUDICATION AUDIT NOTICE]: Automated risk score of {overall_score}/100 ({risk_tier}) "
+            f"was manually adjudicated by authorized officer ({overridden_by or 'Compliance Officer'}) to {effective_score}/100 ({effective_tier}).\n"
+            f"Compliance Justification: \"{override_reason or 'Branch operational review verified documents.'}\""
+        )
+        override_notice_ur = (
+            f"\n\n[آڈٹ نوٹ برائے انسانی فیصلہ]: کمپیوٹرائزڈ رسک سکور {overall_score}/100 کو مجاز افسر "
+            f"کی جانب سے تبدیل کر کے {effective_score}/100 ({effective_tier}) کیا گیا ہے۔\n"
+            f"دستی فیصلے کا جواز: \"{override_reason or 'برانچ ریکارڈ سے دستی تصدیق مکمل ہو گئی ہے۔'}\""
+        )
+
     # 1. Plain English Credit Officer Briefing
-    if not adverse_briefing or overall_score == 0:
-        clean_directive = "Straight-Through Approval" if "STRAIGHT" in action_directive else action_directive.replace('_', ' ')
+    if not adverse_briefing or (overall_score == 0 and tamper_score == 0 and transaction_risk_score == 0):
+        baseline_str = f" [Engine Baseline: {overall_score}/100 ({risk_tier})]" if overridden_score is not None else ""
         english_summary = (
             f"EXECUTIVE BRIEFING FOR CREDIT OFFICERS:\n"
-            f"Verdict: {risk_tier} RISK (Score: {overall_score}/100) — {clean_directive}.\n"
+            f"Forensic Recommendation: {rec_action_en} (Human Adjudication Required).\n"
+            f"Evaluated Risk: {effective_score}/100 ({effective_tier} Risk){baseline_str}.\n"
+            f"Forensic Metrics: Document Authenticity: {authenticity_score}% ({authenticity_tier.replace('_', ' ')}) | Transaction Risk: {transaction_risk_score}/100 ({transaction_risk_tier.replace('_', ' ')}).\n"
             f"Forensic validation confirms 100% document authenticity across all pages. "
             f"All transaction figures reconcile with the core banking ledger without font, visual, "
             f"or mathematical anomalies. State Bank of Pakistan (SBP) IBAN validation passed. "
-            f"Digital chain of custody is cryptographically sealed under PECA 2016 §33/§34 via RFC 3161 TSA."
+            f"Digital chain of custody is cryptographically sealed under PECA 2016 §33/§34 via RFC 3161 TSA.{override_notice_en}\n\n"
+            f"Advisory Notice: DeepTrace outputs constitute evidentiary forensic analysis. All lending, rejection, freeze, or STR decisions remain the exclusive statutory prerogative of authorized human credit & compliance officers."
         )
         urdu_summary = (
             f"کریڈٹ آفیسر کے لیے تفصیلی خلاصہ:\n"
-            f"فیصلہ: کم خطرہ ({risk_tier} RISK, سکور: {overall_score}/100) — براہِ راست منظوری ({clean_directive})۔\n"
+            f"تجویز کردہ کارروائی: {rec_action_ur} (حتمی فیصلہ مجاز افسر کا ہوگا)۔\n"
+            f"لاگو رسک درجہ بندی: {effective_score}/100 ({effective_tier})"
+            + (f" [سسٹم کا ابتدائی سکور: {overall_score}/100]" if overridden_score is not None else "") + "۔\n"
+            f"دستاویزی اصلیت: {authenticity_score}٪ ({auth_tier_ur}) | کاروباری رسک: {transaction_risk_score}/100 ({txn_tier_ur})۔\n"
             f"فرانزک تصدیق سے ثابت ہوا ہے کہ یہ دستاویز مکمل طور پر اصل اور غیر تبدیل شدہ ہے۔ "
             f"تمام کھاتہ جاتی اعداد و شمار، رننگ بیلنس اور فونٹ درست ہیں، اسٹیٹ بینک آف پاکستان (SBP) کا IBAN تصدیق شدہ ہے، "
-            f"اور شواہد کا چین آف کسٹڈی پی ای سی اے 2016 اور RFC 3161 ڈیجیٹل ٹائم سٹیمپ کے تحت محفوظ شدہ ہے۔"
+            f"اور شواہد کا چین آف کسٹڈی پی ای سی اے 2016 اور RFC 3161 ڈیجیٹل ٹائم سٹیمپ کے تحت محفوظ شدہ ہے۔{override_notice_ur}\n\n"
+            f"نوٹ: تمام مالیاتی و قرضہ جاتی فیصلے مجاز افسران کی صوابدید پر منحصر ہیں۔"
         )
         narrative = (
-            f"Multi-Agent forensic investigation verified document authenticity (Risk Score: {overall_score}/100, {risk_tier}). "
+            f"Multi-Agent forensic investigation verified Document Authenticity at {authenticity_score}% and Transaction Risk at {transaction_risk_score}/100 (Evaluated Risk: {effective_score}/100, {effective_tier}). "
             "No structural, visual, or mathematical anomalies detected across the evidence manifest."
         )
     else:
@@ -384,33 +514,76 @@ def _generate_deterministic_briefing(
 
         correlations_str_en = " ".join(cross_signal_correlations) if cross_signal_correlations else ""
 
+        # Determine decoupled advisory
+        if tamper_score > 0 and transaction_risk_score > 0:
+            advisory_en = (
+                "Compound Forensic & Compliance Alert: Severe document tampering detected alongside statutory AML/CFT violations. "
+                "The financial figures have been artificially manipulated post-generation, and transactional counterparties trigger regulatory red flags. Recommend immediate loan application rejection and compliance escalation to fraud unit."
+            )
+            advisory_ur = (
+                "مشترکہ فرانزک و تعمیل انتباہ: دستاویز میں جعل سازی اور اسٹیٹ بینک AML/CFT کے ضوابط کی سنگین خلاف ورزی پائی گئی ہے۔ "
+                "بینک سٹیٹمنٹ میں اعداد و شمار کو غیر قانونی طور پر بدلا گیا ہے اور لین دین میں ممنوعہ عناصر شامل ہیں۔ درخواست مسترد کرنے اور معاملہ اینٹی فراڈ یونٹ کو بھیجنے کی سفارش کی جاتی ہے۔"
+            )
+        elif tamper_score > 0:
+            advisory_en = (
+                "Credit Risk Advisory: The financial figures in this statement have been artificially inflated or modified post-generation. "
+                "Document authenticity is compromised. Recommend halting loan application pending formal verification."
+            )
+            advisory_ur = (
+                "کریڈٹ رسک ایڈوائزری: اس بینک سٹیٹمنٹ کے اعداد و شمار میں سافٹ ویئر کے ذریعے ردوبدل کر کے بیلنس تبدیل کیا گیا ہے۔ "
+                "دستاویز کی اصلیت مشکوک ہے، لہٰذا قرض کی درخواست مسترد کرنے یا سینیئر کریڈٹ کمیٹی کو برائے فیصلہ بھیجنے کی سفارش کی جاتی ہے۔"
+            )
+        else:
+            # Document is authentic, but transaction risk is flagged (e.g. AML, Hawala, Crypto P2P, PEP)
+            advisory_en = (
+                "Statutory AML/CFT Compliance Advisory: The document is genuine with verified typographical and ledger consistency; "
+                "however, high-risk transactional patterns (SBP AML/CFT / FATF red flags) were detected. "
+                "Recommend forwarding docket to AML Compliance for Enhanced Due Diligence (EDD) without alleging document tampering."
+            )
+            advisory_ur = (
+                "اسٹیٹ بینک ضوابط و AML ایڈوائزری: دستاویز کی فرانزک ساخت اور کھاتہ جاتی تسلسل اصل اور درست ہے، البتہ کھاتے دار کے لین دین میں "
+                "اسٹیٹ بینک یا عالمی واچ لسٹ کے مطابق مشکوک ٹرانزیکشنز پائی گئی ہیں۔ اسے جعل سازی کے بجائے منی لانڈرنگ کمپلائنس انکوائری کے لیے بھیجنے کی سفارش کی جاتی ہے۔"
+            )
+
+        baseline_str = f" [Engine Baseline: {overall_score}/100 ({risk_tier})]" if overridden_score is not None else ""
         english_summary = (
             f"CRITICAL BRIEFING FOR CREDIT UNDERWRITERS & LOAN APPROVAL OFFICERS:\n"
-            f"Action Directive: {action_directive.replace('_', ' ')} (Forensic Risk Score: {overall_score}/100 - {risk_tier} Risk).\n\n"
+            f"Forensic Recommendation: {rec_action_en} (Human Adjudication Required).\n"
+            f"Evaluated Risk: {effective_score}/100 ({effective_tier} Risk){baseline_str}.\n"
+            f"Forensic Metrics: Document Authenticity: {authenticity_score}% ({authenticity_tier.replace('_', ' ')}) | Transaction Risk: {transaction_risk_score}/100 ({transaction_risk_tier.replace('_', ' ')}).\n\n"
             f"Key Forensic Deficiencies Detected:\n"
             + "\n".join(en_points)
             + verified_block_en
             + (f"\n\nCross-Vector Correlation:\n{correlations_str_en}" if correlations_str_en else "")
-            + "\n\nCredit Risk Advisory: The financial figures in this statement have been artificially inflated or modified post-generation. Loan application should be halted immediately."
+            + override_notice_en
+            + f"\n\n{advisory_en}\n\n"
+            f"Advisory Notice: DeepTrace outputs constitute evidentiary forensic analysis. All lending, rejection, freeze, or STR decisions remain the exclusive statutory prerogative of authorized human credit & compliance officers."
         )
 
         urdu_summary = (
             f"کریڈٹ آفیسر اور لون انڈر رائٹر کے لیے فوری خلاصہ:\n"
-            f"سفارشی ہدایت: {action_directive.replace('_', ' ')} (فرانزک رسک سکور: {overall_score}/100 — انتہائی خطرہ {risk_tier})۔\n\n"
+            f"تجویز کردہ کارروائی: {rec_action_ur} (حتمی فیصلہ مجاز افسر کا ہوگا)۔\n"
+            f"لاگو رسک درجہ بندی: {effective_score}/100 ({effective_tier})"
+            + (f" [سسٹم کا ابتدائی سکور: {overall_score}/100]" if overridden_score is not None else "") + "۔\n"
+            f"دستاویزی اصلیت: {authenticity_score}٪ ({auth_tier_ur}) | ٹرانزیکشن رسک: {transaction_risk_score}/100 ({txn_tier_ur})۔\n\n"
             f"اہم فرانزک شواہد اور خامیاں:\n"
             + "\n".join(ur_points)
             + verified_block_ur
             + (f"\n\nشواہد کا باہمی ربط:\nپی ڈی ایف فونٹ اور ڈھانچے میں ردوبدل براہِ راست حسابی بیلنس کی تبدیلی کے ساتھ پایا گیا ہے۔" if cross_signal_correlations else "")
-            + "\n\nکریڈٹ رسک ایڈوائزری: اس بینک سٹیٹمنٹ کے اعداد و شمار میں کمپیوٹر سافٹ ویئر کے ذریعے ردوبدل کر کے بیلنس بڑھایا گیا ہے۔ یہ درخواست فوری طور پر مسترد کی جائے۔"
+            + override_notice_ur
+            + f"\n\n{advisory_ur}\n\n"
+            f"نوٹ: تمام مالیاتی و قرضہ جاتی فیصلے مجاز افسران کی صوابدید پر منحصر ہیں۔"
         )
 
         narrative = (
-            f"Multi-Agent forensic investigation detected critical anomalies with an overall risk score of {overall_score}/100 ({risk_tier}). "
+            f"Multi-Agent forensic investigation evaluated Document Authenticity at {authenticity_score}% ({authenticity_tier}) "
+            f"and Transaction Risk at {transaction_risk_score}/100 ({transaction_risk_tier}) with composite score {overall_score}/100 ({risk_tier}). "
             f"Synthesized {len(adverse_briefing)} independent adverse indicator(s). "
             f"{' '.join(cross_signal_correlations)}"
         )
 
     return english_summary, urdu_summary, narrative
+
 
 
 async def _call_groq_llm(
@@ -676,6 +849,44 @@ class LeadInvestigatorAgent(BaseForensicAgent):
             ev_items = manifest.get("evidence_items", self.evidence_items)
             correlations = state.get("cross_signal_correlations", [])
 
+            # Extract dual scores from risk assessment or fusionParameters
+            fusion_params = risk.get("fusionParameters", self.risk_assessment.get("fusionParameters", {}))
+            if hasattr(fusion_params, "data"):
+                fusion_params = fusion_params.data
+            elif hasattr(fusion_params, "to_dict"):
+                fusion_params = fusion_params.to_dict()
+            if not isinstance(fusion_params, dict):
+                fusion_params = {}
+
+            doc_auth = fusion_params.get("document_authenticity", {})
+            txn_risk = fusion_params.get("transaction_risk", {})
+
+            tamper_score = risk.get("tamperScore", risk.get("tamper_score"))
+            if tamper_score is None:
+                tamper_score = doc_auth.get("tamper_score", overall_score)
+
+            authenticity_score = risk.get("authenticityScore", risk.get("authenticity_score"))
+            if authenticity_score is None:
+                authenticity_score = doc_auth.get("score", max(0, 100 - tamper_score))
+
+            authenticity_tier = risk.get("authenticityTier", risk.get("authenticity_tier"))
+            if not authenticity_tier:
+                authenticity_tier = doc_auth.get("tier", "VERIFIED_AUTHENTIC" if tamper_score <= 10 else ("SUSPECT_DOCUMENT" if tamper_score <= 40 else "FORGERY_DETECTED"))
+
+            transaction_risk_score = risk.get("transactionRiskScore", risk.get("transaction_risk_score"))
+            if transaction_risk_score is None:
+                transaction_risk_score = txn_risk.get("score", 0)
+
+            transaction_risk_tier = risk.get("transactionRiskTier", risk.get("transaction_risk_tier"))
+            if not transaction_risk_tier:
+                transaction_risk_tier = txn_risk.get("tier", "CRITICAL_PROSCRIBED" if transaction_risk_score >= 75 else ("HIGH_AML_RISK" if transaction_risk_score >= 45 else ("MONITORED" if transaction_risk_score >= 20 else "CLEAN")))
+
+            # Extract override data if present
+            overridden_score = risk.get("overriddenScore")
+            overridden_tier = risk.get("overriddenTier")
+            override_reason = risk.get("overrideReason")
+            overridden_by = risk.get("overriddenById")
+
             # Generate structured credit briefing items with exact coordinates
             briefing_items = _build_structured_credit_briefing_items(ev_items)
 
@@ -687,6 +898,15 @@ class LeadInvestigatorAgent(BaseForensicAgent):
                 evidence_items=ev_items,
                 cross_signal_correlations=correlations,
                 briefing_items=briefing_items,
+                authenticity_score=authenticity_score,
+                tamper_score=tamper_score,
+                authenticity_tier=authenticity_tier,
+                transaction_risk_score=transaction_risk_score,
+                transaction_risk_tier=transaction_risk_tier,
+                overridden_score=overridden_score,
+                overridden_tier=overridden_tier,
+                override_reason=override_reason,
+                overridden_by=overridden_by,
             )
 
             # Prepare LLM Prompts
@@ -700,6 +920,10 @@ class LeadInvestigatorAgent(BaseForensicAgent):
                 "- For findings with anchor_type 'MULTI_PAGE_SPAN' (like closing balance mismatch across pages), cite both the statement summary page and the ledger terminal page (e.g. 'Page 1 Summary vs Page 23 Ledger Terminal').\n"
                 "- For findings with anchor_type 'DOCUMENT_HEADER', cite as 'Page X Header'.\n"
                 "CRITICAL DISTINCTION: Items with severity 'INFO' or titles containing 'Verified' are CERTIFIED AUTHENTIC CHECKS (such as canonical CBS template match, 0 pt column drift, 0.00 pt variance). You must NEVER describe them as deficiencies, anomalies, tampering, or font irregularities.\n"
+                "CRITICAL ADVISORY DISCIPLINE:\n"
+                "- Frame all outcomes as ADVISORY FORENSIC RECOMMENDATIONS for the credit committee, NEVER as mandatory statutory directives or police powers.\n"
+                "- If Document Authenticity is 100% and tamper score is 0, NEVER state that figures, fonts, or balances have been artificially inflated or modified. Instead, advise on statutory AML/CFT compliance or counterparty risk verification.\n"
+                "- If tamper score > 0, advise on document fabrication and balance tampering.\n"
                 "Output your briefing in two distinct sections:\n"
                 "SECTION 1: PLAIN ENGLISH CREDIT OFFICER BRIEFING (Actionable verdict for loan underwriters, highlighting specific real anchor locations and findings).\n"
                 "SECTION 2: URDU CREDIT OFFICER BRIEFING (خلاصہ برائے کریڈٹ آفیسر) using professional Pakistani banking Urdu."
@@ -708,10 +932,13 @@ class LeadInvestigatorAgent(BaseForensicAgent):
             adverse_ev = [b for b in briefing_items if b.get("severity") != "INFO" and b.get("is_adverse", True)]
             verified_ev = [b for b in briefing_items if b.get("severity") == "INFO" or not b.get("is_adverse", True)]
 
+            rec_text = format_recommendation(action_directive, overridden_tier or risk_tier)
             user_prompt = (
                 f"Investigation Case: {manifest.get('investigation', {}).get('caseNumber', 'DT-AUDIT')}\n"
-                f"Risk Score: {overall_score}/100 ({risk_tier})\n"
-                f"Statutory Action Directive: {action_directive}\n\n"
+                f"Document Authenticity: {authenticity_score}% ({authenticity_tier})\n"
+                f"Transaction Risk: {transaction_risk_score}/100 ({transaction_risk_tier})\n"
+                f"Evaluated Risk Score: {overridden_score if overridden_score is not None else overall_score}/100 ({overridden_tier or risk_tier})\n"
+                f"Forensic Recommendation: {rec_text} (Human Adjudication Required)\n\n"
                 f"Adverse Forensic Deficiencies ({len(adverse_ev)} items):\n"
                 + json.dumps(adverse_ev[:10], indent=2)
                 + (f"\n\nCertified Authentic Controls ({len(verified_ev)} items):\n" + json.dumps(verified_ev[:5], indent=2) if verified_ev else "")
@@ -749,6 +976,11 @@ class LeadInvestigatorAgent(BaseForensicAgent):
                 "overall_score": overall_score,
                 "risk_tier": risk_tier,
                 "action_directive": action_directive,
+                "authenticity_score": authenticity_score,
+                "tamper_score": tamper_score,
+                "authenticity_tier": authenticity_tier,
+                "transaction_risk_score": transaction_risk_score,
+                "transaction_risk_tier": transaction_risk_tier,
                 "english_summary": english_summary,
                 "urdu_summary": urdu_summary,
                 "narrative": narrative,
@@ -939,14 +1171,15 @@ class LeadInvestigatorAgent(BaseForensicAgent):
 
         # 3. Questions regarding risk score or classification
         elif any(w in q_lower for w in ["why", "risk", "score", "classified", "critical", "tier", "assessment", "کیوں", "سکور", "رسک"]):
+            rec_str = format_recommendation(action_directive, risk_tier)
             if is_urdu_query:
                 parts.append(
-                    f"دستاویز کی تفتیش کو **{risk_tier} خطرہ ({overall_score}/100)** قرار دیا گیا ہے، "
-                    f"جس کے لیے سفارشی ہدایت **{action_directive}** ہے۔ درج ذیل تصدیق شدہ شواہد کی بنیاد پر:"
+                    f"دستاویز کی تفتیش کا فرانزک جائزہ **{risk_tier} خطرہ ({overall_score}/100)** ہے، "
+                    f"جس کے لیے فرانزک سفارش **{rec_str}** ہے (حتمی فیصلہ مجاز افسر کا ہوگا)۔ درج ذیل تصدیق شدہ شواہد کی بنیاد پر:"
                 )
             else:
                 parts.append(
-                    f"The investigation was classified as **{risk_tier} Risk ({overall_score}/100)** with directive **{action_directive}** based on the following verified forensic evidence:"
+                    f"The investigation was evaluated as **{risk_tier} Risk ({overall_score}/100)** with advisory recommendation **{rec_str}** (human adjudication required) based on the following verified forensic evidence:"
                 )
 
             for idx, item in enumerate(self.evidence_items[:5], 1):

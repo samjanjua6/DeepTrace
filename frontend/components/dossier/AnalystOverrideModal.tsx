@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { formatRecommendation } from "@/lib/types/forensics";
 
 interface AnalystOverrideModalProps {
   isOpen: boolean;
@@ -27,18 +28,39 @@ export function AnalystOverrideModal({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  const getProjectedTier = (s: number): string => {
+    if (s <= 20) return "LOW";
+    if (s <= 40) return "MODERATE";
+    if (s <= 60) return "ELEVATED";
+    if (s <= 80) return "HIGH";
+    return "CRITICAL";
+  };
+
+  const projectedTier = getProjectedTier(score);
+  const projectedDirective =
+    score >= 81
+      ? "IMMEDIATE_REJECTION"
+      : score >= 61
+      ? "ESCALATION_REQUIRED"
+      : score >= 41
+      ? "HUMAN_REVIEW"
+      : score >= 21
+      ? "SECONDARY_SCAN"
+      : "STRAIGHT_THROUGH_APPROVAL";
+  const projectedRecommendation = formatRecommendation(projectedDirective, projectedTier);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!reason.trim()) {
+    if (reason.trim().length < 10) {
       setError(
-        "A formal justification is mandatory under SBP audit regulations."
+        "A formal compliance justification of at least 10 characters is mandatory under SBP audit regulations."
       );
       return;
     }
     setError(null);
     setIsSubmitting(true);
     try {
-      await onSave(score, reason);
+      await onSave(score, reason.trim());
       onClose();
     } catch (err: any) {
       setError(err.message || "Failed to commit override");
@@ -88,7 +110,7 @@ export function AnalystOverrideModal({
               min={0}
               max={100}
               value={score}
-              onChange={(e) => setScore(parseInt(e.target.value) || 0)}
+              onChange={(e) => setScore(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
               className="w-24 text-base font-bold tabular-nums"
             />
             <span className="text-[11px] text-ink-500">
@@ -96,12 +118,22 @@ export function AnalystOverrideModal({
               <span className="font-bold text-ink-900">{currentScore}</span>
             </span>
           </div>
+
+          <div className="mt-2 p-2 bg-paper-1 border border-rule flex items-center justify-between text-[11px] font-mono">
+            <span className="text-ink-500">Projected Forensic Recommendation:</span>
+            <span className="font-bold text-ink-900">{projectedRecommendation} ({projectedTier})</span>
+          </div>
         </div>
 
         <div>
-          <label htmlFor="override-reason" className="block text-ink-700 uppercase tracking-wider mb-1 font-semibold">
-            Mandatory Compliance Justification:
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label htmlFor="override-reason" className="block text-ink-700 uppercase tracking-wider font-semibold">
+              Mandatory Compliance Justification:
+            </label>
+            <span className={`text-[10px] font-mono ${reason.trim().length >= 10 ? "text-forensic-green" : "text-ink-400"}`}>
+              {reason.trim().length} / 10 min chars
+            </span>
+          </div>
           <textarea
             id="override-reason"
             rows={3}
@@ -131,6 +163,7 @@ export function AnalystOverrideModal({
             type="submit"
             variant="primary"
             isLoading={isSubmitting}
+            disabled={reason.trim().length < 10}
           >
             Commit SBP Audit Override
           </Button>

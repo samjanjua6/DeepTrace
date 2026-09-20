@@ -11,12 +11,14 @@ interface RegulatoryTabProps {
   activeTab: string;
   financialData: any;
   evidence: EvidenceItem[];
+  onFocusCanvas?: (pageNumber: number) => void;
 }
 
 export function RegulatoryTab({
   activeTab,
   financialData,
   evidence,
+  onFocusCanvas,
 }: RegulatoryTabProps) {
   if (activeTab === "iban") {
     return (
@@ -34,6 +36,7 @@ export function RegulatoryTab({
         <SBPAmlCddCard
           screening={financialData?.aml_cdd_screening}
           evidence={evidence}
+          onFocusCanvas={onFocusCanvas}
         />
         {financialData?.cnic_verification && (
           <NadraCnicCard

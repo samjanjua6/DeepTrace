@@ -7,6 +7,7 @@ import { FolioTag } from "@/components/editorial/FolioTag";
 import { HairlineRule } from "@/components/editorial/HairlineRule";
 import { getInvestigations } from "@/lib/api/client";
 import { formatDatePKT } from "@/lib/formatters";
+import { formatRecommendation } from "@/lib/types/forensics";
 import {
   AlertTriangle,
   RotateCcw,
@@ -22,8 +23,11 @@ interface DocketItem {
   title: string;
   status: string;
   riskScore: number | null;
+  authenticityScore: number | null;
+  transactionRiskScore: number | null;
   riskTier: string;
   directive: string;
+  isOverridden?: boolean;
   sha256: string;
   pages: number;
   createdAt: string;
@@ -40,16 +44,26 @@ export default function InvestigationsDocketPage() {
     setError(null);
     try {
       const apiData = await getInvestigations();
-      const formatted: DocketItem[] = (apiData || []).map((inv) => ({
+      const formatted: DocketItem[] = (apiData || []).map((inv: any) => ({
         id: inv.id,
         caseNumber: inv.caseNumber,
         title: inv.title,
         status: inv.status,
-        riskScore: inv.riskAssessment?.overallScore ?? null,
-        riskTier: inv.riskAssessment?.riskTier ?? "PENDING",
+        riskScore: inv.riskAssessment?.overriddenScore ?? inv.riskAssessment?.overallScore ?? null,
+        authenticityScore:
+          inv.riskAssessment?.authenticityScore ??
+          (inv.riskAssessment?.overallScore !== undefined && inv.riskAssessment?.overallScore !== null
+            ? Math.max(0, 100 - inv.riskAssessment.overallScore)
+            : null),
+        transactionRiskScore: inv.riskAssessment?.transactionRiskScore ?? 0,
+        riskTier: inv.riskAssessment?.overriddenTier ?? inv.riskAssessment?.riskTier ?? "PENDING",
         directive:
           inv.riskAssessment?.actionDirective ??
           (inv.status === "PROCESSING" ? "PROCESSING" : "PENDING_ASSESSMENT"),
+        isOverridden: Boolean(
+          inv.riskAssessment?.overriddenScore !== undefined &&
+            inv.riskAssessment?.overriddenScore !== null
+        ),
         sha256: inv.documents?.[0]?.sha256Hash
           ? inv.documents[0].sha256Hash.substring(0, 16) + "..."
           : "—",
@@ -57,6 +71,7 @@ export default function InvestigationsDocketPage() {
         createdAt: inv.createdAt,
       }));
       setInvestigations(formatted);
+
     } catch (err: any) {
       setError(
         err?.message ||
@@ -241,7 +256,7 @@ export default function InvestigationsDocketPage() {
                     <th className="py-3 px-4">Entity & Investigation Title</th>
                     <th className="py-3 px-4 text-center">Score</th>
                     <th className="py-3 px-4 text-center">Risk Tier</th>
-                    <th className="py-3 px-4">Action Directive</th>
+                    <th className="py-3 px-4">Forensic Recommendation</th>
                     <th className="py-3 px-4">Acquired Date (PKT)</th>
                     <th className="py-3 px-4 text-right">Action</th>
                   </tr>
@@ -268,8 +283,35 @@ export default function InvestigationsDocketPage() {
                         <td className="py-3.5 px-4 font-serif text-sm text-ink-900">
                           {inv.title}
                         </td>
-                        <td className="py-3.5 px-4 text-center font-bold tabular-nums text-base">
-                          {inv.riskScore !== null ? inv.riskScore : "—"}
+                        <td className="py-3.5 px-4 text-center">
+                          {inv.riskScore !== null ? (
+                            <div className="flex flex-col items-center">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <span className="font-bold tabular-nums text-sm text-ink-900">
+                                  {inv.riskScore}
+                                </span>
+                                {inv.isOverridden && (
+                                  <span
+                                    title="Score Overridden by Compliance Auditor"
+                                    className="px-1 py-0.2 bg-amber-500/10 border border-amber-500/40 text-amber-700 text-[8px] font-mono font-bold tracking-tight"
+                                  >
+                                    ADJUDICATED
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1 text-[9px] font-mono text-ink-500">
+                                <span title="Document Authenticity" className="text-emerald-700 font-semibold">
+                                  A:{inv.authenticityScore ?? "—"}%
+                                </span>
+                                <span>|</span>
+                                <span title="Transaction AML Risk" className="text-amber-700 font-semibold">
+                                  T:{inv.transactionRiskScore ?? 0}
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-ink-400">—</span>
+                          )}
                         </td>
                         <td className="py-3.5 px-4 text-center">
                           <span
@@ -286,8 +328,8 @@ export default function InvestigationsDocketPage() {
                             {inv.riskTier}
                           </span>
                         </td>
-                        <td className="py-3.5 px-4 text-ink-700 text-[10px] uppercase font-semibold">
-                          {inv.directive.replace(/_/g, " ")}
+                        <td className="py-3.5 px-4 text-ink-700 text-[10px] font-sans font-medium">
+                          {formatRecommendation(inv.directive, inv.riskTier)}
                         </td>
                         <td className="py-3.5 px-4 tabular-nums text-ink-500 whitespace-nowrap">
                           {formatDatePKT(inv.createdAt)}

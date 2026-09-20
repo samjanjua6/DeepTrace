@@ -2,7 +2,7 @@
 
 import React from "react";
 import { AlertTriangle, CheckCircle, ShieldAlert, ShieldCheck, UserCheck, UserX, FileWarning } from "lucide-react";
-import { EvidenceItem } from "@/lib/types/forensics";
+import { EvidenceItem, formatRecommendation } from "@/lib/types/forensics";
 
 interface MatchedEntity {
   list_type: string;
@@ -48,9 +48,10 @@ interface AmlCddScreeningData {
 interface SBPAmlCddCardProps {
   screening?: AmlCddScreeningData | null;
   evidence?: EvidenceItem[];
+  onFocusCanvas?: (pageNumber: number) => void;
 }
 
-export function SBPAmlCddCard({ screening, evidence }: SBPAmlCddCardProps) {
+export function SBPAmlCddCard({ screening, evidence, onFocusCanvas }: SBPAmlCddCardProps) {
   // Infer screening state from evidence items if screening payload not directly present
   const nactaEv = evidence?.find((e) => (e.ruleId || "").includes("AML_NACTA"));
   const unscEv = evidence?.find((e) => (e.ruleId || "").includes("AML_UNSC"));
@@ -86,7 +87,10 @@ export function SBPAmlCddCard({ screening, evidence }: SBPAmlCddCardProps) {
     null;
 
   const matchedEntities = screening?.matched_entities || [];
-  const narrationFlags = screening?.narration_red_flags || [];
+  const narrationFlags: NarrationRedFlag[] =
+    screening?.narration_red_flags ||
+    (hawalaEv?.technicalDetails as any)?.red_flags ||
+    [];
 
   return (
     <div
@@ -271,8 +275,8 @@ export function SBPAmlCddCard({ screening, evidence }: SBPAmlCddCardProps) {
                 </div>
 
                 <div className="pt-1 border-t border-rule/40 flex justify-between items-center text-[10px]">
-                  <span className="text-ink-500 uppercase">Directive:</span>
-                  <span className="font-bold text-forensic-red">{m.action_directive.replace(/_/g, " ")}</span>
+                  <span className="text-ink-500 uppercase">Forensic Recommendation:</span>
+                  <span className="font-bold text-forensic-red">{formatRecommendation(m.action_directive)}</span>
                 </div>
               </div>
             );
@@ -280,31 +284,60 @@ export function SBPAmlCddCard({ screening, evidence }: SBPAmlCddCardProps) {
         </div>
       )}
 
-      {/* Hawala / Hundi Red Flag Narrations (if any) */}
-      {narrationFlags.length > 0 && (
-        <div className="space-y-2 pt-1">
-          <span className="text-[10px] text-ink-500 uppercase tracking-wider block font-bold">
-            Prohibited Informal Value Transfer Narratives ({narrationFlags.length}):
-          </span>
-          <div className="border border-rule divide-y divide-rule rounded-none">
-            {narrationFlags.slice(0, 5).map((n, idx) => (
-              <div key={idx} className="p-2 bg-paper-1 text-[11px] flex justify-between items-center">
-                <div>
-                  <span className="font-semibold text-ink-900">{n.narration}</span>
-                  <span className="text-[10px] text-forensic-red block">
-                    Triggered Keyword: &quot;{n.matched_term}&quot; ({n.category})
-                  </span>
+      {/* Informal Value Transfer & Crypto Red Flag Narrations (if any) */}
+      {narrationFlags.length > 0 && (() => {
+        const isCryptoOnly = narrationFlags.every((n) => n.category === "UNLICENSED_VIRTUAL_ASSETS");
+        const isHawalaOnly = narrationFlags.every(
+          (n) => n.category === "INFORMAL_VALUE_TRANSFER" || n.category === "UNOFFICIAL_SETTLEMENT"
+        );
+        const headerTitle = isCryptoOnly
+          ? `Prohibited Virtual Asset / Crypto P2P Narratives (${narrationFlags.length})`
+          : isHawalaOnly
+          ? `Prohibited Informal Hawala / Hundi Narratives (${narrationFlags.length})`
+          : `Prohibited Informal Value Transfer & Crypto Narratives (${narrationFlags.length})`;
+
+        return (
+          <div className="space-y-2 pt-1">
+            <span className="text-[10px] text-ink-500 uppercase tracking-wider block font-bold">
+              {headerTitle}:
+            </span>
+            <div className="border border-rule divide-y divide-rule rounded-none max-h-64 overflow-y-auto">
+              {narrationFlags.slice(0, 10).map((n, idx) => (
+                <div key={idx} className="p-2 bg-paper-1 text-[11px] flex justify-between items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-ink-900">{n.narration}</span>
+                      {(n.page_number || n.row_number) && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (n.page_number && onFocusCanvas) {
+                              onFocusCanvas(n.page_number);
+                            }
+                          }}
+                          className="text-[9px] px-1.5 py-0.5 bg-paper-2 hover:bg-ink-900 hover:text-white text-ink-900 border border-rule transition-colors font-mono font-bold cursor-pointer"
+                          title={`Jump to Page ${n.page_number || 1}${n.row_number ? `, Row ${n.row_number}` : ""}`}
+                        >
+                          P.{n.page_number || 1}{n.row_number ? ` R.${n.row_number}` : ""} ↗
+                        </button>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-forensic-red block mt-0.5">
+                      Triggered Keyword: &quot;{n.matched_term}&quot; ({n.category})
+                    </span>
+                  </div>
+                  {n.amount && (
+                    <span className="font-mono text-xs font-bold text-ink-900 flex-shrink-0">
+                      PKR {n.amount}
+                    </span>
+                  )}
                 </div>
-                {n.amount && (
-                  <span className="font-mono text-xs font-bold text-ink-900">
-                    PKR {n.amount}
-                  </span>
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Action Directive Summary Callout */}
       {!isClean ? (

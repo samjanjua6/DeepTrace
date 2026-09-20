@@ -63,15 +63,49 @@ async def _build_evidence_manifest(db: Prisma, investigation_id: str) -> dict:
 
     risk_dict = {}
     if inv.riskAssessment:
+        ra = inv.riskAssessment
+        fp = ra.fusionParameters or {}
+        if hasattr(fp, "data"):
+            fp = fp.data
+        elif hasattr(fp, "to_dict"):
+            fp = fp.to_dict()
+        if not isinstance(fp, dict):
+            fp = {}
+        doc_auth = fp.get("document_authenticity") or {}
+        txn_risk = fp.get("transaction_risk") or {}
+
+        tamper_score = doc_auth.get("tamper_score", ra.overallScore)
+        auth_score = doc_auth.get("score", max(0, 100 - tamper_score))
+        auth_tier = doc_auth.get(
+            "tier",
+            "VERIFIED_AUTHENTIC" if tamper_score <= 10 else ("SUSPECT_DOCUMENT" if tamper_score <= 40 else "FORGERY_DETECTED"),
+        )
+        txn_score = txn_risk.get("score", 0)
+        txn_tier = txn_risk.get(
+            "tier",
+            "CRITICAL_PROSCRIBED" if txn_score >= 75 else ("HIGH_AML_RISK" if txn_score >= 45 else ("MONITORED" if txn_score >= 20 else "CLEAN")),
+        )
+
         risk_dict = {
-            "overallScore": inv.riskAssessment.overallScore,
-            "riskTier": inv.riskAssessment.riskTier,
-            "actionDirective": inv.riskAssessment.actionDirective,
-            "totalEvidenceCount": inv.riskAssessment.totalEvidenceCount,
-            "criticalCount": inv.riskAssessment.criticalCount,
-            "highCount": inv.riskAssessment.highCount,
-            "mediumCount": inv.riskAssessment.mediumCount,
-            "lowCount": inv.riskAssessment.lowCount,
+            "overallScore": ra.overallScore,
+            "riskTier": ra.riskTier,
+            "actionDirective": ra.actionDirective,
+            "totalEvidenceCount": ra.totalEvidenceCount,
+            "criticalCount": ra.criticalCount,
+            "highCount": ra.highCount,
+            "mediumCount": ra.mediumCount,
+            "lowCount": ra.lowCount,
+            "overriddenScore": ra.overriddenScore,
+            "overriddenTier": str(ra.overriddenTier) if ra.overriddenTier else None,
+            "overrideReason": ra.overrideReason,
+            "overriddenById": ra.overriddenById,
+            "overriddenAt": ra.overriddenAt.isoformat() if ra.overriddenAt else None,
+            "authenticityScore": auth_score,
+            "tamperScore": tamper_score,
+            "authenticityTier": auth_tier,
+            "transactionRiskScore": txn_score,
+            "transactionRiskTier": txn_tier,
+            "fusionParameters": fp,
         }
 
     return {

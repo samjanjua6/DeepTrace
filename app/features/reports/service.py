@@ -11,6 +11,7 @@ from app.core import security
 from app.core.storage import storage
 from app.features.reports import schemas
 from app.features.agents.swarm.lead_investigator import LeadInvestigatorAgent
+from app.features.risk.schemas import format_recommendation
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -87,12 +88,55 @@ async def generate_report(db: Prisma, investigation_id: str, options: dict | Non
     overall_score = risk.overallScore if risk else 0
     risk_tier = risk.riskTier if risk else "LOW"
     action_directive = risk.actionDirective if risk else "STRAIGHT_THROUGH_APPROVAL"
+    overridden_score = risk.overriddenScore if risk else None
+    overridden_tier = str(risk.overriddenTier) if (risk and risk.overriddenTier) else None
+    override_reason = risk.overrideReason if risk else None
+    overridden_by_id = risk.overriddenById if risk else None
+    overridden_at = risk.overriddenAt.strftime("%Y-%m-%d %H:%M:%S UTC") if (risk and risk.overriddenAt) else None
+
+    effective_score = overridden_score if overridden_score is not None else overall_score
+    effective_tier = overridden_tier if overridden_tier is not None else risk_tier
+    rec_text = format_recommendation(action_directive, effective_tier)
+
+    # Extract dual scores from risk assessment or fusionParameters
+    fusion_params = risk.fusionParameters if risk and risk.fusionParameters else {}
+    if hasattr(fusion_params, "data"):
+        fusion_params = fusion_params.data
+    elif hasattr(fusion_params, "to_dict"):
+        fusion_params = fusion_params.to_dict()
+    if not isinstance(fusion_params, dict):
+        fusion_params = {}
+
+    doc_auth = fusion_params.get("document_authenticity", {})
+    txn_risk = fusion_params.get("transaction_risk", {})
+
+    tamper_score = doc_auth.get("tamper_score", overall_score)
+    authenticity_score = doc_auth.get("score", max(0, 100 - tamper_score))
+    authenticity_tier = doc_auth.get("tier", "VERIFIED_AUTHENTIC" if tamper_score <= 10 else ("SUSPECT_DOCUMENT" if tamper_score <= 40 else "FORGERY_DETECTED"))
+
+    transaction_risk_score = txn_risk.get("score", 0)
+    transaction_risk_tier = txn_risk.get("tier", "CRITICAL_PROSCRIBED" if transaction_risk_score >= 75 else ("HIGH_AML_RISK" if transaction_risk_score >= 45 else ("MONITORED" if transaction_risk_score >= 20 else "CLEAN")))
 
     # Build evidence manifest for Lead Investigator synthesis
     manifest = {
         "investigation": {"id": inv.id, "caseNumber": inv.caseNumber, "title": inv.title},
         "documents": [{"originalFilename": d.originalFilename, "sha256Hash": d.sha256Hash} for d in docs],
-        "risk_assessment": {"overallScore": overall_score, "riskTier": risk_tier, "actionDirective": action_directive},
+        "risk_assessment": {
+            "overallScore": overall_score,
+            "riskTier": risk_tier,
+            "actionDirective": action_directive,
+            "overriddenScore": overridden_score,
+            "overriddenTier": overridden_tier,
+            "overrideReason": override_reason,
+            "overriddenById": overridden_by_id,
+            "overriddenAt": overridden_at,
+            "authenticityScore": authenticity_score,
+            "tamperScore": tamper_score,
+            "authenticityTier": authenticity_tier,
+            "transactionRiskScore": transaction_risk_score,
+            "transactionRiskTier": transaction_risk_tier,
+            "fusionParameters": fusion_params,
+        },
         "evidence_items": [
             {
                 "id": it.id,
@@ -140,19 +184,44 @@ async def generate_report(db: Prisma, investigation_id: str, options: dict | Non
     p1.insert_text((55, curr_y + 110), "Accredited TSA Proof: Cryptographically bound under PECA 2016 §33/§34 & QSO 1984 Art 164", fontsize=6.8, fontname="helv", color=(0.3, 0.35, 0.45))
 
     curr_y += 130
-    # Risk Verdict Banner
-    if risk_tier in ["CRITICAL", "HIGH"]:
+    # Composite Directive & Dual Forensic Radar Banner
+    if effective_tier in ["CRITICAL", "HIGH"]:
         border_col, fill_col, text_col = (0.86, 0.15, 0.15), (0.99, 0.95, 0.95), (0.7, 0.1, 0.1)
-    elif risk_tier == "MEDIUM":
+    elif effective_tier == "MEDIUM":
         border_col, fill_col, text_col = (0.9, 0.6, 0.1), (1.0, 0.98, 0.9), (0.6, 0.4, 0.0)
     else:
         border_col, fill_col, text_col = (0.1, 0.6, 0.2), (0.95, 0.99, 0.95), (0.05, 0.45, 0.15)
 
-    p1.draw_rect(pymupdf.Rect(40, curr_y, 555, curr_y + 60), color=border_col, fill=fill_col, width=1.5)
-    p1.insert_text((55, curr_y + 24), f"VERDICT: {risk_tier} RISK  —  SCORE: {overall_score}/100", fontsize=12, fontname="hebo", color=text_col)
-    p1.insert_text((55, curr_y + 44), f"STATUTORY ACTION DIRECTIVE: {action_directive.replace('_', ' ')}", fontsize=9, fontname="hebo", color=text_col)
+    # Top Composite Strip
+    p1.draw_rect(pymupdf.Rect(40, curr_y, 555, curr_y + 26), color=border_col, fill=fill_col, width=1.2)
+    p1.insert_text((50, curr_y + 17), f"FORENSIC RECOMMENDATION: {rec_text.upper()} (Human Adjudication Required)", fontsize=8.2, fontname="hebo", color=text_col)
 
-    curr_y += 75
+    # Left Box: Document Authenticity (ETO 2002 / PECA 2016)
+    auth_col = (0.05, 0.45, 0.15) if authenticity_score >= 90 else ((0.8, 0.4, 0.0) if authenticity_score >= 60 else (0.7, 0.1, 0.1))
+    auth_bg = (0.95, 0.99, 0.95) if authenticity_score >= 90 else ((1.0, 0.98, 0.9) if authenticity_score >= 60 else (0.99, 0.95, 0.95))
+    p1.draw_rect(pymupdf.Rect(40, curr_y + 30, 292, curr_y + 76), color=auth_col, fill=auth_bg, width=1.0)
+    p1.insert_text((50, curr_y + 44), f"DOCUMENT AUTHENTICITY: {authenticity_score}%", fontsize=10, fontname="hebo", color=auth_col)
+    p1.insert_text((50, curr_y + 58), f"Integrity Tier: {authenticity_tier.replace('_', ' ')} (Tamper: {tamper_score}/100)", fontsize=7.5, fontname="hebo", color=auth_col)
+    p1.insert_text((50, curr_y + 70), "Statutory Basis: ETO 2002 §29 / PECA 2016 §33", fontsize=6.8, fontname="helv", color=(0.35, 0.4, 0.45))
+
+    # Right Box: Transaction & AML Risk (SBP BPRD / AMLA 2010)
+    txn_col = (0.05, 0.45, 0.15) if transaction_risk_score <= 20 else ((0.1, 0.35, 0.7) if transaction_risk_score <= 45 else ((0.8, 0.4, 0.0) if transaction_risk_score <= 70 else (0.7, 0.1, 0.1)))
+    txn_bg = (0.95, 0.99, 0.95) if transaction_risk_score <= 20 else ((0.95, 0.97, 1.0) if transaction_risk_score <= 45 else ((1.0, 0.98, 0.9) if transaction_risk_score <= 70 else (0.99, 0.95, 0.95)))
+    p1.draw_rect(pymupdf.Rect(302, curr_y + 30, 555, curr_y + 76), color=txn_col, fill=txn_bg, width=1.0)
+    p1.insert_text((312, curr_y + 44), f"TRANSACTION & AML RISK: {transaction_risk_score}/100", fontsize=10, fontname="hebo", color=txn_col)
+    p1.insert_text((312, curr_y + 58), f"Compliance Tier: {transaction_risk_tier.replace('_', ' ')}", fontsize=7.5, fontname="hebo", color=txn_col)
+    p1.insert_text((312, curr_y + 70), "Statutory Basis: SBP BPRD 03/2018 & AMLA 2010", fontsize=6.8, fontname="helv", color=(0.35, 0.4, 0.45))
+
+    curr_y += 84
+
+    # Audited Human Override Box (if manual adjudication exists)
+    if overridden_score is not None:
+        p1.draw_rect(pymupdf.Rect(40, curr_y, 555, curr_y + 40), color=(0.85, 0.65, 0.1), fill=(1.0, 0.99, 0.92), width=1.0)
+        p1.insert_text((50, curr_y + 13), "HUMAN ANALYST ADJUDICATION AUDIT — SBP BPRD REGULATED OVERRIDE", fontsize=7.8, fontname="hebo", color=(0.7, 0.4, 0.0))
+        p1.insert_text((50, curr_y + 24), f"Adjudicated Score: {overridden_score}/100 ({overridden_tier})  [Baseline Engine: {overall_score}/100 ({risk_tier})]  |  Officer: {overridden_by_id or 'Authorized Officer'}  |  {overridden_at or 'Logged'}", fontsize=6.8, fontname="helv", color=(0.2, 0.2, 0.2))
+        p1.insert_text((50, curr_y + 34), f"Audit Justification: \"{override_reason}\"", fontsize=6.8, fontname="cobo", color=(0.1, 0.1, 0.1))
+        curr_y += 46
+
     # Lead Investigator Synthesis
     p1.insert_text((40, curr_y), "EXECUTIVE FORENSIC SUMMARY & SYNTHESIS", fontsize=10, fontname="hebo", color=(0.1, 0.1, 0.1))
     curr_y += 15
@@ -271,6 +340,13 @@ async def generate_report(db: Prisma, investigation_id: str, options: dict | Non
         fontsize=6.8,
         fontname="helv",
     )
+    p1.insert_text(
+        (40, curr_y + 11),
+        "EVIDENTIARY NOTICE: DeepTrace outputs provide evidentiary forensic analysis. All lending, rejection, freeze, or STR actions are the exclusive legal responsibility of authorized human officers under SBP regulations.",
+        fontsize=5.8,
+        fontname="helv",
+        color=(0.4, 0.4, 0.4),
+    )
 
     # ─────────────────────────────────────────────────────────────────────────
     # Page 2: Detailed Evidence Manifest Table
@@ -339,7 +415,10 @@ async def generate_report(db: Prisma, investigation_id: str, options: dict | Non
                 p_start = t_details.get("page_start", 1)
                 p_end = t_details.get("last_page") or t_details.get("page_end", 23)
                 loc_str = f"Pages {p_start}–{p_end} (Multi-Page Ledger)"
-            elif anchor_type == "DOCUMENT_HEADER" or "IBAN" in r_id or "CNIC" in r_id or "AML" in r_id:
+            elif anchor_type == "TABLE_ROW":
+                row_str = f" Row {t_details.get('row_number')}" if t_details.get('row_number') else ""
+                loc_str = f"Page {it.pageNumber or 1}{row_str} (Transaction Ledger)"
+            elif anchor_type == "DOCUMENT_HEADER" or "IBAN" in r_id or "CNIC" in r_id or ("AML" in r_id and r_id != "RULE_AML_HIGH_RISK_NARRATION"):
                 loc_str = f"Page {it.pageNumber or 1} (Account Header)"
             elif it.pageNumber:
                 loc_str = f"Page {it.pageNumber}"

@@ -126,6 +126,11 @@ const SAMPLE_EXHIBIT_RISK: RiskAssessment = {
   id: "sample-risk-1",
   investigationId: "sample",
   overallScore: 85,
+  authenticityScore: 15,
+  tamperScore: 85,
+  authenticityTier: "FORGERY_DETECTED",
+  transactionRiskScore: 0,
+  transactionRiskTier: "CLEAN",
   riskTier: "CRITICAL",
   actionDirective: "IMMEDIATE_REJECTION",
   confidenceScore: 0.98,
@@ -173,6 +178,11 @@ export function useInvestigationDocket(investigationId: string) {
           id: "pending",
           investigationId,
           overallScore: 0,
+          authenticityScore: 100,
+          tamperScore: 0,
+          authenticityTier: "VERIFIED_AUTHENTIC",
+          transactionRiskScore: 0,
+          transactionRiskTier: "CLEAN",
           riskTier: "LOW",
           actionDirective: "MANUAL_SUPERVISOR_REVIEW",
           confidenceScore: 0,
@@ -181,6 +191,7 @@ export function useInvestigationDocket(investigationId: string) {
           riskSignals: [],
         }
   );
+
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [custodyEvents, setCustodyEvents] = useState<CustodyEvent[]>([]);
   const [activeEvidenceId, setActiveEvidenceId] = useState<string | null>(null);
@@ -309,6 +320,11 @@ export function useInvestigationDocket(investigationId: string) {
             id: "clean",
             investigationId,
             overallScore: 0,
+            authenticityScore: 100,
+            tamperScore: 0,
+            authenticityTier: "VERIFIED_AUTHENTIC",
+            transactionRiskScore: 0,
+            transactionRiskTier: "CLEAN",
             riskTier: "LOW",
             actionDirective: "STRAIGHT_THROUGH_APPROVAL",
             confidenceScore: 1.0,
@@ -321,6 +337,11 @@ export function useInvestigationDocket(investigationId: string) {
             id: "failed",
             investigationId,
             overallScore: 100,
+            authenticityScore: 0,
+            tamperScore: 100,
+            authenticityTier: "FORGERY_DETECTED",
+            transactionRiskScore: 100,
+            transactionRiskTier: "CRITICAL_PROSCRIBED",
             riskTier: "CRITICAL",
             actionDirective: "IMMEDIATE_REJECTION",
             confidenceScore: 1.0,
@@ -329,6 +350,7 @@ export function useInvestigationDocket(investigationId: string) {
             riskSignals: [],
           });
         }
+
 
         // 6. Fetch Custody Log
         const custody = await getCustodyEvents(investigationId).catch(() => []);

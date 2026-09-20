@@ -199,6 +199,16 @@ export default function InvestigationWorkspacePage() {
               actionDirective={
                 risk?.actionDirective ?? "STRAIGHT_THROUGH_APPROVAL"
               }
+              overriddenScore={risk?.overriddenScore}
+              overriddenTier={risk?.overriddenTier}
+              overrideReason={risk?.overrideReason}
+              overriddenById={risk?.overriddenById}
+              overriddenAt={risk?.overriddenAt}
+              authenticityScore={risk?.authenticityScore}
+              tamperScore={risk?.tamperScore}
+              authenticityTier={risk?.authenticityTier}
+              transactionRiskScore={risk?.transactionRiskScore}
+              transactionRiskTier={risk?.transactionRiskTier}
               evidenceItems={evidence}
               onFocusCanvas={(pageNum) => setFocusedPageNumber(pageNum)}
               onSelectEvidence={(id) => {
@@ -282,6 +292,7 @@ export default function InvestigationWorkspacePage() {
                 activeTab={activeTab}
                 financialData={financialData}
                 evidence={evidence}
+                onFocusCanvas={(pageNum) => setFocusedPageNumber(pageNum)}
               />
             )}
 
@@ -321,6 +332,8 @@ export default function InvestigationWorkspacePage() {
         isOpen={isOverrideOpen}
         onClose={() => setIsOverrideOpen(false)}
         currentScore={risk.overallScore}
+        authenticityScore={risk.authenticityScore}
+        transactionRiskScore={risk.transactionRiskScore}
         onSave={handleOverrideSave}
       />
 

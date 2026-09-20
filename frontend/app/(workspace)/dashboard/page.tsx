@@ -7,7 +7,7 @@ import { FolioTag } from "@/components/editorial/FolioTag";
 import { HairlineRule } from "@/components/editorial/HairlineRule";
 import { useAuth } from "@/context/AuthContext";
 import { getDashboardMetrics } from "@/lib/api/client";
-import { DashboardMetrics } from "@/lib/types/forensics";
+import { DashboardMetrics, formatRecommendation } from "@/lib/types/forensics";
 import { formatDatePKT } from "@/lib/formatters";
 import {
   ShieldAlert,
@@ -580,7 +580,7 @@ export default function ExecutiveDashboardPage() {
                   <th className="py-2.5 px-3">Type</th>
                   <th className="py-2.5 px-3">Risk Assessment</th>
                   <th className="py-2.5 px-3">Blocked Discrepancy</th>
-                  <th className="py-2.5 px-3">Action Directive</th>
+                  <th className="py-2.5 px-3">Forensic Recommendation</th>
                   <th className="py-2.5 px-3">Date</th>
                   <th className="py-2.5 px-3 text-right">Action</th>
                 </tr>
@@ -624,7 +624,7 @@ export default function ExecutiveDashboardPage() {
                         )}
                       </td>
                       <td className="py-3 px-3 text-[10px] font-semibold text-ink-700 uppercase whitespace-nowrap">
-                        {alert.action_directive.replace(/_/g, " ")}
+                        {formatRecommendation(alert.action_directive, alert.risk_tier)}
                       </td>
                       <td className="py-3 px-3 text-ink-500 text-[10px] whitespace-nowrap">
                         {formatDatePKT(alert.created_at)}

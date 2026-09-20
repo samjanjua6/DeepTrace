@@ -14,7 +14,7 @@ import {
   Scale,
   ExternalLink,
 } from "lucide-react";
-import { EvidenceItem, EvidenceAnchor } from "@/lib/types/forensics";
+import { EvidenceItem, EvidenceAnchor, formatRecommendation } from "@/lib/types/forensics";
 
 export interface CreditBriefingItem {
   page_number?: number;
@@ -48,9 +48,15 @@ export interface LeadInvestigatorAnalysis {
   english_summary: string;
   urdu_summary: string;
   narrative: string;
-  cross_signal_correlations: string[];
   credit_briefing_items: CreditBriefingItem[];
-  evidence_citations: string[];
+  cross_signal_correlations: string[];
+  evidence_citations?: string[];
+  specialist_reports?: Record<string, any>;
+  authenticity_score?: number;
+  tamper_score?: number;
+  authenticity_tier?: string;
+  transaction_risk_score?: number;
+  transaction_risk_tier?: string;
 }
 
 interface CreditOfficerBriefingProps {
@@ -59,6 +65,16 @@ interface CreditOfficerBriefingProps {
   riskTier: string;
   actionDirective: string;
   evidenceItems: EvidenceItem[];
+  authenticityScore?: number;
+  tamperScore?: number;
+  authenticityTier?: string;
+  transactionRiskScore?: number;
+  transactionRiskTier?: string;
+  overriddenScore?: number;
+  overriddenTier?: string;
+  overrideReason?: string;
+  overriddenById?: string;
+  overriddenAt?: string;
   onFocusCanvas?: (pageNumber: number) => void;
   onSelectEvidence?: (evidenceId: string) => void;
 }
@@ -69,6 +85,16 @@ export function CreditOfficerBriefing({
   riskTier,
   actionDirective,
   evidenceItems,
+  authenticityScore,
+  tamperScore,
+  authenticityTier,
+  transactionRiskScore,
+  transactionRiskTier,
+  overriddenScore,
+  overriddenTier,
+  overrideReason,
+  overriddenById,
+  overriddenAt,
   onFocusCanvas,
   onSelectEvidence,
 }: CreditOfficerBriefingProps) {
@@ -105,20 +131,86 @@ export function CreditOfficerBriefing({
     };
   }, [investigationId]);
 
-  const isCriticalOrHigh = riskTier === "CRITICAL" || riskTier === "HIGH";
-  const isMedium = riskTier === "MEDIUM";
+  const effectiveAuthScore =
+    analysis?.authenticity_score ??
+    authenticityScore ??
+    Math.max(0, 100 - overallScore);
 
-  const adverseEvidence = evidenceItems.filter((e) => e.severity !== "INFO");
-  const verifiedEvidence = evidenceItems.filter((e) => e.severity === "INFO");
+  const effectiveTamperScore =
+    analysis?.tamper_score ??
+    tamperScore ??
+    overallScore;
+
+  const effectiveAuthTier =
+    analysis?.authenticity_tier ??
+    authenticityTier ??
+    (effectiveAuthScore >= 90
+      ? "VERIFIED_AUTHENTIC"
+      : effectiveAuthScore >= 60
+      ? "SUSPECT_DOCUMENT"
+      : "FORGERY_DETECTED");
+
+  const effectiveTxnScore =
+    analysis?.transaction_risk_score ??
+    transactionRiskScore ??
+    0;
+
+  const effectiveTxnTier =
+    analysis?.transaction_risk_tier ??
+    transactionRiskTier ??
+    (effectiveTxnScore <= 20
+      ? "CLEAN"
+      : effectiveTxnScore <= 40
+      ? "MONITORED"
+      : effectiveTxnScore <= 70
+      ? "HIGH_AML_RISK"
+      : "CRITICAL_PROSCRIBED");
+
+  const isOverridden = overriddenScore !== undefined && overriddenScore !== null;
+  const effectiveScore = isOverridden ? overriddenScore : overallScore;
+  const effectiveTier = isOverridden ? (overriddenTier || riskTier) : riskTier;
+  const isCriticalOrHigh = effectiveTier === "CRITICAL" || effectiveTier === "HIGH";
+  const isMedium = effectiveTier === "MEDIUM";
+  const recAction = formatRecommendation(actionDirective, effectiveTier);
+
+  const adverseEvidence = evidenceItems.filter(
+    (it) => it.severity !== "INFO" && !it.ruleId?.endsWith("_VERIFIED")
+  );
+  const verifiedEvidence = evidenceItems.filter(
+    (it) => it.severity === "INFO" || it.ruleId?.endsWith("_VERIFIED")
+  );
+
+  const advisoryEn =
+    effectiveTamperScore > 0 && effectiveTxnScore > 0
+      ? "Compound Forensic & Compliance Alert: Severe document tampering detected alongside statutory AML/CFT violations. Financial figures have been artificially manipulated post-generation, and transactional counterparties trigger regulatory red flags. Recommend loan rejection and compliance escalation to fraud unit."
+      : effectiveTamperScore > 0
+      ? "Credit Risk Advisory: The financial figures in this statement have been artificially inflated or modified post-generation. Document authenticity is compromised. Recommend halting loan application pending formal verification."
+      : "Statutory AML/CFT Compliance Advisory: The document is genuine with verified typographical and ledger consistency; however, high-risk transactional patterns (SBP AML/CFT / FATF red flags) were detected. Recommend forwarding docket to AML Compliance for Enhanced Due Diligence (EDD) without alleging document tampering.";
+
+  const advisoryUr =
+    effectiveTamperScore > 0 && effectiveTxnScore > 0
+      ? "مشترکہ فرانزک و تعمیل انتباہ: دستاویز میں جعل سازی اور اسٹیٹ بینک AML/CFT کے ضوابط کی سنگین خلاف ورزی پائی گئی ہے۔ اعداد و شمار میں غیر قانونی ردوبدل پایا گیا ہے اور ممنوعہ عناصر شامل ہیں۔ درخواست مسترد کرنے اور اینٹی فراڈ یونٹ کو بھیجنے کی سفارش کی جاتی ہے۔"
+      : effectiveTamperScore > 0
+      ? "کریڈٹ رسک ایڈوائزری: اس بینک سٹیٹمنٹ کے اعداد و شمار میں سافٹ ویئر کے ذریعے ردوبدل کر کے بیلنس تبدیل کیا گیا ہے۔ دستاویز کی اصلیت مشکوک ہے، لہٰذا درخواست مسترد کرنے یا سینیئر کمیٹی کو برائے فیصلہ پیش کرنے کی سفارش کی جاتی ہے۔"
+      : "اسٹیٹ بینک ضوابط و AML ایڈوائزری: دستاویز کی ساخت اور کھاتہ جاتی تسلسل درست اور مصدقہ ہے، البتہ کھاتے دار کے لین دین میں مشکوک ٹرانزیکشنز پائی گئی ہیں۔ اسے جعل سازی کے بجائے منی لانڈرنگ انکوائری کے لیے بھیجنے کی سفارش کی جاتی ہے۔";
+
+  const overrideNoteEn = isOverridden
+    ? `\n\n[HUMAN ADJUDICATION AUDIT NOTICE]: Automated risk score of ${overallScore}/100 (${riskTier}) was manually adjudicated to ${effectiveScore}/100 (${effectiveTier}) by officer ${overriddenById || "Authorized Officer"}.\nCompliance Justification: "${overrideReason || "Documented branch operational review cleared discrepancy."}"`
+    : "";
+
+  const overrideNoteUr = isOverridden
+    ? `\n\n[آڈٹ نوٹ برائے دستی فیصلہ]: کمپیوٹرائزڈ رسک سکور ${overallScore}/100 کو مجاز افسر کی جانب سے تبدیل کر کے ${effectiveScore}/100 (${effectiveTier}) کیا گیا ہے۔\nدستی فیصلے کا جواز: "${overrideReason || "برانچ ریکارڈ سے دستی تصدیق مکمل ہو گئی ہے۔"}"`
+    : "";
+
+  const baselineStrEn = isOverridden ? ` [Engine Baseline: ${overallScore}/100 (${riskTier})]` : "";
 
   // Client-side deterministic fallback if API is not yet loaded or on sample exhibit
   const fallbackEnglishSummary =
     overallScore > 0 && adverseEvidence.length > 0
       ? `CRITICAL BRIEFING FOR CREDIT UNDERWRITERS & LOAN APPROVAL OFFICERS:
-Action Directive: ${actionDirective.replace(
-          /_/g,
-          " "
-        )} (Forensic Risk Score: ${overallScore}/100 - ${riskTier} Risk).
+Forensic Recommendation: ${recAction} (Human Decision Required).
+Evaluated Risk: ${effectiveScore}/100 (${effectiveTier} Risk)${baselineStrEn}.
+Forensic Radar: Document Authenticity: ${effectiveAuthScore}% (${effectiveAuthTier.replace(/_/g, " ")}) | Transaction Risk: ${effectiveTxnScore}/100 (${effectiveTxnTier.replace(/_/g, " ")}).
 
 Key Forensic Deficiencies Detected:
 ` +
@@ -161,18 +253,23 @@ Key Forensic Deficiencies Detected:
               })
               .join("\n")
           : "") +
-        "\n\nCredit Risk Advisory: The financial figures in this statement have been artificially inflated or modified post-generation. Loan application should be halted immediately."
+        overrideNoteEn +
+        `\n\n${advisoryEn}\n\nAdvisory Notice: DeepTrace outputs constitute evidentiary forensic analysis. All lending, rejection, freeze, or STR decisions remain the exclusive statutory prerogative of authorized human credit & compliance officers.`
       : `EXECUTIVE BRIEFING FOR CREDIT OFFICERS:
-Verdict: ${riskTier} RISK (Score: ${overallScore}/100) — Straight-Through Approval.
-Forensic validation confirms 100% document authenticity across all pages. All transaction figures reconcile with the core banking ledger without font, visual, or mathematical anomalies. State Bank of Pakistan (SBP) IBAN validation passed.`;
+Forensic Recommendation: ${recAction} (Human Decision Required).
+Evaluated Risk: ${effectiveScore}/100 (${effectiveTier} Risk)${baselineStrEn}.
+Forensic Radar: Document Authenticity: ${effectiveAuthScore}% | Transaction Risk: ${effectiveTxnScore}/100.
+Forensic validation confirms 100% document authenticity across all pages. All transaction figures reconcile with the core banking ledger without font, visual, or mathematical anomalies. State Bank of Pakistan (SBP) IBAN validation passed.${overrideNoteEn}
+
+Advisory Notice: Final credit decisions rest with authorized underwriting officers.`;
 
   const fallbackUrduSummary =
     overallScore > 0 && adverseEvidence.length > 0
       ? `کریڈٹ آفیسر اور لون انڈر رائٹر کے لیے فوری خلاصہ:
-سفارشی ہدایت: ${actionDirective.replace(
-          /_/g,
-          " "
-        )} (فرانزک رسک سکور: ${overallScore}/100 — انتہائی خطرہ ${riskTier})۔
+تجویز کردہ کارروائی: ${recAction} (حتمی فیصلہ مجاز افسر کا ہوگا)۔
+لاگو رسک سکور: ${effectiveScore}/100 (${effectiveTier})${isOverridden ? ` [سسٹم سکور: ${overallScore}/100]` : ""}۔
+دستاویزی اصلیت: ${effectiveAuthScore}٪ | کاروباری ٹرانزیکشن رسک: ${effectiveTxnScore}/100۔
+دستاویزی اصلیت: ${effectiveAuthScore}٪ | کاروباری ٹرانزیکشن رسک: ${effectiveTxnScore}/100۔
 
 اہم فرانزک شواہد اور خامیاں:
 ` +
@@ -191,24 +288,18 @@ Forensic validation confirms 100% document authenticity across all pages. All tr
             } else if (it.pageNumber) {
               locStr = `صفحہ ${it.pageNumber}`;
             }
-            return `• [${locStr}]: ${it.title}۔ ${
-              it.discrepancy ? `مالیاتی فرق: ${it.discrepancy}۔` : ""
-            }`;
+            return `• [${locStr}]: ${it.title}۔`;
           })
           .join("\n") +
-        (verifiedEvidence.length > 0
-          ? `\n\nمصدقہ سسٹم کنٹرولز (بغیر کسی تضاد کے):\n` +
-            verifiedEvidence
-              .map((it) => {
-                const loc = it.pageNumber ? `صفحہ ${it.pageNumber}` : "دستاویز میٹا ڈیٹا";
-                return `✓ [${loc}]: ${it.title}۔`;
-              })
-              .join("\n")
-          : "") +
-        "\n\nکریڈٹ رسک ایڈوائزری: اس بینک سٹیٹمنٹ کے اعداد و شمار میں کمپیوٹر سافٹ ویئر کے ذریعے ردوبدل کر کے بیلنس بڑھایا گیا ہے۔ یہ درخواست فوری طور پر مسترد کی جائے۔"
+        overrideNoteUr +
+        `\n\n${advisoryUr}\n\nنوٹ: تمام مالیاتی و قرضہ جاتی فیصلے مجاز افسران کی صوابدید پر منحصر ہیں۔`
       : `کریڈٹ آفیسر کے لیے تفصیلی خلاصہ:
-فیصلہ: کم خطرہ (${riskTier} RISK, سکور: ${overallScore}/100) — براہِ راست منظوری۔
-فرانزک تصدیق سے ثابت ہوا ہے کہ یہ دستاویز مکمل طور پر اصل اور غیر تبدیل شدہ ہے۔ تمام کھاتہ جاتی اعداد و شمار، رننگ بیلنس اور فونٹ مکمل درست ہیں اور اسٹیٹ بینک آف پاکستان (SBP) کا IBAN معیار پر پورا اترتا ہے۔`;
+تجویز کردہ کارروائی: ${recAction} (حتمی فیصلہ مجاز افسر کا ہوگا)۔
+لاگو رسک سکور: ${effectiveScore}/100 (${effectiveTier})${isOverridden ? ` [سسٹم سکور: ${overallScore}/100]` : ""}۔
+دستاویزی اصلیت: ${effectiveAuthScore}٪ | کاروباری رسک: ${effectiveTxnScore}/100۔
+فرانزک تصدیق سے ثابت ہوا ہے کہ یہ دستاویز مکمل طور پر اصل اور غیر تبدیل شدہ ہے۔ تمام کھاتہ جاتی اعداد و شمار، رننگ بیلنس اور فونٹ مکمل درست ہیں اور اسٹیٹ بینک آف پاکستان (SBP) کا IBAN معیار پر پورا اترتا ہے۔${overrideNoteUr}
+
+نوٹ: تمام مالیاتی و قرضہ جاتی فیصلے مجاز افسران کی صوابدید پر منحصر ہیں۔`;
 
   const currentSummary =
     activeLang === "en"
@@ -369,23 +460,40 @@ Forensic validation confirms 100% document authenticity across all pages. All tr
             : "bg-emerald-500/10 border-emerald-500/30 text-emerald-700"
         }`}
       >
-        <div className="flex items-center gap-2 font-bold tracking-wider">
-          {isCriticalOrHigh ? (
-            <ShieldAlert className="w-4 h-4 text-forensic-red" />
-          ) : (
-            <ShieldCheck className="w-4 h-4 text-emerald-600" />
-          )}
-          <span>
-            VERDICT: {riskTier} RISK ({overallScore}/100) — STATUTORY DIRECTIVE:{" "}
-            {actionDirective.replace(/_/g, " ")}
-          </span>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 font-bold tracking-wider">
+            {isCriticalOrHigh ? (
+              <ShieldAlert className="w-4 h-4 text-forensic-red" />
+            ) : (
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            )}
+            <span>
+              FORENSIC RECOMMENDATION: {recAction.toUpperCase()} ({effectiveTier} RISK, {effectiveScore}/100)
+              {isOverridden && (
+                <span className="ml-2 text-[10px] px-1.5 py-0.5 bg-amber-500/20 text-amber-900 border border-amber-500/40 rounded font-bold">
+                  HUMAN OVERRIDE
+                </span>
+              )}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 text-[10px]">
+            <span className="px-2 py-0.5 border border-current font-bold">
+              AUTH: {effectiveAuthScore}% ({effectiveAuthTier.replace(/_/g, " ")})
+            </span>
+            <span className="px-2 py-0.5 border border-current font-bold">
+              AML RISK: {effectiveTxnScore}/100 ({effectiveTxnTier.replace(/_/g, " ")})
+            </span>
+          </div>
         </div>
+
         <div className="text-[11px] font-sans opacity-90">
           {activeLang === "ur"
             ? "زیرو ہالوسینیشن پالیسی — صرف مصدقہ شواہد پر مبنی تجزیہ"
             : "Zero-Hallucination Guardrail — Strictly Bound to Verified Evidence Manifest"}
         </div>
       </div>
+
 
       {/* ETO 2002 Section 29 Digital Signature Compliance Strip */}
       {evidenceItems.some(
