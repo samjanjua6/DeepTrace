@@ -462,9 +462,64 @@ AML_HIGH_RISK_NARRATION_KEYWORDS: list[dict[str, str]] = [
         "description": "Binance cryptocurrency exchange trade or liquidation.",
     },
     {
-        "term": "p2p",
+        "term": "binance p2p",
         "category": "UNLICENSED_VIRTUAL_ASSETS",
-        "description": "Peer-to-peer crypto liquidation prohibited under SBP regulations.",
+        "description": "Binance peer-to-peer crypto liquidation prohibited under SBP BPRD Circular No. 3 of 2018.",
+    },
+    {
+        "term": "crypto p2p",
+        "category": "UNLICENSED_VIRTUAL_ASSETS",
+        "description": "Peer-to-peer cryptocurrency trading prohibited under SBP regulations.",
+    },
+    {
+        "term": "p2p usdt",
+        "category": "UNLICENSED_VIRTUAL_ASSETS",
+        "description": "USDT Tether peer-to-peer trading or liquidation.",
+    },
+    {
+        "term": "usdt p2p",
+        "category": "UNLICENSED_VIRTUAL_ASSETS",
+        "description": "USDT Tether peer-to-peer trading or liquidation.",
+    },
+    {
+        "term": "okx p2p",
+        "category": "UNLICENSED_VIRTUAL_ASSETS",
+        "description": "OKX crypto peer-to-peer exchange trade.",
+    },
+    {
+        "term": "bybit p2p",
+        "category": "UNLICENSED_VIRTUAL_ASSETS",
+        "description": "Bybit crypto peer-to-peer exchange trade.",
+    },
+    {
+        "term": "kucoin p2p",
+        "category": "UNLICENSED_VIRTUAL_ASSETS",
+        "description": "KuCoin crypto peer-to-peer exchange trade.",
+    },
+    {
+        "term": "paxful p2p",
+        "category": "UNLICENSED_VIRTUAL_ASSETS",
+        "description": "Paxful peer-to-peer crypto remittance/trade.",
+    },
+    {
+        "term": "p2p trade",
+        "category": "UNLICENSED_VIRTUAL_ASSETS",
+        "description": "Unlicensed peer-to-peer digital asset trade.",
+    },
+    {
+        "term": "p2p trading",
+        "category": "UNLICENSED_VIRTUAL_ASSETS",
+        "description": "Unlicensed peer-to-peer digital asset trading.",
+    },
+    {
+        "term": "p2p escrow",
+        "category": "UNLICENSED_VIRTUAL_ASSETS",
+        "description": "Peer-to-peer crypto escrow settlement indicator.",
+    },
+    {
+        "term": "p2p liquidation",
+        "category": "UNLICENSED_VIRTUAL_ASSETS",
+        "description": "Peer-to-peer crypto asset liquidation into fiat.",
     },
     {
         "term": "bitcoin",

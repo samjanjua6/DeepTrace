@@ -258,9 +258,21 @@ def screen_entity_against_sanctions(
     return matches
 
 
+# Legitimate Pakistani digital payment rails and retail transaction keywords
+LEGITIMATE_BANKING_P2P_INDICATORS = {
+    "raast", "1link", "ibft", "interbank", "inter-bank", "funds transfer",
+    "fund transfer", "alfa", "hbl pay", "nayapay", "sadapay", "easypaisa",
+    "jazzcash", "upaisa", "mobile banking", "internet banking", "app transfer",
+    "money transfer", "money request", "rent", "salary", "fee", "bill",
+    "over the counter", "clearing", "cheque", "deposit", "atm", "pos",
+}
+
+
 def scan_transaction_narrations(transactions: list[dict]) -> list[dict[str, Any]]:
     """
     Scan transaction ledger descriptions for informal Hawala/Hundi/Crypto red flags.
+    Uses regex word boundaries to avoid false-positive substring matches and protects
+    legitimate Pakistani interbank payment rails (e.g. Raast P2P, Alfa P2P, 1LINK P2P).
     """
     red_flags: list[dict[str, Any]] = []
 
@@ -272,10 +284,12 @@ def scan_transaction_narrations(transactions: list[dict]) -> list[dict[str, Any]
 
         for kw in AML_HIGH_RISK_NARRATION_KEYWORDS:
             term = kw["term"].lower()
-            if term in narr_lower:
+            # Enforce regex word boundaries on matched term
+            pattern = rf"\b{re.escape(term)}\b"
+            if re.search(pattern, narr_lower):
                 red_flags.append({
-                    "row_number": tx.get("row_number"),
-                    "page_number": tx.get("page_number", 1),
+                    "row_number": tx.get("row_number") or tx.get("line_number") or tx.get("index"),
+                    "page_number": tx.get("page_number") or tx.get("page") or 1,
                     "narration": narr,
                     "matched_term": kw["term"],
                     "category": kw["category"],
@@ -409,20 +423,62 @@ def perform_sbp_cdd_screening(
         })
 
     if has_narration:
+        matched_categories = set(r.get("category") for r in narration_red_flags)
+        has_crypto = "UNLICENSED_VIRTUAL_ASSETS" in matched_categories
+        has_hawala = any(c in matched_categories for c in ("INFORMAL_VALUE_TRANSFER", "UNOFFICIAL_SETTLEMENT"))
+        has_structuring = any(c in matched_categories for c in ("STRUCTURING", "CASH_STRUCTURING", "BENAMI_TRANSACTION"))
+
+        unique_terms = sorted(list(set(r["matched_term"] for r in narration_red_flags)))
+        sample_terms = ", ".join(unique_terms[:4])
+        count = len(narration_red_flags)
+
+        if has_crypto and not (has_hawala or has_structuring):
+            title = f"Unlicensed Cryptocurrency P2P Trading Indicators in {count} Transaction(s)"
+            desc = (
+                f"Detected {count} transaction(s) bearing prohibited virtual asset or cryptocurrency P2P trading keywords: "
+                f"{sample_terms}. Prohibited under State Bank of Pakistan (SBP) BPRD Circular No. 3 of 2018."
+            )
+            discrepancy = "Prohibited virtual asset / cryptocurrency P2P trading keywords detected (SBP BPRD Circular No. 3 of 2018)"
+        elif has_hawala and not (has_crypto or has_structuring):
+            title = f"Informal Hawala / Hundi Settlement Red Flags in {count} Transaction(s)"
+            desc = (
+                f"Detected {count} transaction(s) bearing prohibited informal value transfer (Hawala / Hundi) keywords: "
+                f"{sample_terms}. Prohibited under Anti-Money Laundering Act (AMLA 2010) and SBP BPRD regulations."
+            )
+            discrepancy = "Prohibited informal value transfer (Hawala / Hundi) keywords detected"
+        elif has_structuring and not (has_crypto or has_hawala):
+            title = f"Transaction Structuring / Smurfing Red Flags in {count} Transaction(s)"
+            desc = (
+                f"Detected {count} transaction(s) bearing high-risk structuring, smurfing, or Benami indicators: "
+                f"{sample_terms}. Prohibited under Benami Transactions (Prohibition) Act 2017 and SBP AML guidelines."
+            )
+            discrepancy = "High-risk transaction structuring or smurfing keywords detected"
+        else:
+            title = f"Informal Value Transfer & High-Risk AML Red Flags in {count} Transaction(s)"
+            desc = (
+                f"Detected {count} transaction(s) bearing prohibited informal value transfer, structuring, or crypto liquidation keywords: "
+                f"{sample_terms}. Prohibited under SBP BPRD Circular No. 3 of 2018 and AMLA 2010."
+            )
+            discrepancy = "Prohibited informal value transfer or virtual asset structuring keywords detected"
+
         findings.append({
             "category": "TRANSACTION_FORMAT_VIOLATION",
             "severity": "HIGH",
             "rule_id": "RULE_AML_HIGH_RISK_NARRATION",
             "risk_points": 25,
-            "title": f"Informal Hawala / Hundi / Structuring Red Flags in {len(narration_red_flags)} Transaction(s)",
-            "description": (
-                f"Detected {len(narration_red_flags)} transaction(s) bearing prohibited informal value transfer or crypto liquidation keywords: "
-                f"{', '.join(set(r['matched_term'] for r in narration_red_flags[:4]))}. Prohibited under SBP BPRD Circular No. 3 of 2018."
-            ),
+            "title": title,
+            "description": desc,
             "expected_value": "Standard Commercial / Personal Transaction Narratives",
-            "actual_value": f"{len(narration_red_flags)} Suspicious Narrative(s)",
-            "discrepancy": "Prohibited informal value transfer or asset structuring keywords detected",
-            "technical_details": {"red_flags": narration_red_flags[:10], "aml_category": "AML_HIGH_RISK_NARRATION"},
+            "actual_value": f"{count} Suspicious Narrative(s)",
+            "discrepancy": discrepancy,
+            "technical_details": {
+                "red_flags": narration_red_flags,
+                "matched_categories": list(matched_categories),
+                "matched_terms": unique_terms,
+                "aml_category": "AML_HIGH_RISK_NARRATION",
+                "is_crypto": has_crypto,
+                "is_hawala": has_hawala,
+            },
         })
 
     if not findings:

@@ -1794,32 +1794,69 @@ async def process_financial(
                         aml_cdd_summary = aml_res
 
                         for aml_f in aml_res.get("findings", []):
+                            r_id = aml_f.get("rule_id", "RULE_AML_CDD_CLEARED")
+                            if r_id == "RULE_AML_HIGH_RISK_NARRATION":
+                                red_flags = aml_f.get("technical_details", {}).get("red_flags", [])
+                                flagged_pages = sorted(list(set(r.get("page_number", 1) for r in red_flags if r.get("page_number"))))
+                                is_multi_page = len(flagged_pages) > 1
+                                f_anchor_type = "MULTI_PAGE_SPAN" if is_multi_page else "TABLE_ROW"
+                                f_page_number = flagged_pages[-1] if flagged_pages else 1
+
+                                anchors = []
+                                for r in red_flags:
+                                    p = r.get("page_number", 1)
+                                    row = r.get("row_number")
+                                    term = r.get("matched_term", "Red Flag")
+                                    label = f"P.{p} Row {row}: {term}" if row else f"P.{p}: {term}"
+                                    anchors.append({
+                                        "pageNumber": p,
+                                        "rowNumber": row,
+                                        "label": label,
+                                        "type": "TABLE_ROW",
+                                        "matched_term": term,
+                                        "category": r.get("category"),
+                                    })
+
+                                tech_details = {
+                                    **aml_f.get("technical_details", {}),
+                                    "anchor_type": f_anchor_type,
+                                    "anchors": anchors,
+                                    "page_start": flagged_pages[0] if flagged_pages else 1,
+                                    "last_page": flagged_pages[-1] if flagged_pages else 1,
+                                    "flagged_pages": flagged_pages,
+                                    "flagged_count": len(red_flags),
+                                }
+                            else:
+                                f_anchor_type = "DOCUMENT_HEADER"
+                                f_page_number = 1
+                                tech_details = {
+                                    **aml_f.get("technical_details", {}),
+                                    "anchor_type": f_anchor_type,
+                                }
+
                             finding = await tx.evidenceitem.create(
                                 data={
                                     "document": {"connect": {"id": doc.id}},
                                     "pipelineStage": {"connect": {"id": pipeline_stage_id}},
                                     "category": aml_f.get("category", "TRANSACTION_FORMAT_VIOLATION"),
                                     "severity": aml_f.get("severity", "INFO"),
-                                    "ruleId": aml_f.get("rule_id", "RULE_AML_CDD_CLEARED"),
+                                    "ruleId": r_id,
                                     "riskPoints": aml_f.get("risk_points", 0),
                                     "title": aml_f.get("title", "SBP CDD Screening"),
                                     "description": aml_f.get("description", ""),
                                     "isDeterministic": True,
-                                    "pageNumber": 1,
+                                    "pageNumber": f_page_number,
                                     "expectedValue": aml_f.get("expected_value"),
                                     "actualValue": aml_f.get("actual_value"),
                                     "discrepancy": aml_f.get("discrepancy"),
-                                    "technicalDetails": Json({
-                                        **aml_f.get("technical_details", {}),
-                                        "anchor_type": "DOCUMENT_HEADER",
-                                    }),
+                                    "technicalDetails": Json(tech_details),
                                 }
                             )
                             stage_findings.append({
                                 "id": finding.id,
-                                "rule_id": aml_f.get("rule_id"),
+                                "rule_id": r_id,
                                 "severity": finding.severity,
-                                "page": 1,
+                                "page": f_page_number,
                                 "title": finding.title,
                             })
                     except Exception as aml_err:

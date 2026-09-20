@@ -210,3 +210,73 @@ def test_lead_investigator_briefing_aml_urdu():
     assert "نیکٹا" in item["summary_ur"]
     assert "11EE" in item["summary_ur"]
     assert "اکاؤنٹ منجمد" in item["summary_ur"]
+
+
+def test_raast_p2p_legitimate_narrations_not_flagged():
+    """Verify legitimate Pakistani banking Person-to-Person (P2P) transfers trigger ZERO false positives."""
+    legit_p2p_txs = [
+        {"row_number": 1, "particulars": "Raast P2P Fund transfer to Brother", "amount": 15000},
+        {"row_number": 2, "particulars": "RAAST/P2P/Rent Transfer", "amount": 45000},
+        {"row_number": 3, "particulars": "Alfa P2P Funds Transfer to Nayapay Account", "amount": 10000},
+        {"row_number": 4, "particulars": "1LINK P2P IBFT Payment from 0042", "amount": 75000},
+        {"row_number": 5, "particulars": "Meezan Mobile App P2P to Sadapay", "amount": 5000},
+        {"row_number": 6, "particulars": "JazzCash P2P Transfer", "amount": 2500},
+    ]
+    flags = scan_transaction_narrations(legit_p2p_txs)
+    assert len(flags) == 0, f"Expected 0 false positives, but got {len(flags)}: {flags}"
+
+
+def test_crypto_vs_hawala_title_disambiguation():
+    """Verify finding titles accurately reflect Crypto P2P vs Hawala rather than hardcoding Hawala."""
+    # 1. Crypto P2P only
+    crypto_txs = [
+        {"row_number": 1, "particulars": "Binance P2P liquidation to bank", "amount": 200000},
+    ]
+    res_crypto = perform_sbp_cdd_screening("Meezan Bank Statement", transactions=crypto_txs)
+    narration_findings = [f for f in res_crypto["findings"] if f["rule_id"] == "RULE_AML_HIGH_RISK_NARRATION"]
+    assert len(narration_findings) == 1
+    crypto_title = narration_findings[0]["title"]
+    assert "Cryptocurrency P2P" in crypto_title
+    assert "Hawala" not in crypto_title
+
+    # 2. Hawala only
+    hawala_txs = [
+        {"row_number": 1, "particulars": "Settlement via Dubai chitti token payment", "amount": 500000},
+    ]
+    res_hawala = perform_sbp_cdd_screening("Meezan Bank Statement", transactions=hawala_txs)
+    hawala_findings = [f for f in res_hawala["findings"] if f["rule_id"] == "RULE_AML_HIGH_RISK_NARRATION"]
+    assert len(hawala_findings) == 1
+    hawala_title = hawala_findings[0]["title"]
+    assert "Hawala" in hawala_title
+    assert "Cryptocurrency" not in hawala_title
+
+
+def test_lead_investigator_briefing_crypto_urdu_and_multipage():
+    """Verify Lead Investigator distinguishes Crypto P2P in Urdu and handles multi-page anchors."""
+    evidence_items = [
+        {
+            "id": "ev-crypto-p2p",
+            "ruleId": "RULE_AML_HIGH_RISK_NARRATION",
+            "severity": "HIGH",
+            "title": "Unlicensed Cryptocurrency P2P Trading Indicators in 2 Transaction(s)",
+            "pageNumber": 23,
+            "technicalDetails": {
+                "is_crypto": True,
+                "is_hawala": False,
+                "anchor_type": "MULTI_PAGE_SPAN",
+                "page_start": 1,
+                "last_page": 23,
+                "anchors": [
+                    {"pageNumber": 1, "rowNumber": 5, "label": "P.1 Row 5: binance p2p", "type": "TABLE_ROW"},
+                    {"pageNumber": 23, "rowNumber": 108, "label": "P.23 Row 108: usdt p2p", "type": "TABLE_ROW"},
+                ],
+            },
+        }
+    ]
+    briefing_items = _build_structured_credit_briefing_items(evidence_items)
+    assert len(briefing_items) == 1
+    item = briefing_items[0]
+    assert item["anchor_type"] == "MULTI_PAGE_SPAN"
+    assert "Pages 1–23 (Multi-Page Ledger)" in item["summary_en"]
+    assert "کرپٹو / پی ٹو پی" in item["summary_ur"]
+    assert "صفحات 1 تا 23" in item["summary_ur"]
