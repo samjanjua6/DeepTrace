@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import { initiateSso, SsoInitiateResponse } from "@/lib/api/client";
-import { ExternalLink, KeyRound, CheckCircle2, ShieldCheck } from "lucide-react";
+import { ExternalLink, KeyRound, CheckCircle2 } from "lucide-react";
 
 interface SsoFederationModalProps {
   isOpen: boolean;
@@ -142,8 +142,8 @@ export function SsoFederationModal({
               value={domain}
               onChange={(e) => setDomain(e.target.value)}
             />
-            <span className="text-[10px] text-ink-500 mt-1 block">
-              Directs SAML AuthnRequest to your bank's dedicated single sign-on realm.
+            <span className="text-[11px] text-ink-500 mt-1 block">
+              Directs SAML AuthnRequest to your bank&apos;s dedicated single sign-on realm.
             </span>
           </div>
 
@@ -181,22 +181,22 @@ export function SsoFederationModal({
 
           <div className="bg-paper-1 border border-rule p-3 space-y-2 text-[11px]">
             <div className="flex justify-between">
-              <span className="text-ink-500 uppercase text-[10px]">Identity Provider:</span>
+              <span className="text-ink-500 uppercase text-[11px]">Identity Provider:</span>
               <strong className="text-ink-900 uppercase">{ssoResult.provider}</strong>
             </div>
             <div className="flex justify-between">
-              <span className="text-ink-500 uppercase text-[10px]">Protocol:</span>
+              <span className="text-ink-500 uppercase text-[11px]">Protocol:</span>
               <strong className="text-ink-900">{ssoResult.protocol}</strong>
             </div>
             <div className="flex flex-col gap-0.5">
-              <span className="text-ink-500 uppercase text-[10px]">Service Provider Entity ID:</span>
-              <span className="text-ink-900 font-bold break-all bg-paper-0 p-1 border border-rule text-[10px]">
+              <span className="text-ink-500 uppercase text-[11px]">Service Provider Entity ID:</span>
+              <span className="text-ink-900 font-bold break-all bg-paper-0 p-1 border border-rule text-[11px]">
                 {ssoResult.entity_id}
               </span>
             </div>
             <div className="flex flex-col gap-0.5">
-              <span className="text-ink-500 uppercase text-[10px]">Target IdP Authorization URL:</span>
-              <span className="text-ink-900 font-bold break-all bg-paper-0 p-1 border border-rule text-[10px]">
+              <span className="text-ink-500 uppercase text-[11px]">Target IdP Authorization URL:</span>
+              <span className="text-ink-900 font-bold break-all bg-paper-0 p-1 border border-rule text-[11px]">
                 {ssoResult.sso_url}
               </span>
             </div>
