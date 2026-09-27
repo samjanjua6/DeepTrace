@@ -46,7 +46,11 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Local storage & scratch
+# Local storage, scratch & debug
 storage/
 scratch/
+scripts/debug/*
+!scripts/debug/README.md
+tests/artifacts/*.pdf
+!tests/artifacts/README.md
 
