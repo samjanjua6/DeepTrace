@@ -41,10 +41,10 @@ export function Tabs({ tabs, activeTab, onChange, className }: TabsProps) {
             {typeof tab.count === "number" && (
               <span
                 className={cn(
-                  "ml-1 px-1.5 py-0.2 text-[9px] font-bold tabular-nums",
+                  "ml-1.5 px-2 py-0.5 text-[11px] font-bold tabular-nums",
                   isActive
                     ? "bg-paper-0 text-ink-900"
-                    : "bg-paper-2 text-ink-700"
+                    : "bg-paper-2 text-ink-800 border border-rule"
                 )}
               >
                 {tab.count}

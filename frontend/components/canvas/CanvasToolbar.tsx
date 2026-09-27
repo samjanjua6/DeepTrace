@@ -99,26 +99,26 @@ export function CanvasToolbar({
 
       {/* Finding Category Filters */}
       {categoryCounts && onCategoryChange && (
-        <div className="flex items-center gap-1 border-r border-rule pr-3">
-          <span className="text-[10px] text-ink-500 mr-1 hidden sm:inline uppercase tracking-wider">
+        <div className="flex items-center gap-1.5 border-r border-rule pr-3">
+          <span className="text-[11px] text-ink-700 mr-1 hidden sm:inline uppercase tracking-wider font-bold">
             FILTER:
           </span>
           <button
             onClick={() => onCategoryChange("ALL")}
-            className={`px-2 py-0.5 border text-[10px] uppercase font-mono transition-colors ${
+            className={`px-2.5 py-1 border text-[11px] uppercase font-mono transition-colors ${
               selectedCategory === "ALL"
-                ? "bg-ink-900 text-paper-0 border-ink-900 font-semibold"
-                : "bg-paper-0 text-ink-700 border-rule hover:bg-paper-2"
+                ? "bg-ink-900 text-paper-0 border-ink-900 font-bold"
+                : "bg-paper-0 text-ink-700 border-rule hover:bg-paper-2 font-semibold"
             }`}
           >
             ALL ({categoryCounts.all})
           </button>
           <button
             onClick={() => onCategoryChange("FINANCIAL")}
-            className={`px-2 py-0.5 border text-[10px] uppercase font-mono transition-colors ${
+            className={`px-2.5 py-1 border text-[11px] uppercase font-mono transition-colors ${
               selectedCategory === "FINANCIAL"
-                ? "bg-ink-900 text-paper-0 border-ink-900 font-semibold"
-                : "bg-paper-0 text-ink-700 border-rule hover:bg-paper-2"
+                ? "bg-ink-900 text-paper-0 border-ink-900 font-bold"
+                : "bg-paper-0 text-ink-700 border-rule hover:bg-paper-2 font-semibold"
             }`}
             title="Show only financial balance and ledger tampering"
           >
@@ -126,10 +126,10 @@ export function CanvasToolbar({
           </button>
           <button
             onClick={() => onCategoryChange("VISUAL")}
-            className={`px-2 py-0.5 border text-[10px] uppercase font-mono transition-colors ${
+            className={`px-2.5 py-1 border text-[11px] uppercase font-mono transition-colors ${
               selectedCategory === "VISUAL"
-                ? "bg-ink-900 text-paper-0 border-ink-900 font-semibold"
-                : "bg-paper-0 text-ink-700 border-rule hover:bg-paper-2"
+                ? "bg-ink-900 text-paper-0 border-ink-900 font-bold"
+                : "bg-paper-0 text-ink-700 border-rule hover:bg-paper-2 font-semibold"
             }`}
             title="Show image ELA and copy-move forgery"
           >
@@ -137,10 +137,10 @@ export function CanvasToolbar({
           </button>
           <button
             onClick={() => onCategoryChange("DATES")}
-            className={`px-2 py-0.5 border text-[10px] uppercase font-mono transition-colors ${
+            className={`px-2.5 py-1 border text-[11px] uppercase font-mono transition-colors ${
               selectedCategory === "DATES"
-                ? "bg-ink-900 text-paper-0 border-ink-900 font-semibold"
-                : "bg-paper-0 text-ink-700 border-rule hover:bg-paper-2"
+                ? "bg-ink-900 text-paper-0 border-ink-900 font-bold"
+                : "bg-paper-0 text-ink-700 border-rule hover:bg-paper-2 font-semibold"
             }`}
             title="Show bank holiday and weekend transaction dates"
           >
@@ -155,7 +155,7 @@ export function CanvasToolbar({
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => onToggleRuler(!showRuler)}
-            className={`px-2.5 py-1 border transition-colors flex items-center gap-1.5 font-mono text-[11px] ${
+            className={`px-2.5 py-1 border transition-colors flex items-center gap-1.5 font-mono text-[11px] font-bold ${
               showRuler
                 ? "bg-ink-900 text-paper-0 border-ink-900 shadow-sm"
                 : "bg-paper-0 text-ink-700 border-rule hover:bg-paper-2"
@@ -167,7 +167,7 @@ export function CanvasToolbar({
           {pinnedBaselinesCount > 0 && onClearPinnedBaselines && (
             <button
               onClick={onClearPinnedBaselines}
-              className="px-2 py-1 bg-paper-0 text-ink-700 border border-rule hover:bg-paper-2 transition-colors text-[10px] uppercase font-mono"
+              className="px-2.5 py-1 bg-paper-0 text-ink-900 border border-rule hover:bg-paper-2 transition-colors text-[11px] uppercase font-mono font-bold"
               title="Clear all pinned baseline guides"
             >
               CLEAR ({pinnedBaselinesCount})
@@ -179,7 +179,7 @@ export function CanvasToolbar({
         <div className="flex items-center gap-2">
           <button
             onClick={() => onToggleELA(!showELA)}
-            className={`px-2.5 py-1 border transition-colors flex items-center gap-1.5 ${
+            className={`px-2.5 py-1 border transition-colors flex items-center gap-1.5 font-bold text-[11px] ${
               showELA
                 ? "bg-forensic-red text-white border-forensic-red"
                 : "bg-paper-0 text-ink-700 border-rule hover:bg-paper-2"
@@ -190,7 +190,7 @@ export function CanvasToolbar({
           </button>
           {showELA && (
             <div className="flex items-center gap-1.5 bg-paper-0 border border-rule px-2 py-0.5">
-              <span className="text-[10px] text-ink-500">ALPHA:</span>
+              <span className="text-[11px] text-ink-700 font-bold">ALPHA:</span>
               <input
                 type="range"
                 min="0.1"
@@ -200,7 +200,7 @@ export function CanvasToolbar({
                 onChange={(e) => onElaOpacityChange(parseFloat(e.target.value))}
                 className="w-16 h-1 accent-forensic-red cursor-pointer"
               />
-              <span className="tabular-nums text-[10px] text-ink-700 font-semibold w-6">
+              <span className="tabular-nums text-[11px] text-ink-900 font-bold w-7">
                 {Math.round(elaOpacity * 100)}%
               </span>
             </div>

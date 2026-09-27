@@ -67,7 +67,7 @@ export function LedgerMathTable({
               <AlertTriangle className="w-4 h-4 text-forensic-red flex-shrink-0" />
               <span>DETERMINISTIC BALANCE AUDIT: HEADER TAMPERING DETECTED</span>
             </div>
-            <span className="bg-forensic-red text-white text-[9px] px-2 py-0.5 uppercase font-bold tracking-wider">
+            <span className="bg-rose-100 text-rose-950 border border-rose-700 text-xs px-2.5 py-1 uppercase font-bold tracking-wider">
               CRITICAL FRAUD SIGNAL
             </span>
           </div>
@@ -80,14 +80,14 @@ export function LedgerMathTable({
                   onSelectEvidence?.(openingMismatch.id);
                   onFocusCanvas?.(openingMismatch.pageNumber || 1);
                 }}
-                className="bg-forensic-red/5 border border-forensic-red/40 p-3 hover:bg-forensic-red/10 cursor-pointer transition-colors space-y-2 group"
+                className="bg-rose-50/60 border border-rose-700/60 p-3 hover:bg-rose-100/50 cursor-pointer transition-colors space-y-2 group"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-bold text-forensic-red uppercase text-[10px] tracking-wider">
+                    <span className="font-bold text-forensic-red uppercase text-[11px] tracking-wider">
                       Opening Balance Discrepancy
                     </span>
-                    <span className="bg-forensic-red/20 text-forensic-red border border-forensic-red/40 px-1 py-0.2 text-[8.5px] font-bold rounded-xs">
+                    <span className="bg-rose-200/80 text-rose-950 border border-rose-700/60 px-1.5 py-0.5 text-[11px] font-bold rounded-none">
                       {(() => {
                         const sPage = openingMismatch.endpoints?.find((ep) => ep.role === "stated")?.page || 1;
                         const dPage = openingMismatch.endpoints?.find((ep) => ep.role === "derived")?.page || openingMismatch.pageNumber || 1;
@@ -95,14 +95,14 @@ export function LedgerMathTable({
                       })()}
                     </span>
                     {openingMismatch.pattern && (
-                      <span className="bg-forensic-red/20 text-forensic-red border border-forensic-red/40 px-1 py-0.2 text-[8.5px] font-bold rounded-xs">
+                      <span className="bg-amber-100 text-amber-950 border border-amber-600 px-1.5 py-0.5 text-[11px] font-bold rounded-none">
                         {openingMismatch.pattern === "magnitude_power_of_ten"
                           ? `MAGNITUDE (${openingMismatch.multiplier}×)`
                           : openingMismatch.pattern.replace(/_/g, " ").toUpperCase()}
                       </span>
                     )}
                     {openingMismatch.corroboration && (
-                      <span className="bg-blue-900/30 text-blue-400 border border-blue-700/40 px-1 py-0.2 text-[8.5px] font-bold rounded-xs">
+                      <span className="bg-blue-100 text-blue-950 border border-blue-600 px-1.5 py-0.5 text-[11px] font-bold rounded-none">
                         {openingMismatch.corroboration.shared_factor}× SYMMETRIC
                       </span>
                     )}
@@ -118,7 +118,7 @@ export function LedgerMathTable({
                             onSelectEvidence?.(openingMismatch.id);
                             onFocusCanvas?.(ep.page);
                           }}
-                          className="text-[9px] bg-forensic-red/15 hover:bg-forensic-red text-forensic-red hover:text-white px-1.5 py-0.5 rounded-sm transition-colors font-bold cursor-pointer"
+                          className="text-[11px] bg-paper-2 hover:bg-ink-900 text-ink-900 hover:text-white border border-ink-900/30 px-2 py-0.5 rounded-none transition-colors font-bold cursor-pointer"
                           title={ep.label}
                         >
                           P.{ep.page} {ep.role === "stated" ? "Stated" : "Origin"} ↗
@@ -132,39 +132,39 @@ export function LedgerMathTable({
                           onSelectEvidence?.(openingMismatch.id);
                           onFocusCanvas?.(openingMismatch.pageNumber || 1);
                         }}
-                        className="text-[10px] bg-forensic-red/15 hover:bg-forensic-red text-forensic-red hover:text-white px-2 py-0.5 rounded-sm transition-colors flex items-center gap-1 font-bold"
+                        className="text-[11px] bg-paper-2 hover:bg-ink-900 text-ink-900 hover:text-white border border-ink-900/30 px-2 py-0.5 rounded-none transition-colors flex items-center gap-1 font-bold cursor-pointer"
                       >
                         Locate P.{openingMismatch.pageNumber || 1} <ArrowRight className="w-3 h-3" />
                       </button>
                     )}
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t border-forensic-red/20">
+                <div className="grid grid-cols-2 gap-2 text-xs pt-1.5 border-t border-rose-700/30">
                   <div>
-                    <span className="text-[10px] text-ink-500 block uppercase">Stated on PDF</span>
+                    <span className="text-[11px] text-ink-700 font-bold block uppercase tracking-wider">Stated on PDF</span>
                     <span className="font-bold text-ink-900 tabular-nums">
                       {openingMismatch.actualValue || "—"}
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-ink-500 block uppercase">Calculated Ledger</span>
+                    <span className="text-[11px] text-ink-700 font-bold block uppercase tracking-wider">Calculated Ledger</span>
                     <span className="font-bold text-forensic-green tabular-nums">
                       {openingMismatch.expectedValue || "—"}
                     </span>
                   </div>
                 </div>
-                <div className="bg-forensic-red/15 px-2 py-1 text-[10px] text-forensic-red font-bold flex justify-between">
+                <div className="bg-rose-100 border border-rose-700/40 px-2 py-1 text-[11px] text-rose-950 font-bold flex justify-between">
                   <span>UNRECONCILED VARIANCE:</span>
                   <span className="tabular-nums">{openingMismatch.discrepancy || "MISMATCH"}</span>
                 </div>
               </div>
             ) : (
               <div className="bg-paper-1 border border-rule p-3 space-y-1">
-                <div className="flex items-center gap-1.5 text-forensic-green text-[10px] font-bold uppercase tracking-wider">
+                <div className="flex items-center gap-1.5 text-forensic-green text-[11px] font-bold uppercase tracking-wider">
                   <CheckCircle className="w-3.5 h-3.5" />
                   <span>Opening Balance Reconciled</span>
                 </div>
-                <p className="text-[11px] text-ink-600">
+                <p className="text-xs text-ink-700">
                   Stated opening balance matches initial transaction baseline.
                 </p>
               </div>
@@ -177,14 +177,14 @@ export function LedgerMathTable({
                   onSelectEvidence?.(closingMismatch.id);
                   onFocusCanvas?.(closingMismatch.pageNumber || 23);
                 }}
-                className="bg-forensic-red/5 border border-forensic-red/40 p-3 hover:bg-forensic-red/10 cursor-pointer transition-colors space-y-2 group"
+                className="bg-rose-50/60 border border-rose-700/60 p-3 hover:bg-rose-100/50 cursor-pointer transition-colors space-y-2 group"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-bold text-forensic-red uppercase text-[10px] tracking-wider">
+                    <span className="font-bold text-forensic-red uppercase text-[11px] tracking-wider">
                       Closing Balance Discrepancy
                     </span>
-                    <span className="bg-forensic-red/20 text-forensic-red border border-forensic-red/40 px-1 py-0.2 text-[8.5px] font-bold rounded-xs">
+                    <span className="bg-rose-200/80 text-rose-950 border border-rose-700/60 px-1.5 py-0.5 text-[11px] font-bold rounded-none">
                       {(() => {
                         const sPage = closingMismatch.endpoints?.find((ep) => ep.role === "stated")?.page || 1;
                         const dPage = closingMismatch.endpoints?.find((ep) => ep.role === "derived")?.page || closingMismatch.pageNumber || 23;
@@ -192,14 +192,14 @@ export function LedgerMathTable({
                       })()}
                     </span>
                     {closingMismatch.pattern && (
-                      <span className="bg-forensic-red/20 text-forensic-red border border-forensic-red/40 px-1 py-0.2 text-[8.5px] font-bold rounded-xs">
+                      <span className="bg-amber-100 text-amber-950 border border-amber-600 px-1.5 py-0.5 text-[11px] font-bold rounded-none">
                         {closingMismatch.pattern === "magnitude_power_of_ten"
                           ? `MAGNITUDE (${closingMismatch.multiplier}×)`
                           : closingMismatch.pattern.replace(/_/g, " ").toUpperCase()}
                       </span>
                     )}
                     {closingMismatch.corroboration && (
-                      <span className="bg-blue-900/30 text-blue-400 border border-blue-700/40 px-1 py-0.2 text-[8.5px] font-bold rounded-xs">
+                      <span className="bg-blue-100 text-blue-950 border border-blue-600 px-1.5 py-0.5 text-[11px] font-bold rounded-none">
                         {closingMismatch.corroboration.shared_factor}× SYMMETRIC
                       </span>
                     )}
@@ -215,7 +215,7 @@ export function LedgerMathTable({
                             onSelectEvidence?.(closingMismatch.id);
                             onFocusCanvas?.(ep.page);
                           }}
-                          className="text-[9px] bg-forensic-red/15 hover:bg-forensic-red text-forensic-red hover:text-white px-1.5 py-0.5 rounded-sm transition-colors font-bold cursor-pointer"
+                          className="text-[11px] bg-paper-2 hover:bg-ink-900 text-ink-900 hover:text-white border border-ink-900/30 px-2 py-0.5 rounded-none transition-colors font-bold cursor-pointer"
                           title={ep.label}
                         >
                           P.{ep.page} {ep.role === "stated" ? "Stated" : "Terminal"} ↗
@@ -230,7 +230,7 @@ export function LedgerMathTable({
                             onSelectEvidence?.(closingMismatch.id);
                             onFocusCanvas?.(1);
                           }}
-                          className="text-[9px] bg-forensic-red/15 hover:bg-forensic-red text-forensic-red hover:text-white px-1.5 py-0.5 rounded-sm transition-colors font-bold cursor-pointer"
+                          className="text-[11px] bg-paper-2 hover:bg-ink-900 text-ink-900 hover:text-white border border-ink-900/30 px-2 py-0.5 rounded-none transition-colors font-bold cursor-pointer"
                           title="Jump to Stated Closing Balance on Page 1 Summary"
                         >
                           P.1 Stated ↗
@@ -242,7 +242,7 @@ export function LedgerMathTable({
                             onSelectEvidence?.(closingMismatch.id);
                             onFocusCanvas?.(closingMismatch.pageNumber || 23);
                           }}
-                          className="text-[9px] bg-forensic-red/15 hover:bg-forensic-red text-forensic-red hover:text-white px-1.5 py-0.5 rounded-sm transition-colors font-bold cursor-pointer"
+                          className="text-[11px] bg-paper-2 hover:bg-ink-900 text-ink-900 hover:text-white border border-ink-900/30 px-2 py-0.5 rounded-none transition-colors font-bold cursor-pointer"
                           title="Jump to Final Transaction Balance on Page 23 Ledger Terminal"
                         >
                           P.{closingMismatch.pageNumber || 23} Terminal ↗
@@ -336,7 +336,7 @@ export function LedgerMathTable({
                         <div className="flex items-center gap-1.5">
                           {r.pageNumber && (
                             <span
-                              className="text-[9px] font-mono text-ink-500 border border-rule px-1 py-0.2 bg-paper-1"
+                              className="text-[11px] font-mono text-ink-800 font-bold border border-rule px-1.5 py-0.2 bg-paper-1"
                               title={`Statement Page ${r.pageNumber}`}
                             >
                               P.{r.pageNumber}
@@ -349,7 +349,7 @@ export function LedgerMathTable({
                         <div className="flex items-center gap-1.5 truncate">
                           <span className="truncate">{r.particulars}</span>
                           {r.rowType && r.rowType !== "TRANSACTION" && (
-                            <span className="text-[8px] tracking-wider uppercase font-mono px-1 py-0.5 border border-rule text-ink-600 bg-paper-2 flex-shrink-0">
+                            <span className="text-[11px] tracking-wider uppercase font-mono px-1.5 py-0.5 border border-rule text-ink-800 bg-paper-2 flex-shrink-0 font-bold">
                               {r.rowType.replace(/_/g, " ")}
                             </span>
                           )}
@@ -366,11 +366,11 @@ export function LedgerMathTable({
                       </td>
                       <td className="py-2.5 px-3 text-center">
                         {r.isTampered ? (
-                          <span className="bg-forensic-red text-white text-[9px] px-2 py-0.5 uppercase tracking-wider font-bold">
+                          <span className="bg-forensic-red text-white text-[11px] px-2 py-0.5 uppercase tracking-wider font-bold">
                             MISMATCH
                           </span>
                         ) : (
-                          <span className="text-forensic-green text-[10px] font-bold">
+                          <span className="text-forensic-green text-[11px] font-bold">
                             ✓ MATCH
                           </span>
                         )}

@@ -77,23 +77,23 @@ export function RiskGaugeBlock({
       {/* Top Section: Composite Decision Radar & Regulatory Directive */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-rule">
         <div>
-          <span className="font-mono text-[10px] tracking-[0.15em] uppercase text-ink-500 block">
+          <span className="font-mono text-[11px] font-bold tracking-[0.15em] uppercase text-ink-700 block">
             § 01 / DUAL-RADAR FORENSIC DECISION METER
           </span>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="font-mono text-xs text-ink-600">Evaluated Fraud Risk:</span>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="font-mono text-xs font-semibold text-ink-700">Evaluated Fraud Risk:</span>
             <span className="font-mono text-sm font-bold text-ink-900 tabular-nums">
               {isCalculating ? "..." : `${displayScore}/100`}
             </span>
             <span
-              className={`font-mono text-[10px] font-bold px-2 py-0.5 border uppercase tracking-wider ${getTierColor(
+              className={`font-mono text-xs font-bold px-2.5 py-1 border uppercase tracking-wider ${getTierColor(
                 displayTier
               )}`}
             >
               {isCalculating ? "● PROCESSING" : `${displayTier} RISK`}
             </span>
             {isOverridden && !isCalculating && (
-              <span className="font-mono text-[9px] text-forensic-amber uppercase tracking-wider font-semibold">
+              <span className="font-mono text-[11px] font-bold text-amber-900 uppercase tracking-wider">
                 ● ANALYST ADJUDICATED (Baseline: {rawScore}/100)
               </span>
             )}
@@ -104,7 +104,7 @@ export function RiskGaugeBlock({
           {onOpenOverride && (
             <button
               onClick={onOpenOverride}
-              className="px-3 py-1.5 bg-paper-1 hover:bg-paper-2 border border-rule text-ink-900 font-mono text-[11px] uppercase tracking-wider transition-colors"
+              className="px-3 py-1.5 bg-paper-1 hover:bg-paper-2 border border-rule text-ink-900 font-mono text-xs font-bold uppercase tracking-wider transition-colors"
             >
               {isOverridden ? "Edit Adjudication" : "Override Score"}
             </button>
@@ -120,15 +120,15 @@ export function RiskGaugeBlock({
               <span className="inline-block w-2 h-2 rounded-full bg-amber-500" />
               HUMAN ANALYST AUDIT OVERRIDE (SBP BPRD COMPLIANT)
             </span>
-            <span className="text-[10px] text-amber-700">
+            <span className="text-[11px] font-semibold text-amber-800">
               {assessment.overriddenAt ? new Date(assessment.overriddenAt).toLocaleString() : "Adjudicated"}
             </span>
           </div>
-          <div className="text-[11px] text-amber-900/90">
-            <span className="font-semibold text-ink-700">Adjudication Justification: </span>
+          <div className="text-[11px] text-amber-900">
+            <span className="font-semibold text-ink-800">Adjudication Justification: </span>
             <span className="italic">"{assessment.overrideReason}"</span>
           </div>
-          <div className="text-[10px] text-amber-700/80 flex items-center gap-3">
+          <div className="text-[11px] text-amber-900 flex items-center gap-3 font-medium">
             <span>Adjudicating Officer: {assessment.overriddenById || "Authorized Officer"}</span>
             <span>•</span>
             <span>Engine Baseline: {rawScore}/100 ({rawTier}) → Final: {displayScore}/100 ({displayTier})</span>
@@ -142,15 +142,15 @@ export function RiskGaugeBlock({
         <div className="border border-rule bg-paper-1/60 p-4 space-y-3">
           <div className="flex items-start justify-between">
             <div>
-              <span className="font-mono text-[9px] tracking-[0.12em] uppercase text-ink-500 block">
+              <span className="font-mono text-[11px] font-bold tracking-[0.12em] uppercase text-ink-700 block">
                 DIMENSION A • DOCUMENT INTEGRITY
               </span>
-              <span className="text-xs font-serif font-medium text-ink-900">
+              <span className="text-xs font-serif font-semibold text-ink-900">
                 Document Authenticity
               </span>
             </div>
             <span
-              className={`font-mono text-[10px] font-bold px-2 py-0.5 border uppercase tracking-wider ${getAuthBadge(
+              className={`font-mono text-xs font-bold px-2.5 py-1 border uppercase tracking-wider ${getAuthBadge(
                 authTier
               )}`}
             >
@@ -166,17 +166,17 @@ export function RiskGaugeBlock({
                 <span className="font-serif text-4xl font-semibold tracking-tight text-ink-900 tabular-nums">
                   {authScore}
                 </span>
-                <span className="font-mono text-sm text-ink-500">%</span>
+                <span className="font-mono text-sm text-ink-700 font-bold">%</span>
               </>
             )}
-            <span className="font-mono text-[10px] text-ink-500 ml-auto tabular-nums">
+            <span className="font-mono text-[11px] font-bold text-ink-700 ml-auto tabular-nums">
               Tamper Score: {tamperScore}/100
             </span>
           </div>
 
           {/* Authenticity Progress Bar */}
           <div className="w-full">
-            <div className="h-1.5 w-full bg-paper-2 border border-rule overflow-hidden">
+            <div className="h-2 w-full bg-paper-2 border border-rule overflow-hidden">
               <div
                 style={{ width: `${Math.min(100, Math.max(0, authScore))}%` }}
                 className={`h-full transition-all duration-300 ${
@@ -188,14 +188,14 @@ export function RiskGaugeBlock({
                 }`}
               />
             </div>
-            <div className="flex justify-between font-mono text-[8px] text-ink-400 mt-1">
+            <div className="flex justify-between font-mono text-[11px] font-semibold text-ink-600 mt-1">
               <span>0% (FORGED)</span>
               <span>60% (SUSPECT)</span>
               <span>100% (AUTHENTIC)</span>
             </div>
           </div>
 
-          <div className="text-[10px] font-mono text-ink-500 pt-1 border-t border-rule/50">
+          <div className="text-[11px] font-mono text-ink-700 pt-1.5 border-t border-rule/60">
             Covers typography baselines, PDF revision xref, image ELA, and ledger arithmetic.
           </div>
         </div>
@@ -204,15 +204,15 @@ export function RiskGaugeBlock({
         <div className="border border-rule bg-paper-1/60 p-4 space-y-3">
           <div className="flex items-start justify-between">
             <div>
-              <span className="font-mono text-[9px] tracking-[0.12em] uppercase text-ink-500 block">
+              <span className="font-mono text-[11px] font-bold tracking-[0.12em] uppercase text-ink-700 block">
                 DIMENSION B • STATUTORY COMPLIANCE
               </span>
-              <span className="text-xs font-serif font-medium text-ink-900">
+              <span className="text-xs font-serif font-semibold text-ink-900">
                 Transaction & AML Risk
               </span>
             </div>
             <span
-              className={`font-mono text-[10px] font-bold px-2 py-0.5 border uppercase tracking-wider ${getTxnBadge(
+              className={`font-mono text-xs font-bold px-2.5 py-1 border uppercase tracking-wider ${getTxnBadge(
                 txnTier
               )}`}
             >
@@ -228,17 +228,17 @@ export function RiskGaugeBlock({
                 <span className="font-serif text-4xl font-semibold tracking-tight text-ink-900 tabular-nums">
                   {txnScore}
                 </span>
-                <span className="font-mono text-sm text-ink-500">/ 100</span>
+                <span className="font-mono text-sm text-ink-700 font-bold">/ 100</span>
               </>
             )}
-            <span className="font-mono text-[10px] text-ink-500 ml-auto">
+            <span className="font-mono text-[11px] font-bold text-ink-700 ml-auto">
               SBP BPRD & CDD
             </span>
           </div>
 
           {/* Transaction Risk Progress Bar */}
           <div className="w-full">
-            <div className="h-1.5 w-full bg-paper-2 border border-rule overflow-hidden">
+            <div className="h-2 w-full bg-paper-2 border border-rule overflow-hidden">
               <div
                 style={{ width: `${Math.min(100, Math.max(0, txnScore))}%` }}
                 className={`h-full transition-all duration-300 ${
@@ -252,7 +252,7 @@ export function RiskGaugeBlock({
                 }`}
               />
             </div>
-            <div className="flex justify-between font-mono text-[8px] text-ink-400 mt-1">
+            <div className="flex justify-between font-mono text-[11px] font-semibold text-ink-600 mt-1">
               <span>0 (CLEAN)</span>
               <span>20 (MONITORED)</span>
               <span>45 (HIGH)</span>
@@ -260,18 +260,18 @@ export function RiskGaugeBlock({
             </div>
           </div>
 
-          <div className="text-[10px] font-mono text-ink-500 pt-1 border-t border-rule/50">
+          <div className="text-[11px] font-mono text-ink-700 pt-1.5 border-t border-rule/60">
             Covers SBP BPRD circulars, NACTA, UNSC 1267, PEPs, crypto P2P & hawala red flags.
           </div>
         </div>
       </div>
 
       {/* Action Recommendation Strip */}
-      <div className="pt-2 border-t border-rule flex flex-col sm:flex-row sm:items-center justify-between gap-1 font-mono text-xs">
-        <span className="text-ink-500 text-[10px] uppercase">
+      <div className="pt-2.5 border-t border-rule flex flex-col sm:flex-row sm:items-center justify-between gap-1 font-mono text-xs">
+        <span className="text-ink-700 text-[11px] font-bold uppercase tracking-wider">
           FORENSIC RECOMMENDATION (HUMAN ADJUDICATION REQUIRED):
         </span>
-        <span className="font-semibold text-ink-900 tracking-wide text-right">
+        <span className="font-bold text-ink-900 tracking-wide text-right">
           {isCalculating ? "PIPELINE EXECUTION IN PROGRESS" : formatRecommendation(directive, displayTier)}
         </span>
       </div>

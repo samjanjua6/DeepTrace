@@ -24,7 +24,7 @@ export function PipelineAuditChecklist({
 }: PipelineAuditChecklistProps) {
   return (
     <div className="bg-paper-1 border border-rule p-4 font-mono text-xs">
-      <span className="font-semibold text-ink-900 uppercase tracking-wider block mb-2 text-[10px]">
+      <span className="font-bold text-ink-900 uppercase tracking-wider block mb-2 text-[11px]">
         § 04 / 8-STAGE FORENSIC PIPELINE EXECUTION AUDIT
       </span>
       <div className="space-y-1.5 text-[11px]">

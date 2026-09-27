@@ -5,12 +5,16 @@
   --color-paper-1: #F5F2EC;
   --color-paper-2: #ECE8DF;
   --color-rule: #DDD8CE;
-  --color-rule-dark: #C8C2B6;
+  --color-rule-dark: #B5AFA2;
   
+  --color-ink-950: #0D0D0C;
   --color-ink-900: #141413;
+  --color-ink-800: #1E1D1B;
   --color-ink-700: #2B2A27;
-  --color-ink-500: #6E6A63;
-  --color-ink-300: #A8A39A;
+  --color-ink-600: #33302B;
+  --color-ink-500: #3F3C37;
+  --color-ink-400: #4E4A43;
+  --color-ink-300: #656056;
   
   --color-forensic-red: #BA2518;
   --color-forensic-amber: #C27803;

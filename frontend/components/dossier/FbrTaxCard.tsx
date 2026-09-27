@@ -171,11 +171,11 @@ export function FbrTaxCard({ verification, evidence }: FbrTaxCardProps) {
         {/* NTN Structure Card */}
         <div className="border border-rule bg-paper-50 p-3 space-y-2">
           <div className="flex items-center justify-between border-b border-rule pb-1.5">
-            <span className="text-[10px] uppercase font-bold text-ink-700 flex items-center gap-1.5">
+            <span className="text-[11px] uppercase font-bold text-ink-700 flex items-center gap-1.5">
               <Building2 className="w-3.5 h-3.5 text-ink-500" />
               National Tax Number (NTN)
             </span>
-            <span className="text-[9px] uppercase font-semibold text-ink-500">
+            <span className="text-[11px] uppercase font-bold text-ink-700">
               {ntn?.ntn_type ?? (ntn?.formatted_ntn ? "Corporate/AOP" : "Format Audit")}
             </span>
           </div>
@@ -227,39 +227,39 @@ export function FbrTaxCard({ verification, evidence }: FbrTaxCardProps) {
         {/* CPR Audit Card */}
         <div className="border border-rule bg-paper-50 p-3 space-y-2">
           <div className="flex items-center justify-between border-b border-rule pb-1.5">
-            <span className="text-[10px] uppercase font-bold text-ink-700 flex items-center gap-1.5">
+            <span className="text-[11px] uppercase font-bold text-ink-700 flex items-center gap-1.5">
               <FileCheck2 className="w-3.5 h-3.5 text-ink-500" />
               Computerized Payment Receipt (CPR)
             </span>
-            <span className="text-[9px] uppercase font-semibold text-ink-500">
+            <span className="text-[11px] uppercase font-bold text-ink-700">
               {cpr?.cpr_type ?? "Treasury Check"}
             </span>
           </div>
 
           <div className="space-y-1.5 text-[11px]">
             <div className="flex justify-between items-center">
-              <span className="text-ink-500">CPR Identifier:</span>
+              <span className="text-ink-700 font-medium">CPR Identifier:</span>
               <span className="font-bold text-ink-900 tracking-wider">
                 {cpr?.raw_cpr ?? "None Cited"}
               </span>
             </div>
 
             <div className="flex justify-between items-center">
-              <span className="text-ink-500">Tax Year / Period:</span>
-              <span className="font-mono text-ink-700">{cpr?.tax_year ?? "—"}</span>
+              <span className="text-ink-700 font-medium">Tax Year / Period:</span>
+              <span className="font-mono text-ink-700 font-semibold">{cpr?.tax_year ?? "—"}</span>
             </div>
 
             <div className="flex justify-between items-center">
-              <span className="text-ink-500">Receipt Status:</span>
+              <span className="text-ink-700 font-medium">Receipt Status:</span>
               <span className="font-mono font-bold">
                 {cpr ? (
                   cpr.is_valid && !cpr.is_future_dated ? (
-                    <span className="text-emerald-700 flex items-center gap-1">
+                    <span className="text-emerald-700 flex items-center gap-1 font-bold">
                       <CheckCircle className="w-3.5 h-3.5" />
                       Authentic Format
                     </span>
                   ) : (
-                    <span className="text-forensic-red flex items-center gap-1">
+                    <span className="text-forensic-red flex items-center gap-1 font-bold">
                       <AlertTriangle className="w-3.5 h-3.5" />
                       {cpr.is_future_dated ? "Future-Dated" : "Invalid Format"}
                     </span>
@@ -271,7 +271,7 @@ export function FbrTaxCard({ verification, evidence }: FbrTaxCardProps) {
             </div>
 
             {cpr?.reason && (
-              <div className="text-[10px] text-ink-600 bg-paper-0 border border-rule p-1.5 mt-1">
+              <div className="text-[11px] text-ink-700 bg-paper-0 border border-rule p-1.5 mt-1 font-medium">
                 {cpr.reason}
               </div>
             )}
@@ -282,18 +282,18 @@ export function FbrTaxCard({ verification, evidence }: FbrTaxCardProps) {
       {/* Section 149 Withholding Tax Audit Table */}
       <div className="border border-rule bg-paper-50 p-3 space-y-3">
         <div className="flex items-center justify-between border-b border-rule pb-1.5">
-          <span className="text-[10px] uppercase font-bold text-ink-700 flex items-center gap-1.5">
+          <span className="text-[11px] uppercase font-bold text-ink-700 flex items-center gap-1.5">
             <Receipt className="w-3.5 h-3.5 text-ink-500" />
             Section 149 Salary Tax Reconciler (Finance Act Progressive Slabs)
           </span>
-          <span className="text-[9px] uppercase font-semibold text-ink-500">
+          <span className="text-[11px] uppercase font-bold text-ink-700">
             {wht?.tax_year ? `Tax Year ${wht.tax_year}` : "Statutory First Schedule"}
           </span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
           <div className="border border-rule bg-paper-0 p-2 space-y-1">
-            <span className="text-[9px] uppercase text-ink-500 font-bold block">Monthly Gross</span>
+            <span className="text-[11px] uppercase text-ink-700 font-bold block">Monthly Gross</span>
             <span className="font-bold text-ink-900 block text-xs">
               {wht?.monthly_gross !== undefined
                 ? `PKR ${wht.monthly_gross.toLocaleString()}`
@@ -302,7 +302,7 @@ export function FbrTaxCard({ verification, evidence }: FbrTaxCardProps) {
           </div>
 
           <div className="border border-rule bg-paper-0 p-2 space-y-1">
-            <span className="text-[9px] uppercase text-ink-500 font-bold block">Annualized Gross</span>
+            <span className="text-[11px] uppercase text-ink-700 font-bold block">Annualized Gross</span>
             <span className="font-bold text-ink-900 block text-xs">
               {wht?.annual_gross !== undefined
                 ? `PKR ${wht.annual_gross.toLocaleString()}`
@@ -311,7 +311,7 @@ export function FbrTaxCard({ verification, evidence }: FbrTaxCardProps) {
           </div>
 
           <div className="border border-rule bg-paper-0 p-2 space-y-1">
-            <span className="text-[9px] uppercase text-ink-500 font-bold block">Declared WHT</span>
+            <span className="text-[11px] uppercase text-ink-700 font-bold block">Declared WHT</span>
             <span className={`font-bold block text-xs ${hasWhtZeroFail ? "text-forensic-red" : "text-ink-900"}`}>
               {wht?.declared_wht !== undefined
                 ? `PKR ${wht.declared_wht.toLocaleString()}`
@@ -320,7 +320,7 @@ export function FbrTaxCard({ verification, evidence }: FbrTaxCardProps) {
           </div>
 
           <div className="border border-rule bg-paper-0 p-2 space-y-1">
-            <span className="text-[9px] uppercase text-ink-500 font-bold block">Expected Statutory WHT</span>
+            <span className="text-[11px] uppercase text-ink-700 font-bold block">Expected Statutory WHT</span>
             <span className="font-bold text-emerald-700 block text-xs">
               {wht?.expected_monthly_wht !== undefined
                 ? `PKR ${wht.expected_monthly_wht.toLocaleString()}`

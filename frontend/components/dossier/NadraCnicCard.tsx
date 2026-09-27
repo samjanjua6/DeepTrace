@@ -129,28 +129,28 @@ export function NadraCnicCard({ verification, evidence }: NadraCnicCardProps) {
           <span className="font-bold uppercase tracking-wider text-ink-900">
             NADRA CNIC & SMART CARD IDENTITY AUDIT
           </span>
-          <span className="text-[10px] text-ink-400 font-mono hidden sm:inline">
+          <span className="text-[11px] text-ink-600 font-mono hidden sm:inline">
             (NADRA Ord 2000 §30 & ICAO 9303)
           </span>
         </div>
 
         {isTampered ? (
-          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-rose-500/10 text-forensic-red border border-forensic-red/30 text-[10px] font-bold uppercase tracking-wider">
-            <ShieldAlert className="w-3.5 h-3.5 text-forensic-red" />
+          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-rose-100 text-rose-950 border border-rose-700/80 text-xs font-bold uppercase tracking-wider">
+            <ShieldAlert className="w-3.5 h-3.5 text-rose-700 stroke-[2.5]" />
             <span>✕ FORGERY / ANOMALY DETECTED</span>
           </div>
         ) : isAnomaly ? (
-          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-500/10 text-amber-800 border border-amber-500/30 text-[10px] font-bold uppercase tracking-wider">
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-700" />
+          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-100 text-amber-950 border border-amber-700/80 text-xs font-bold uppercase tracking-wider">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-800 stroke-[2.5]" />
             <span>▲ TEMPORAL INCONSISTENCY</span>
           </div>
         ) : isVerified ? (
-          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/10 text-emerald-800 border border-emerald-500/30 text-[10px] font-bold uppercase tracking-wider">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
+          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 text-emerald-950 border border-emerald-700/80 text-xs font-bold uppercase tracking-wider">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-800 stroke-[2.5]" />
             <span>✓ VERIFIED AUTHENTIC</span>
           </div>
         ) : (
-          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-paper-2 text-ink-600 border border-rule text-[10px] font-bold uppercase tracking-wider">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-paper-2 text-ink-800 border border-ink-400 text-xs font-bold uppercase tracking-wider">
             <span>● 13-DIGIT SCHEMA AUDITED</span>
           </div>
         )}
@@ -159,7 +159,7 @@ export function NadraCnicCard({ verification, evidence }: NadraCnicCardProps) {
       {/* Primary CNIC Display Box */}
       <div className="bg-paper-1 border border-rule p-3 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <div className="text-[10px] uppercase text-ink-500 font-semibold tracking-wider">
+          <div className="text-[11px] uppercase text-ink-700 font-bold tracking-wider">
             Cardholder CNIC / Identity Number
           </div>
           <div className="text-lg font-bold text-ink-900 font-mono tracking-widest mt-0.5">
@@ -187,7 +187,7 @@ export function NadraCnicCard({ verification, evidence }: NadraCnicCardProps) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
         {/* Box 1: Province & Administrative Codes */}
         <div className="border border-rule bg-paper-1 p-2.5 space-y-1.5">
-          <div className="text-[10px] uppercase font-bold text-ink-500 flex items-center justify-between">
+          <div className="text-[11px] uppercase font-bold text-ink-700 flex items-center justify-between">
             <span>1st-Digit Province</span>
             {hasProvinceFail ? (
               <span className="text-forensic-red font-bold">INVALID CODE</span>
@@ -206,14 +206,14 @@ export function NadraCnicCard({ verification, evidence }: NadraCnicCardProps) {
               <span className="text-ink-400">Not Decoded</span>
             )}
           </div>
-          <div className="text-[10px] text-ink-500 leading-tight">
+          <div className="text-[11px] text-ink-700 leading-tight">
             NADRA Ordinance 2000 Section 30 mandates strict territorial prefix: 1=KP, 2=FATA, 3=Punjab, 4=Sindh, 5=Balochistan, 6=ICT, 7=GB, 8=AJK.
           </div>
         </div>
 
         {/* Box 2: 13th-Digit Gender Parity */}
         <div className="border border-rule bg-paper-1 p-2.5 space-y-1.5">
-          <div className="text-[10px] uppercase font-bold text-ink-500 flex items-center justify-between">
+          <div className="text-[11px] uppercase font-bold text-ink-700 flex items-center justify-between">
             <span>13th Digit Parity</span>
             {hasGenderFail ? (
               <span className="text-forensic-red font-bold">CONTRADICTION</span>
@@ -230,28 +230,28 @@ export function NadraCnicCard({ verification, evidence }: NadraCnicCardProps) {
               <span className="text-ink-400">Not Decoded</span>
             )}
           </div>
-          <div className="text-[10px] text-ink-500 leading-tight">
+          <div className="text-[11px] text-ink-700 leading-tight">
             {verification?.gender_explanation || "Statutory gender invariant: Odd terminal digit = Male; Even terminal digit = Female."}
           </div>
         </div>
 
         {/* Box 3: Family Tree Serial & Division */}
         <div className="border border-rule bg-paper-1 p-2.5 space-y-1.5">
-          <div className="text-[10px] uppercase font-bold text-ink-500 flex items-center justify-between">
+          <div className="text-[11px] uppercase font-bold text-ink-700 flex items-center justify-between">
             <span>Administrative Invariant</span>
-            <span className="text-ink-500">5-7-1 Format</span>
+            <span className="text-ink-700 font-bold">5-7-1 Format</span>
           </div>
           <div className="font-mono text-xs text-ink-800 space-y-0.5">
             <div>
-              <span className="text-ink-500">Family Number: </span>
+              <span className="text-ink-700">Family Number: </span>
               <span className="font-semibold">{struct?.family_number || "—"}</span>
             </div>
             <div>
-              <span className="text-ink-500">Tehsil Code: </span>
+              <span className="text-ink-700">Tehsil Code: </span>
               <span className="font-semibold">{struct?.tehsil_code || "—"}</span>
             </div>
           </div>
-          <div className="text-[10px] text-ink-500 leading-tight">
+          <div className="text-[11px] text-ink-700 leading-tight">
             Middle 7-digits correlate directly with family tree registry under the national registration database.
           </div>
         </div>
@@ -269,11 +269,11 @@ export function NadraCnicCard({ verification, evidence }: NadraCnicCardProps) {
             </div>
 
             {mrz.is_valid && !hasMrzChecksumFail && !hasMrzMismatchFail ? (
-              <div className="px-2 py-0.5 bg-emerald-500/10 text-emerald-800 border border-emerald-500/30 text-[10px] font-bold">
+              <div className="px-2.5 py-1 bg-emerald-100 text-emerald-950 border border-emerald-700/80 text-[11px] font-bold">
                 ✓ 7-3-1 MODULUS-10 CHECKSUMS SATISFIED
               </div>
             ) : (
-              <div className="px-2 py-0.5 bg-rose-500/10 text-forensic-red border border-forensic-red/30 text-[10px] font-bold">
+              <div className="px-2.5 py-1 bg-rose-100 text-rose-950 border border-rose-700/80 text-[11px] font-bold">
                 ✕ ICAO 9303 CHECKSUM / VIZ MISMATCH
               </div>
             )}
@@ -282,7 +282,7 @@ export function NadraCnicCard({ verification, evidence }: NadraCnicCardProps) {
           {/* Raw MRZ 3 Lines */}
           {mrz.raw_lines && mrz.raw_lines.length > 0 && (
             <div className="bg-ink-900 text-paper-0 p-2.5 font-mono text-[11px] leading-relaxed tracking-wider border border-ink-950">
-              <div className="text-[9px] uppercase text-ink-400 mb-1">Raw Optical TD1 Lines:</div>
+              <div className="text-[11px] uppercase text-ink-400 mb-1 font-bold">Raw Optical TD1 Lines:</div>
               {mrz.raw_lines.map((line, idx) => (
                 <div key={idx} className="overflow-x-auto whitespace-pre">
                   {line}
@@ -294,7 +294,7 @@ export function NadraCnicCard({ verification, evidence }: NadraCnicCardProps) {
           {/* ICAO Field Checksum Indicators */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
             <div className="border border-rule bg-paper-0 p-2 space-y-1">
-              <span className="text-[9px] uppercase text-ink-500 font-bold block">Doc Number Check</span>
+              <span className="text-[11px] uppercase text-ink-700 font-bold block">Doc Number Check</span>
               <div className="flex items-center justify-between">
                 <span className="font-bold">
                   {mrz.document_number?.check_digit ?? "—"} (Calc: {mrz.document_number?.calculated ?? "—"})
@@ -308,7 +308,7 @@ export function NadraCnicCard({ verification, evidence }: NadraCnicCardProps) {
             </div>
 
             <div className="border border-rule bg-paper-0 p-2 space-y-1">
-              <span className="text-[9px] uppercase text-ink-500 font-bold block">DOB Check Digit</span>
+              <span className="text-[11px] uppercase text-ink-700 font-bold block">DOB Check Digit</span>
               <div className="flex items-center justify-between">
                 <span className="font-bold">
                   {mrz.date_of_birth?.check_digit ?? "—"} (Calc: {mrz.date_of_birth?.calculated ?? "—"})
@@ -322,7 +322,7 @@ export function NadraCnicCard({ verification, evidence }: NadraCnicCardProps) {
             </div>
 
             <div className="border border-rule bg-paper-0 p-2 space-y-1">
-              <span className="text-[9px] uppercase text-ink-500 font-bold block">Expiry Check Digit</span>
+              <span className="text-[11px] uppercase text-ink-700 font-bold block">Expiry Check Digit</span>
               <div className="flex items-center justify-between">
                 <span className="font-bold">
                   {mrz.expiry_date?.check_digit ?? "—"} (Calc: {mrz.expiry_date?.calculated ?? "—"})
@@ -336,7 +336,7 @@ export function NadraCnicCard({ verification, evidence }: NadraCnicCardProps) {
             </div>
 
             <div className="border border-rule bg-paper-0 p-2 space-y-1">
-              <span className="text-[9px] uppercase text-ink-500 font-bold block">Composite Check</span>
+              <span className="text-[11px] uppercase text-ink-700 font-bold block">Composite Check</span>
               <div className="flex items-center justify-between">
                 <span className="font-bold">
                   {mrz.composite_check?.check_digit ?? "—"} (Calc: {mrz.composite_check?.calculated ?? "—"})
@@ -405,11 +405,11 @@ export function NadraCnicCard({ verification, evidence }: NadraCnicCardProps) {
       )}
 
       {/* Statutory Footer Citation */}
-      <div className="text-[10px] text-ink-500 border-t border-rule pt-2 flex flex-wrap justify-between items-center gap-2">
+      <div className="text-[11px] text-ink-700 border-t border-rule pt-2 flex flex-wrap justify-between items-center gap-2">
         <span>
           Statutory Authority: National Database and Registration Authority Ordinance, 2000 (§30) | ICAO Doc 9303 Part 5 (TD1)
         </span>
-        <span className="font-semibold uppercase tracking-wider text-ink-600">
+        <span className="font-semibold uppercase tracking-wider text-ink-800">
           Zero-Hallucination Deterministic Engine
         </span>
       </div>

@@ -22,6 +22,7 @@ interface MastheadProps {
   caseTitle?: string;
   orgName?: string;
   documentType?: string;
+  showDocketBanner?: boolean;
 }
 
 export function Masthead({
@@ -29,6 +30,7 @@ export function Masthead({
   caseTitle,
   orgName: initialOrgName,
   documentType = "GENERAL_DOCUMENT",
+  showDocketBanner = true,
 }: MastheadProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -493,7 +495,7 @@ export function Masthead({
       )}
 
       {/* Active Case Banner if provided */}
-      {caseNumber && (
+      {showDocketBanner && caseNumber && (
         <div className="bg-paper-1 px-6 py-2 border-t border-rule flex items-center justify-between flex-wrap gap-2 font-mono text-xs">
           <div className="flex items-center gap-3">
             <span className="text-ink-500">ACTIVE DOCKET:</span>

@@ -220,26 +220,26 @@ export function SplitLedgerEvidenceViewer({
         </div>
 
         {/* Financial Continuity Metrics Pill Strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[10px] pt-1">
-          <div className="bg-paper-0 p-1.5 border border-rule">
-            <span className="text-ink-500 block uppercase text-[9px]">Stated Opening</span>
-            <span className="font-semibold text-ink-900 tabular-nums">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-1">
+          <div className="bg-paper-0 p-2 border border-rule">
+            <span className="text-ink-700 block uppercase text-[11px] font-bold tracking-wider">Stated Opening</span>
+            <span className="font-bold text-ink-900 tabular-nums text-xs">
               {statedOpening !== undefined && statedOpening !== null ? formatPKR(statedOpening) : "—"}
             </span>
           </div>
 
-          <div className="bg-paper-0 p-1.5 border border-rule">
-            <span className="text-ink-500 block uppercase text-[9px]">Stated Closing</span>
-            <span className="font-semibold text-ink-900 tabular-nums">
+          <div className="bg-paper-0 p-2 border border-rule">
+            <span className="text-ink-700 block uppercase text-[11px] font-bold tracking-wider">Stated Closing</span>
+            <span className="font-bold text-ink-900 tabular-nums text-xs">
               {statedClosing !== undefined && statedClosing !== null ? formatPKR(statedClosing) : "—"}
             </span>
           </div>
 
-          <div className="bg-paper-0 p-1.5 border border-rule">
-            <span className="text-ink-500 block uppercase text-[9px]">Calculated Running</span>
+          <div className="bg-paper-0 p-2 border border-rule">
+            <span className="text-ink-700 block uppercase text-[11px] font-bold tracking-wider">Calculated Running</span>
             <span
-              className={`font-semibold tabular-nums ${
-                closingDiscrepancy ? "text-forensic-red font-bold" : "text-forensic-green"
+              className={`font-bold tabular-nums text-xs ${
+                closingDiscrepancy ? "text-forensic-red" : "text-forensic-green"
               }`}
             >
               {impliedClosing !== undefined && impliedClosing !== null ? formatPKR(impliedClosing) : "—"}
@@ -247,14 +247,14 @@ export function SplitLedgerEvidenceViewer({
           </div>
 
           <div
-            className={`p-1.5 border ${
+            className={`p-2 border ${
               closingDiscrepancy
-                ? "bg-forensic-red/10 border-forensic-red/40 text-forensic-red"
-                : "bg-paper-0 border-rule text-forensic-green"
+                ? "bg-rose-100 border-rose-700/70 text-rose-950 font-bold"
+                : "bg-emerald-50 border-emerald-700/60 text-emerald-950 font-bold"
             }`}
           >
-            <span className="block uppercase text-[9px]">Discrepancy</span>
-            <span className="font-bold tabular-nums">
+            <span className="block uppercase text-[11px] font-bold tracking-wider">Discrepancy</span>
+            <span className="font-bold tabular-nums text-xs">
               {closingDiscrepancy
                 ? `${closingDiscrepancy > 0 ? "+" : ""}${formatPKR(closingDiscrepancy)}`
                 : "0.00 PKR"}
@@ -326,33 +326,33 @@ export function SplitLedgerEvidenceViewer({
       {/* Scrollable Transaction Ledger Table                            */}
       {/* ───────────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto overflow-x-auto">
-        <table className="w-full text-left font-mono text-[11px] border-collapse">
-          <thead className="sticky top-0 bg-paper-1 border-b border-rule z-10 select-none shadow-xs text-[9px] uppercase tracking-wider text-ink-500">
+        <table className="w-full text-left font-mono text-xs border-collapse">
+          <thead className="sticky top-0 bg-paper-1 border-b border-rule z-10 select-none shadow-xs text-[11px] uppercase tracking-wider text-ink-700 font-bold">
             <tr>
-              <th className="py-2 px-2.5 w-10 text-center">#</th>
-              <th className="py-2 px-2.5 w-24">Date</th>
-              <th className="py-2 px-3">Description / Narration</th>
-              <th className="py-2 px-2.5 text-right w-24">Debit (PKR)</th>
-              <th className="py-2 px-2.5 text-right w-24">Credit (PKR)</th>
-              <th className="py-2 px-2.5 text-right w-28">Stated Balance</th>
-              <th className="py-2 px-2 text-center w-20">Status</th>
+              <th className="py-2.5 px-2.5 w-10 text-center">#</th>
+              <th className="py-2.5 px-2.5 w-24">Date</th>
+              <th className="py-2.5 px-3">Description / Narration</th>
+              <th className="py-2.5 px-2.5 text-right w-24">Debit (PKR)</th>
+              <th className="py-2.5 px-2.5 text-right w-24">Credit (PKR)</th>
+              <th className="py-2.5 px-2.5 text-right w-28">Stated Balance</th>
+              <th className="py-2.5 px-2 text-center w-20">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-rule/60">
             {displayRows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="p-12 text-center text-xs text-ink-500 font-mono space-y-2">
-                  <div className="font-bold uppercase tracking-wider text-ink-800">
+                <td colSpan={7} className="p-12 text-center text-xs text-ink-700 font-mono space-y-2">
+                  <div className="font-bold uppercase tracking-wider text-ink-900">
                     No Tabular Ledger Rows Detected
                   </div>
-                  <div className="text-[11px] text-ink-500 max-w-sm mx-auto">
+                  <div className="text-[11px] text-ink-700 max-w-sm mx-auto">
                     The document extraction engine did not locate tabular financial ledger columns in this document. Running balance mathematical verification applies to structured bank statements.
                   </div>
                 </td>
               </tr>
             ) : filteredRows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="p-8 text-center text-xs text-ink-400">
+                <td colSpan={7} className="p-8 text-center text-xs text-ink-600">
                   {filterMode === "INCONSISTENT"
                     ? "No mathematical ledger inconsistencies detected. All rows reconcile."
                     : "No transactions match the selected filter."}
@@ -374,15 +374,15 @@ export function SplitLedgerEvidenceViewer({
                         : "hover:bg-paper-1 text-ink-800"
                     }`}
                   >
-                    <td className="py-2 px-2 text-center tabular-nums text-ink-400 text-[9px]">
+                    <td className="py-2 px-2 text-center tabular-nums text-ink-700 text-[11px] font-semibold">
                       {r.originalIdx + 1}
                     </td>
 
                     <td className="py-2 px-2.5 whitespace-nowrap tabular-nums text-ink-900">
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1.5">
                         {r.pageNumber && (
                           <span
-                            className="text-[8px] font-mono text-ink-500 border border-rule px-1 bg-paper-1 flex-shrink-0"
+                            className="text-[11px] font-mono text-ink-800 font-bold border border-rule px-1.5 py-0.2 bg-paper-1 flex-shrink-0"
                             title={`Statement Page ${r.pageNumber}`}
                           >
                             P.{r.pageNumber}
@@ -396,18 +396,18 @@ export function SplitLedgerEvidenceViewer({
                       <div className="flex items-center gap-1.5 truncate">
                         <span className="truncate">{r.particulars}</span>
                         {r.rowType && r.rowType !== "TRANSACTION" && (
-                          <span className="text-[8px] tracking-wider uppercase px-1 border border-rule text-ink-600 bg-paper-2 flex-shrink-0">
+                          <span className="text-[11px] font-bold tracking-wider uppercase px-1.5 py-0.2 border border-rule text-ink-800 bg-paper-2 flex-shrink-0">
                             {r.rowType.replace(/_/g, " ")}
                           </span>
                         )}
                       </div>
                     </td>
 
-                    <td className="py-2 px-2.5 text-right tabular-nums text-ink-900">
+                    <td className="py-2 px-2.5 text-right tabular-nums text-ink-900 font-medium">
                       {r.debit ? formatPKR(r.debit) : "—"}
                     </td>
 
-                    <td className="py-2 px-2.5 text-right tabular-nums text-ink-900">
+                    <td className="py-2 px-2.5 text-right tabular-nums text-ink-900 font-medium">
                       {r.credit ? formatPKR(r.credit) : "—"}
                     </td>
 
@@ -419,11 +419,11 @@ export function SplitLedgerEvidenceViewer({
 
                     <td className="py-2 px-2 text-center">
                       {r.isTampered ? (
-                        <span className="inline-block bg-forensic-red text-white text-[8px] px-1.5 py-0.5 uppercase tracking-wider font-bold shadow-xs">
+                        <span className="inline-block bg-forensic-red text-white text-[11px] px-2 py-0.5 uppercase tracking-wider font-bold shadow-xs">
                           MISMATCH
                         </span>
                       ) : (
-                        <span className="text-forensic-green text-[9px] font-bold">
+                        <span className="text-forensic-green text-[11px] font-bold">
                           ✓ MATCH
                         </span>
                       )}
@@ -443,15 +443,15 @@ export function SplitLedgerEvidenceViewer({
         <div className="border-t-2 border-rule bg-paper-1 p-3 select-none flex flex-col gap-2.5 max-h-[40%] overflow-y-auto">
           <div className="flex items-center justify-between border-b border-rule pb-1.5">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-ink-600">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-ink-800">
                 ROW #{selectedIndex !== null ? selectedIndex + 1 : 1} FORENSIC INSPECTOR
               </span>
               {selectedRow.isTampered ? (
-                <span className="bg-forensic-red text-white text-[8px] font-bold px-1.5 py-0.2 uppercase">
+                <span className="bg-forensic-red text-white text-[11px] font-bold px-2 py-0.5 uppercase">
                   UNRECONCILED DISCREPANCY
                 </span>
               ) : (
-                <span className="text-forensic-green text-[9px] font-bold">
+                <span className="text-forensic-green text-[11px] font-bold">
                   ✓ MATHEMATICALLY VALID
                 </span>
               )}

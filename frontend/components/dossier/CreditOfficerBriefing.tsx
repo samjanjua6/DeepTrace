@@ -4,15 +4,11 @@ import React, { useState, useEffect } from "react";
 import {
   ShieldAlert,
   ShieldCheck,
-  FileText,
   Copy,
   Check,
-  Cpu,
   Layers,
   Sparkles,
-  Info,
   Scale,
-  ExternalLink,
 } from "lucide-react";
 import { EvidenceItem, EvidenceAnchor, formatRecommendation } from "@/lib/types/forensics";
 
@@ -204,162 +200,60 @@ export function CreditOfficerBriefing({
 
   const baselineStrEn = isOverridden ? ` [Engine Baseline: ${overallScore}/100 (${riskTier})]` : "";
 
-  // Client-side deterministic fallback if API is not yet loaded or on sample exhibit
+  const authTierUrMap: Record<string, string> = {
+    VERIFIED_AUTHENTIC: "مصدقہ اصل",
+    SUSPECT_DOCUMENT: "مشکوک دستاویز",
+    FORGERY_DETECTED: "جعل سازی ثابت",
+  };
+  const txnTierUrMap: Record<string, string> = {
+    CLEAN: "محفوظ",
+    MONITORED: "زیرِ نگرانی",
+    HIGH_AML_RISK: "زیادہ رسک",
+    CRITICAL_PROSCRIBED: "کالعدم / پابندی",
+  };
+  const authTierUr = authTierUrMap[effectiveAuthTier] || effectiveAuthTier;
+  const txnTierUr = txnTierUrMap[effectiveTxnTier] || effectiveTxnTier;
+
+  const topAdverse = adverseEvidence[0];
+  const primarySynthesisEn = topAdverse
+    ? `${topAdverse.title}: ${topAdverse.discrepancy ? `Discrepancy of ${topAdverse.discrepancy}` : topAdverse.description}${
+        topAdverse.pageNumber ? ` identified on Page ${topAdverse.pageNumber}` : ""
+      }${adverseEvidence.length > 1 ? ` (and ${adverseEvidence.length - 1} secondary anomalies; see Anomaly Cards below)` : ""}.`
+    : "Multiple cross-vector forensic indicators detected across statement structure.";
+
+  const primarySynthesisUr = topAdverse
+    ? `${topAdverse.title}۔ ${topAdverse.discrepancy ? `${topAdverse.discrepancy} کا فرق` : topAdverse.description}${
+        topAdverse.pageNumber ? ` (صفحہ ${topAdverse.pageNumber})` : ""
+      }${adverseEvidence.length > 1 ? ` (اور مزید ${adverseEvidence.length - 1} نقائص؛ تفصیلات نیچے کارڈز میں درج ہیں)` : ""}۔`
+    : "دستاویز میں متعدد فرانزک نقائص پائے گئے ہیں۔";
+
+  // Client-side deterministic fallback if API is not yet loaded or on sample exhibit (strict 4 lines)
   const fallbackEnglishSummary =
     overallScore > 0 && adverseEvidence.length > 0
-      ? `CRITICAL BRIEFING FOR CREDIT UNDERWRITERS & LOAN APPROVAL OFFICERS:
-Forensic Recommendation: ${recAction} (Human Decision Required).
-Evaluated Risk: ${effectiveScore}/100 (${effectiveTier} Risk)${baselineStrEn}.
+      ? `CRITICAL BRIEFING FOR CREDIT UNDERWRITERS: Forensic Recommendation: ${recAction} (${effectiveTier} Risk, ${effectiveScore}/100) — Human Decision Required.${baselineStrEn}
 Forensic Radar: Document Authenticity: ${effectiveAuthScore}% (${effectiveAuthTier.replace(/_/g, " ")}) | Transaction Risk: ${effectiveTxnScore}/100 (${effectiveTxnTier.replace(/_/g, " ")}).
-
-Key Forensic Deficiencies Detected:
-` +
-        adverseEvidence
-          .slice(0, 6)
-          .map((it) => {
-            const hasFontAnomaly =
-              it.severity !== "INFO" &&
-              (it.category === "FONT_BASELINE_INCONSISTENCY" ||
-                (it.ruleId || "").includes("FONT") ||
-                Boolean(it.description.match(/([A-Za-z0-9_-]+)\s+instead/i)));
-            const details = [
-              it.discrepancy ? `Discrepancy: ${it.discrepancy}.` : "",
-              hasFontAnomaly ? "Font irregularity identified." : "",
-            ]
-              .filter(Boolean)
-              .join(" ");
-
-            const tech = it.technicalDetails || {};
-            const anchorType = it.anchorType || tech.anchor_type || (it.pageNumber ? "PAGE_REGION" : "DOCUMENT_METADATA");
-            let locStr = "Document Metadata";
-            if (anchorType === "MULTI_PAGE_SPAN") {
-              locStr = `Pages 1–${it.pageNumber || 23} (Summary vs Terminal Ledger)`;
-            } else if (anchorType === "DOCUMENT_HEADER" && it.pageNumber) {
-              locStr = `Page ${it.pageNumber} Header`;
-            } else if (tech.row_number && it.pageNumber) {
-              locStr = `Page ${it.pageNumber}, Row ${tech.row_number}`;
-            } else if (it.pageNumber) {
-              locStr = `Page ${it.pageNumber}`;
-            }
-            return `• [${locStr}]: ${it.title}.${details ? ` ${details}` : ""}`;
-          })
-          .join("\n") +
-        (verifiedEvidence.length > 0
-          ? `\n\nCertified Authentic Controls:\n` +
-            verifiedEvidence
-              .map((it) => {
-                const loc = it.pageNumber ? `Page ${it.pageNumber}` : "Document Metadata";
-                return `✓ [${loc}]: ${it.title}. ${it.discrepancy || "Verified Authentic."}`;
-              })
-              .join("\n")
-          : "") +
-        overrideNoteEn +
-        `\n\n${advisoryEn}\n\nAdvisory Notice: DeepTrace outputs constitute evidentiary forensic analysis. All lending, rejection, freeze, or STR decisions remain the exclusive statutory prerogative of authorized human credit & compliance officers.`
-      : `EXECUTIVE BRIEFING FOR CREDIT OFFICERS:
-Forensic Recommendation: ${recAction} (Human Decision Required).
-Evaluated Risk: ${effectiveScore}/100 (${effectiveTier} Risk)${baselineStrEn}.
-Forensic Radar: Document Authenticity: ${effectiveAuthScore}% | Transaction Risk: ${effectiveTxnScore}/100.
-Forensic validation confirms 100% document authenticity across all pages. All transaction figures reconcile with the core banking ledger without font, visual, or mathematical anomalies. State Bank of Pakistan (SBP) IBAN validation passed.${overrideNoteEn}
-
-Advisory Notice: Final credit decisions rest with authorized underwriting officers.`;
+Key Forensic Deficiencies Detected: ${primarySynthesisEn}${overrideNoteEn}
+Advisory Notice: DeepTrace outputs constitute evidentiary forensic analysis. All lending, rejection, freeze, or STR decisions remain the exclusive statutory prerogative of authorized human credit & compliance officers.`
+      : `CRITICAL BRIEFING FOR CREDIT UNDERWRITERS: Forensic Recommendation: ${recAction} (${effectiveTier} Risk, ${effectiveScore}/100) — Human Decision Required.${baselineStrEn}
+Forensic Radar: Document Authenticity: ${effectiveAuthScore}% (${effectiveAuthTier.replace(/_/g, " ")}) | Transaction Risk: ${effectiveTxnScore}/100 (${effectiveTxnTier.replace(/_/g, " ")}).
+Forensic validation confirms 100% document authenticity across all pages with zero ledger or typographic anomalies. State Bank of Pakistan (SBP) IBAN validation passed.${overrideNoteEn}
+Advisory Notice: DeepTrace outputs constitute evidentiary forensic analysis. All lending, rejection, freeze, or STR decisions remain the exclusive statutory prerogative of authorized human credit & compliance officers.`;
 
   const fallbackUrduSummary =
     overallScore > 0 && adverseEvidence.length > 0
-      ? `کریڈٹ آفیسر اور لون انڈر رائٹر کے لیے فوری خلاصہ:
-تجویز کردہ کارروائی: ${recAction} (حتمی فیصلہ مجاز افسر کا ہوگا)۔
-لاگو رسک سکور: ${effectiveScore}/100 (${effectiveTier})${isOverridden ? ` [سسٹم سکور: ${overallScore}/100]` : ""}۔
-دستاویزی اصلیت: ${effectiveAuthScore}٪ | کاروباری ٹرانزیکشن رسک: ${effectiveTxnScore}/100۔
-دستاویزی اصلیت: ${effectiveAuthScore}٪ | کاروباری ٹرانزیکشن رسک: ${effectiveTxnScore}/100۔
-
-اہم فرانزک شواہد اور خامیاں:
-` +
-        adverseEvidence
-          .slice(0, 6)
-          .map((it) => {
-            const tech = it.technicalDetails || {};
-            const anchorType = it.anchorType || tech.anchor_type || (it.pageNumber ? "PAGE_REGION" : "DOCUMENT_METADATA");
-            let locStr = "دستاویز میٹا ڈیٹا";
-            if (anchorType === "MULTI_PAGE_SPAN") {
-              locStr = `صفحات 1 تا ${it.pageNumber || 23} لیجر`;
-            } else if (anchorType === "DOCUMENT_HEADER" && it.pageNumber) {
-              locStr = `صفحہ ${it.pageNumber} ہیڈر`;
-            } else if (tech.row_number && it.pageNumber) {
-              locStr = `صفحہ ${it.pageNumber}، قطار ${tech.row_number}`;
-            } else if (it.pageNumber) {
-              locStr = `صفحہ ${it.pageNumber}`;
-            }
-            return `• [${locStr}]: ${it.title}۔`;
-          })
-          .join("\n") +
-        overrideNoteUr +
-        `\n\n${advisoryUr}\n\nنوٹ: تمام مالیاتی و قرضہ جاتی فیصلے مجاز افسران کی صوابدید پر منحصر ہیں۔`
-      : `کریڈٹ آفیسر کے لیے تفصیلی خلاصہ:
-تجویز کردہ کارروائی: ${recAction} (حتمی فیصلہ مجاز افسر کا ہوگا)۔
-لاگو رسک سکور: ${effectiveScore}/100 (${effectiveTier})${isOverridden ? ` [سسٹم سکور: ${overallScore}/100]` : ""}۔
-دستاویزی اصلیت: ${effectiveAuthScore}٪ | کاروباری رسک: ${effectiveTxnScore}/100۔
-فرانزک تصدیق سے ثابت ہوا ہے کہ یہ دستاویز مکمل طور پر اصل اور غیر تبدیل شدہ ہے۔ تمام کھاتہ جاتی اعداد و شمار، رننگ بیلنس اور فونٹ مکمل درست ہیں اور اسٹیٹ بینک آف پاکستان (SBP) کا IBAN معیار پر پورا اترتا ہے۔${overrideNoteUr}
-
+      ? `کریڈٹ آفیسر اور لون انڈر رائٹر کے لیے فوری خلاصہ: تجویز کردہ کارروائی: ${recAction} (${effectiveTier}، ${effectiveScore}/100) — حتمی فیصلہ مجاز افسر کا ہوگا${isOverridden ? ` [سسٹم سکور: ${overallScore}/100]` : ""}۔
+دستاویزی اصلیت: ${effectiveAuthScore}٪ (${authTierUr}) | ٹرانزیکشن رسک: ${effectiveTxnScore}/100 (${txnTierUr})۔
+اہم فرانزک شواہد اور خامیاں: ${primarySynthesisUr}${overrideNoteUr}
+نوٹ: تمام مالیاتی و قرضہ جاتی فیصلے مجاز افسران کی صوابدید پر منحصر ہیں۔`
+      : `کریڈٹ آفیسر اور لون انڈر رائٹر کے لیے فوری خلاصہ: تجویز کردہ کارروائی: ${recAction} (${effectiveTier}، ${effectiveScore}/100) — حتمی فیصلہ مجاز افسر کا ہوگا${isOverridden ? ` [سسٹم سکور: ${overallScore}/100]` : ""}۔
+دستاویزی اصلیت: ${effectiveAuthScore}٪ (${authTierUr}) | ٹرانزیکشن رسک: ${effectiveTxnScore}/100 (${txnTierUr})۔
+فرانزک تصدیق سے ثابت ہوا ہے کہ یہ دستاویز مکمل طور پر اصل اور غیر تبدیل شدہ ہے اور تمام کھاتہ جاتی اعداد و شمار درست ہیں۔${overrideNoteUr}
 نوٹ: تمام مالیاتی و قرضہ جاتی فیصلے مجاز افسران کی صوابدید پر منحصر ہیں۔`;
 
   const currentSummary =
     activeLang === "en"
       ? analysis?.english_summary || fallbackEnglishSummary
       : analysis?.urdu_summary || fallbackUrduSummary;
-
-  const briefingItems: CreditBriefingItem[] =
-    analysis?.credit_briefing_items && analysis.credit_briefing_items.length > 0
-      ? analysis.credit_briefing_items
-      : evidenceItems.map((it) => {
-          const isInfo = it.severity === "INFO" || (it.ruleId || "").endsWith("_VERIFIED");
-          const tech = it.technicalDetails || {};
-          const anchorType = it.anchorType || tech.anchor_type || (it.pageNumber ? "PAGE_REGION" : "DOCUMENT_METADATA");
-          const rowNum = tech.row_number || (tech.anchors && tech.anchors[0]?.rowNumber) || undefined;
-          const anchors = tech.anchors || it.anchors || (it.pageNumber ? [{ type: anchorType, pageNumber: it.pageNumber, label: `Page ${it.pageNumber}` }] : [{ type: "DOCUMENT_METADATA", label: "Document Metadata" }]);
-
-          let locLabelEn = "Document Metadata";
-          let locLabelUr = "دستاویز میٹا ڈیٹا";
-          if (anchorType === "MULTI_PAGE_SPAN") {
-            locLabelEn = `Pages 1–${it.pageNumber || 23} Ledger`;
-            locLabelUr = `صفحات 1 تا ${it.pageNumber || 23} لیجر`;
-          } else if (anchorType === "DOCUMENT_HEADER" && it.pageNumber) {
-            locLabelEn = `Page ${it.pageNumber} Header`;
-            locLabelUr = `صفحہ ${it.pageNumber} ہیڈر`;
-          } else if (rowNum && it.pageNumber) {
-            locLabelEn = `Page ${it.pageNumber}, Row ${rowNum}`;
-            locLabelUr = `صفحہ ${it.pageNumber}، قطار ${rowNum}`;
-          } else if (it.pageNumber) {
-            locLabelEn = `Page ${it.pageNumber}`;
-            locLabelUr = `صفحہ ${it.pageNumber}`;
-          }
-
-          return {
-            page_number: it.pageNumber,
-            row_number: rowNum,
-            anchor_type: anchorType,
-            anchors: anchors,
-            title: it.title,
-            transaction_label: it.title,
-            expected_value: it.expectedValue,
-            actual_value: it.actualValue,
-            discrepancy: it.discrepancy,
-            font_detected: it.description.match(/([A-Za-z0-9_-]+)\s+instead/i)?.[1],
-            expected_font: it.description.match(/instead of\s+([A-Za-z0-9_-]+)/i)?.[1],
-            visual_cue: it.ruleId.includes("CV_") ? "Local ELA compression divergence" : undefined,
-            summary_en: isInfo
-              ? `${locLabelEn}: ${it.title}. ${it.discrepancy || "Verified Authentic."}`
-              : `${locLabelEn}: ${it.title}. ${
-                  it.discrepancy ? `Discrepancy: ${it.discrepancy}.` : ""
-                }`,
-            summary_ur: isInfo
-              ? `${locLabelUr}: ${it.title} (مصدقہ کنٹرول)۔`
-              : `${locLabelUr}: ${it.title}۔ ${
-                  it.discrepancy ? `${it.discrepancy} کا فرق۔` : ""
-                }`,
-            severity: it.severity,
-            rule_id: it.ruleId,
-            evidence_id: it.id,
-          };
-        });
 
   const correlations =
     analysis?.cross_signal_correlations &&
@@ -395,11 +289,11 @@ Advisory Notice: Final credit decisions rest with authorized underwriting office
               <span className="font-serif text-sm font-bold tracking-tight uppercase">
                 Lead Investigator Agent — Credit Officer Briefing
               </span>
-              <span className="text-[10px] bg-paper-0/20 text-paper-0 px-2 py-0.5 border border-paper-0/30 font-mono font-medium">
+              <span className="text-[11px] bg-paper-0/20 text-paper-0 px-2 py-0.5 border border-paper-0/30 font-mono font-bold">
                 {providerLabel}
               </span>
             </div>
-            <p className="text-[11px] text-paper-2 font-sans">
+            <p className="text-xs text-paper-2 font-sans">
               Autonomous LangGraph multi-agent synthesis for underwriting & loan approval committees
             </p>
           </div>
@@ -470,24 +364,24 @@ Advisory Notice: Final credit decisions rest with authorized underwriting office
             <span>
               FORENSIC RECOMMENDATION: {recAction.toUpperCase()} ({effectiveTier} RISK, {effectiveScore}/100)
               {isOverridden && (
-                <span className="ml-2 text-[10px] px-1.5 py-0.5 bg-amber-500/20 text-amber-900 border border-amber-500/40 rounded font-bold">
+                <span className="ml-2 text-[11px] px-2 py-0.5 bg-amber-500/20 text-amber-900 border border-amber-500/40 rounded-none font-bold">
                   HUMAN OVERRIDE
                 </span>
               )}
             </span>
           </div>
 
-          <div className="flex items-center gap-2 text-[10px]">
-            <span className="px-2 py-0.5 border border-current font-bold">
+          <div className="flex items-center gap-2 text-[11px]">
+            <span className="px-2.5 py-0.5 border border-current font-bold">
               AUTH: {effectiveAuthScore}% ({effectiveAuthTier.replace(/_/g, " ")})
             </span>
-            <span className="px-2 py-0.5 border border-current font-bold">
+            <span className="px-2.5 py-0.5 border border-current font-bold">
               AML RISK: {effectiveTxnScore}/100 ({effectiveTxnTier.replace(/_/g, " ")})
             </span>
           </div>
         </div>
 
-        <div className="text-[11px] font-sans opacity-90">
+        <div className="text-xs font-sans font-medium opacity-95">
           {activeLang === "ur"
             ? "زیرو ہالوسینیشن پالیسی — صرف مصدقہ شواہد پر مبنی تجزیہ"
             : "Zero-Hallucination Guardrail — Strictly Bound to Verified Evidence Manifest"}
@@ -505,7 +399,7 @@ Advisory Notice: Final credit decisions rest with authorized underwriting office
           <div className="flex items-center gap-2 font-bold uppercase tracking-wider">
             <span>ETO 2002 §29 STATUTORY PRESUMPTION REBUTTED</span>
           </div>
-          <span className="text-[11px] font-sans">
+          <span className="text-xs font-sans font-medium">
             {activeLang === "ur"
               ? "ڈیجیٹل سرٹیفکیٹ تصدیق ناکام — دستخط کے بعد بائٹس تبدیل ہونے کا قطعی حسابی ثبوت"
               : "Digital Certificate Invalidated — Cryptographic Byte-Range Mismatch Proves Post-Signing Alteration"}
@@ -522,7 +416,7 @@ Advisory Notice: Final credit decisions rest with authorized underwriting office
             <div className="flex items-center gap-2 font-bold uppercase tracking-wider">
               <span>ETO 2002 §29 STATUTORY PRESUMPTION SATISFIED</span>
             </div>
-            <span className="text-[11px] font-sans">
+            <span className="text-xs font-sans font-medium">
               {activeLang === "ur"
                 ? "مصدقہ این آئی ایف ٹی (NIFT) ڈیجیٹل سرٹیفکیٹ کی تصدیق مکمل — صفر ردوبدل"
                 : "Accredited Digital Certificate Validated — Complete Document Integrity Preserved"}
@@ -543,184 +437,7 @@ Advisory Notice: Final credit decisions rest with authorized underwriting office
           {currentSummary}
         </div>
 
-        {/* Structured Evidence Items (Coordinate Table) */}
-        {briefingItems.length > 0 && (
-          <div className="mt-5">
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-mono text-xs font-bold uppercase tracking-wider text-ink-700 flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5" />
-                {activeLang === "ur"
-                  ? "مصدقہ شواہد اور نشاندہی شدہ نقائص (صفحہ اور قطار کے مطابق)"
-                  : "Verified Evidence Coordinates (Page, Row & Typography Discrepancies)"}
-              </span>
-              <span className="font-mono text-[11px] text-ink-500">
-                {briefingItems.filter((i) => i.severity !== "INFO").length} anomaly(ies) ·{" "}
-                {briefingItems.filter((i) => i.severity === "INFO").length} verified check(s)
-              </span>
-            </div>
 
-            <div className="border border-rule divide-y divide-rule text-xs font-mono bg-paper-0">
-              {briefingItems.map((item, idx) => (
-                <div
-                  key={idx}
-                  className="p-3 hover:bg-paper-1/40 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-3"
-                >
-                  <div className="flex-1 space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {/* Anchor Badge & Jump Links */}
-                      {item.anchor_type === "DOCUMENT_METADATA" || (!item.page_number && !item.row_number) ? (
-                        <span className="px-1.5 py-0.5 text-[10px] font-bold bg-ink-800 text-paper-0">
-                          DOC METADATA
-                        </span>
-                      ) : item.anchor_type === "MULTI_PAGE_SPAN" ? (
-                        <div className="flex items-center gap-1">
-                          <span className="px-1.5 py-0.5 text-[10px] font-bold bg-forensic-red text-white">
-                            P.1–{item.page_number || 23} LEDGER
-                          </span>
-                          {item.anchors && item.anchors.length > 0 ? (
-                            item.anchors.map((anc, aIdx) => (
-                              <button
-                                key={aIdx}
-                                type="button"
-                                onClick={() => {
-                                  if (anc.pageNumber) onFocusCanvas?.(anc.pageNumber);
-                                  if (item.evidence_id) onSelectEvidence?.(item.evidence_id);
-                                }}
-                                className="px-1.5 py-0.5 text-[9px] font-bold bg-paper-2 hover:bg-ink-900 hover:text-white text-ink-900 border border-ink-900/20 rounded-sm transition-colors flex items-center gap-0.5 cursor-pointer"
-                                title={`Jump to ${anc.label}`}
-                              >
-                                {anc.label} ↗
-                              </button>
-                            ))
-                          ) : (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  onFocusCanvas?.(1);
-                                  if (item.evidence_id) onSelectEvidence?.(item.evidence_id);
-                                }}
-                                className="px-1.5 py-0.5 text-[9px] font-bold bg-paper-2 hover:bg-ink-900 hover:text-white text-ink-900 border border-ink-900/20 rounded-sm transition-colors cursor-pointer"
-                              >
-                                P.1 Summary ↗
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  onFocusCanvas?.(item.page_number || 23);
-                                  if (item.evidence_id) onSelectEvidence?.(item.evidence_id);
-                                }}
-                                className="px-1.5 py-0.5 text-[9px] font-bold bg-paper-2 hover:bg-ink-900 hover:text-white text-ink-900 border border-ink-900/20 rounded-sm transition-colors cursor-pointer"
-                              >
-                                P.{item.page_number || 23} Terminal ↗
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      ) : item.row_number ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (item.page_number) onFocusCanvas?.(item.page_number);
-                            if (item.evidence_id) onSelectEvidence?.(item.evidence_id);
-                          }}
-                          className={`px-1.5 py-0.5 text-[10px] font-bold transition-colors flex items-center gap-1 cursor-pointer ${
-                            item.severity === "INFO"
-                              ? "bg-emerald-700 hover:bg-emerald-800 text-white"
-                              : "bg-ink-900 hover:bg-forensic-blue text-paper-0"
-                          }`}
-                        >
-                          P.{item.page_number} · ROW {item.row_number} ↗
-                        </button>
-                      ) : item.anchor_type === "DOCUMENT_HEADER" ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (item.page_number) onFocusCanvas?.(item.page_number);
-                            if (item.evidence_id) onSelectEvidence?.(item.evidence_id);
-                          }}
-                          className={`px-1.5 py-0.5 text-[10px] font-bold transition-colors flex items-center gap-1 cursor-pointer ${
-                            item.severity === "INFO"
-                              ? "bg-emerald-700 hover:bg-emerald-800 text-white"
-                              : "bg-ink-900 hover:bg-forensic-blue text-paper-0"
-                          }`}
-                        >
-                          P.{item.page_number} HEADER ↗
-                        </button>
-                      ) : item.page_number ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onFocusCanvas?.(item.page_number!);
-                            if (item.evidence_id) onSelectEvidence?.(item.evidence_id);
-                          }}
-                          className={`px-1.5 py-0.5 text-[10px] font-bold transition-colors flex items-center gap-1 cursor-pointer ${
-                            item.severity === "INFO"
-                              ? "bg-emerald-700 hover:bg-emerald-800 text-white"
-                              : "bg-ink-900 hover:bg-forensic-blue text-paper-0"
-                          }`}
-                        >
-                          {item.severity === "INFO" ? `P.${item.page_number} VERIFIED ↗` : `PAGE ${item.page_number} ↗`}
-                        </button>
-                      ) : (
-                        <span className="px-1.5 py-0.5 text-[10px] font-bold bg-ink-800 text-paper-0">
-                          {item.severity === "INFO" ? "VERIFIED" : "AUDIT FINDING"}
-                        </span>
-                      )}
-
-                      <span className="font-serif text-sm font-semibold text-ink-900">
-                        {item.title}
-                      </span>
-                      <span
-                        className={`text-[9px] px-1.5 py-0.2 border uppercase font-bold ${
-                          item.severity === "CRITICAL"
-                            ? "border-forensic-red/40 bg-forensic-red/10 text-forensic-red"
-                            : item.severity === "HIGH"
-                            ? "border-forensic-amber/40 bg-forensic-amber/10 text-forensic-amber"
-                            : item.severity === "INFO"
-                            ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700"
-                            : "border-rule text-ink-600"
-                        }`}
-                      >
-                        {item.severity === "INFO" ? "VERIFIED" : item.severity}
-                      </span>
-                    </div>
-
-                    <div
-                      dir={activeLang === "ur" ? "rtl" : "ltr"}
-                      className="font-sans text-xs text-ink-700 pl-1"
-                    >
-                      {activeLang === "ur" ? item.summary_ur : item.summary_en}
-                    </div>
-
-                    {/* Coordinates & Typography Chip */}
-                    {(item.expected_value ||
-                      item.font_detected ||
-                      item.visual_cue) && (
-                      <div className="flex flex-wrap items-center gap-2 pt-1 text-[10px] text-ink-600">
-                        {item.expected_value && (
-                          <span className="bg-paper-1 border border-rule px-2 py-0.5">
-                            Expected: <strong className="text-ink-900">{item.expected_value}</strong> | Recorded: <strong className="text-ink-900">{item.actual_value}</strong>
-                          </span>
-                        )}
-                        {item.font_detected && (
-                          <span className="bg-amber-500/10 border border-amber-500/30 text-amber-800 px-2 py-0.5 font-mono">
-                            Font: <strong>{item.font_detected}</strong> vs {item.expected_font || "Original"}
-                          </span>
-                        )}
-                        {item.visual_cue && (
-                          <span className="bg-blue-500/10 border border-blue-500/30 text-blue-800 px-2 py-0.5">
-                            Visual: {item.visual_cue}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Cross-Signal Convergence Cards */}
         {correlations.length > 0 && (

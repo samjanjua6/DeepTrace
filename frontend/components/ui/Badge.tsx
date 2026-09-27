@@ -21,19 +21,19 @@ export function Badge({
   ...props
 }: BadgeProps) {
   const variantStyles: Record<NonNullable<BadgeProps["variant"]>, string> = {
-    critical: "border-forensic-red/50 bg-forensic-red/5 text-forensic-red border",
-    high: "border-forensic-amber/50 bg-forensic-amber/5 text-forensic-amber border",
-    low: "border-forensic-green/50 bg-forensic-green/5 text-forensic-green border",
-    neutral: "border-rule bg-paper-1 text-ink-700 border",
+    critical: "border-rose-700/80 bg-rose-100 text-rose-950 border",
+    high: "border-amber-700/80 bg-amber-100 text-amber-950 border",
+    low: "border-emerald-700/80 bg-emerald-100 text-emerald-950 border",
+    neutral: "border-rule-dark bg-paper-1 text-ink-900 border",
     outline: "border-ink-900 text-ink-900 bg-transparent border",
     inverse: "bg-ink-900 text-paper-0 border border-ink-900",
-    amber: "bg-amber-100 text-amber-900 border border-amber-300",
+    amber: "bg-amber-100 text-amber-950 border border-amber-600",
   };
 
   const sizeStyles: Record<NonNullable<BadgeProps["size"]>, string> = {
-    xs: "text-[9px] px-1.5 py-0.2",
-    sm: "text-[10px] px-2 py-0.5",
-    md: "text-[11px] px-2.5 py-1",
+    xs: "text-[11px] px-2 py-0.5",
+    sm: "text-xs px-2.5 py-0.5",
+    md: "text-xs px-3 py-1 font-bold",
   };
 
   return (

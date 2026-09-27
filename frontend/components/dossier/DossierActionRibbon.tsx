@@ -41,17 +41,17 @@ export function DossierActionRibbon({
       {/* Top Utility Bar: Section Identifier & Global Action Controls */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-ink-500 whitespace-nowrap">
+          <span className="text-[11px] font-bold uppercase tracking-widest text-ink-700 whitespace-nowrap">
             § 03 / Forensic Dossier
           </span>
           {evidenceCount > 0 ? (
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[9px] font-bold bg-forensic-red/10 text-forensic-red border border-forensic-red/30 whitespace-nowrap">
-              <span className="w-1.5 h-1.5 rounded-full bg-forensic-red animate-pulse shrink-0" />
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-bold bg-rose-100 text-rose-950 border border-rose-700/80 whitespace-nowrap">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-700 animate-pulse shrink-0" />
               {evidenceCount} {evidenceCount === 1 ? "Anomaly" : "Anomalies"}
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[9px] font-bold bg-forensic-green/10 text-forensic-green border border-forensic-green/30 whitespace-nowrap">
-              <span className="w-1.5 h-1.5 rounded-full bg-forensic-green shrink-0" />
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-bold bg-emerald-100 text-emerald-950 border border-emerald-700/80 whitespace-nowrap">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-700 shrink-0" />
               Clean Record
             </span>
           )}

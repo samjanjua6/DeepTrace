@@ -30,6 +30,13 @@ export function BoundingBoxLayer({
   pinnedBaselines = [],
   selectedCategory = "ALL",
 }: BoundingBoxLayerProps) {
+  // Deterministic 1-based finding index mapping for adverse findings
+  const adverseFindings = evidence.filter((e) => e.severity !== "INFO");
+  const findingIndexMap = new Map<string, number>();
+  adverseFindings.forEach((ev, idx) => {
+    findingIndexMap.set(ev.id, idx + 1);
+  });
+
   // Filter evidence items that have bounding boxes on this page and match category
   const pageEvidence = evidence.filter((ev) => {
     const hasBoxOnPage =
@@ -72,30 +79,105 @@ export function BoundingBoxLayer({
     return true;
   });
 
+  // Flatten and calculate all bounding boxes and smart pin placements on current page
+  interface PageBoxItem {
+    boxId: string;
+    evidenceId: string;
+    findingNum: number;
+    pinLabel: string;
+    ev: EvidenceItem;
+    box: { id: string; x: number; y: number; width: number; height: number; label?: string };
+    strokeColor: string;
+    isSelected: boolean;
+    anchorX: number;
+    anchorY: number;
+    pinX: number;
+    pinY: number;
+    isRightHalf: boolean;
+  }
+
+  const pageBoxes: PageBoxItem[] = [];
+  pageEvidence.forEach((ev) => {
+    const isSelected = activeEvidenceId === ev.id;
+    const evBoxes = (ev.boundingBoxes || []).filter(
+      (b) => b.pageNumber === currentPage
+    );
+    const findingNum =
+      findingIndexMap.get(ev.id) ?? (evidence.indexOf(ev) + 1);
+    const strokeColor =
+      ev.severity === "CRITICAL"
+        ? "#BA2518"
+        : ev.severity === "HIGH"
+        ? "#C27803"
+        : "#1E5E3A";
+
+    evBoxes.forEach((box, boxIdx) => {
+      const pinLabel =
+        evBoxes.length > 1
+          ? `${findingNum}${String.fromCharCode(65 + boxIdx)}`
+          : `${findingNum}`;
+
+      const x = box.x;
+      const y = box.y;
+      const w = Math.max(12, box.width);
+      const h = Math.max(12, box.height);
+      const cy = y + h / 2;
+
+      // Position pin safely outside the text area into margins/gutters
+      const isRightHalf = x + w / 2 > canvasWidth * 0.45;
+      let anchorX = isRightHalf ? x + w : x;
+      let anchorY = cy;
+      let pinX = isRightHalf ? x + w + 55 : x - 55;
+      let pinY = cy;
+
+      // Ensure pin stays within canvas margins
+      if (pinX > canvasWidth - 32) {
+        anchorX = x;
+        pinX = Math.max(32, x - 55);
+      } else if (pinX < 32) {
+        anchorX = x + w;
+        pinX = Math.min(canvasWidth - 32, x + w + 55);
+      }
+
+      pageBoxes.push({
+        boxId: box.id,
+        evidenceId: ev.id,
+        findingNum,
+        pinLabel,
+        ev,
+        box: { ...box, width: w, height: h },
+        strokeColor,
+        isSelected,
+        anchorX,
+        anchorY,
+        pinX,
+        pinY,
+        isRightHalf,
+      });
+    });
+  });
+
+  // Vertical anti-collision staggering for co-located or closely spaced pins
+  for (let i = 0; i < pageBoxes.length; i++) {
+    for (let j = i + 1; j < pageBoxes.length; j++) {
+      const b1 = pageBoxes[i];
+      const b2 = pageBoxes[j];
+      const dx = Math.abs(b1.pinX - b2.pinX);
+      const dy = Math.abs(b1.pinY - b2.pinY);
+      if (dx < 50 && dy < 48) {
+        b1.pinY -= 24;
+        b2.pinY += 24;
+      }
+    }
+  }
+
   return (
     <svg
       className="absolute inset-0 pointer-events-auto"
       viewBox={`0 0 ${canvasWidth} ${canvasHeight}`}
-      style={{ width: "100%", height: "100%" }}
+      style={{ width: "100%", height: "100%", overflow: "visible" }}
     >
       <defs>
-        <pattern
-          id="hatch-red"
-          width="8"
-          height="8"
-          patternTransform="rotate(45 0 0)"
-          patternUnits="userSpaceOnUse"
-        >
-          <line
-            x1="0"
-            y1="0"
-            x2="0"
-            y2="8"
-            stroke="#BA2518"
-            strokeWidth="1"
-            opacity="0.3"
-          />
-        </pattern>
         {/* Arrow marker for copy-move vectors */}
         <marker
           id="arrow-cmfd"
@@ -110,7 +192,7 @@ export function BoundingBoxLayer({
         </marker>
       </defs>
 
-      {/* Pinned Reference Baselines Layer (Institutional Archival Ink Rule) */}
+      {/* Pinned Reference Baselines Layer */}
       {showRuler &&
         pinnedBaselines.map((pinnedY, idx) => (
           <g key={`pinned-${idx}`} className="select-none pointer-events-none">
@@ -126,17 +208,17 @@ export function BoundingBoxLayer({
             />
             <rect
               x={6}
-              y={Math.max(4, pinnedY - 18)}
-              width={125}
-              height={16}
+              y={Math.max(4, pinnedY - 24)}
+              width={175}
+              height={22}
               fill="#141413"
-              rx={1}
+              rx={2}
             />
             <text
-              x={10}
-              y={Math.max(4, pinnedY - 18) + 11}
+              x={12}
+              y={Math.max(4, pinnedY - 24) + 15}
               fill="#FBF9F5"
-              fontSize="9"
+              fontSize="14"
               fontFamily="monospace"
               fontWeight="bold"
             >
@@ -145,7 +227,7 @@ export function BoundingBoxLayer({
           </g>
         ))}
 
-      {/* Live Mouse Laser Guideline Layer (Institutional Theme) */}
+      {/* Live Mouse Laser Guideline Layer */}
       {showRuler && mousePos && (
         <g className="select-none pointer-events-none">
           <line
@@ -159,17 +241,18 @@ export function BoundingBoxLayer({
             opacity="0.85"
           />
           <rect
-            x={canvasWidth - 150}
-            y={Math.max(4, mousePos.y - 18)}
-            width={145}
-            height={16}
+            x={canvasWidth - 195}
+            y={Math.max(4, mousePos.y - 24)}
+            width={185}
+            height={22}
             fill="#141413"
+            rx={2}
           />
           <text
-            x={canvasWidth - 143}
-            y={Math.max(4, mousePos.y - 18) + 11}
+            x={canvasWidth - 188}
+            y={Math.max(4, mousePos.y - 24) + 15}
             fill="#FBF9F5"
-            fontSize="9"
+            fontSize="14"
             fontFamily="monospace"
             fontWeight="bold"
           >
@@ -178,340 +261,325 @@ export function BoundingBoxLayer({
         </g>
       )}
 
-      {/* Bounding Boxes and Evidence Highlights */}
+      {/* Intra-Page Outer Margin Connector (Multi-Box Financial Reconciliations) */}
       {pageEvidence.map((ev) => {
         const isSelected = activeEvidenceId === ev.id;
         const boxes = (ev.boundingBoxes || []).filter(
           (b) => b.pageNumber === currentPage
         );
 
+        if (ev.ruleId === "RULE_CV_COPY_MOVE_FORGERY" && boxes.length >= 2) {
+          const srcBox =
+            boxes.find((b) => b.label?.toLowerCase().includes("source")) ||
+            boxes[0];
+          const dstBox =
+            boxes.find((b) =>
+              b.label?.toLowerCase().includes("destination")
+            ) || boxes[1];
+          const sx = srcBox.x + srcBox.width / 2;
+          const sy = srcBox.y + srcBox.height / 2;
+          const dx = dstBox.x + dstBox.width / 2;
+          const dy = dstBox.y + dstBox.height / 2;
+          const mx = (sx + dx) / 2;
+          const my = Math.min(sy, dy) - 35;
+
+          return (
+            <g
+              key={`cmfd-${ev.id}`}
+              className={`select-none pointer-events-none transition-opacity ${
+                isSelected ? "opacity-100" : "opacity-40 group-hover:opacity-100"
+              }`}
+            >
+              <path
+                d={`M ${sx} ${sy} Q ${mx} ${my} ${dx} ${dy}`}
+                fill="none"
+                stroke="#BA2518"
+                strokeWidth={isSelected ? 3 : 2}
+                strokeDasharray="6 3"
+                markerEnd="url(#arrow-cmfd)"
+              />
+              <rect
+                x={mx - 50}
+                y={my - 14}
+                width={100}
+                height={22}
+                fill="#BA2518"
+                rx={2}
+              />
+              <text
+                x={mx}
+                y={my + 2}
+                fill="#FFFFFF"
+                fontSize="14"
+                fontFamily="monospace"
+                fontWeight="bold"
+                textAnchor="middle"
+              >
+                Δ: {Math.round(dx - sx)}px
+              </text>
+            </g>
+          );
+        }
+
+        if (boxes.length >= 2) {
+          const sorted = [...boxes].sort((a, b) => a.y - b.y);
+          const topBox = sorted[0];
+          const bottomBox = sorted[sorted.length - 1];
+          const marginX = 20;
+          const ty = topBox.y + topBox.height / 2;
+          const by = bottomBox.y + bottomBox.height / 2;
+          const strokeColor = ev.severity === "CRITICAL" ? "#BA2518" : "#C27803";
+
+          return (
+            <g
+              key={`margin-conn-${ev.id}`}
+              className={`select-none pointer-events-none transition-opacity ${
+                isSelected ? "opacity-100" : "opacity-45 group-hover:opacity-100"
+              }`}
+            >
+              <path
+                d={`M ${topBox.x} ${ty} L ${marginX} ${ty} L ${marginX} ${by} L ${bottomBox.x} ${by}`}
+                fill="none"
+                stroke={strokeColor}
+                strokeWidth={isSelected ? 2.5 : 1.5}
+                strokeDasharray={isSelected ? "none" : "5 3"}
+              />
+              <circle cx={topBox.x} cy={ty} r={4} fill={strokeColor} />
+              <circle cx={bottomBox.x} cy={by} r={4} fill={strokeColor} />
+              <g transform={`translate(${marginX + 4}, ${(ty + by) / 2 - 12})`}>
+                <rect
+                  x={0}
+                  y={0}
+                  width={ev.pattern ? 190 : 160}
+                  height={24}
+                  fill="#141413"
+                  rx={2}
+                />
+                <text
+                  x={8}
+                  y={16}
+                  fill="#FBF9F5"
+                  fontSize="13"
+                  fontFamily="monospace"
+                  fontWeight="bold"
+                >
+                  {ev.pattern
+                    ? `PROOF: ${ev.pattern.replace(/_/g, " ").toUpperCase()}`
+                    : "RECONCILIATION ↔"}
+                </text>
+              </g>
+            </g>
+          );
+        }
+
+        return null;
+      })}
+
+      {/* Primary Evidence Bounding Boxes, HUD Reticles, Leader Lines, and Numbered Pins */}
+      {pageBoxes.map((item) => {
+        const {
+          box,
+          ev,
+          strokeColor,
+          isSelected,
+          anchorX,
+          anchorY,
+          pinX,
+          pinY,
+          pinLabel,
+          findingNum,
+        } = item;
+
+        const x = box.x;
+        const y = box.y;
+        const w = box.width;
+        const h = box.height;
+        const cornerLen = Math.min(8, w / 3, h / 3);
+
+        const isPinRight = pinX > anchorX;
+        const elbowX = isPinRight
+          ? anchorX + Math.max(16, (pinX - anchorX) * 0.45)
+          : anchorX - Math.max(16, (anchorX - pinX) * 0.45);
+
         return (
           <g
-            key={ev.id}
+            key={box.id}
             className="cursor-pointer group"
-            onClick={() => onSelectEvidence(isSelected ? null : ev.id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelectEvidence(isSelected ? null : ev.id);
+            }}
             onMouseEnter={() => onSelectEvidence(ev.id)}
           >
-            {/* Copy-Move Directional Vector Connector */}
-            {ev.ruleId === "RULE_CV_COPY_MOVE_FORGERY" && boxes.length >= 2 && (
-              (() => {
-                const srcBox =
-                  boxes.find((b) => b.label?.toLowerCase().includes("source")) ||
-                  boxes[0];
-                const dstBox =
-                  boxes.find((b) =>
-                    b.label?.toLowerCase().includes("destination")
-                  ) || boxes[1];
-                const sx = srcBox.x + srcBox.width / 2;
-                const sy = srcBox.y + srcBox.height / 2;
-                const dx = dstBox.x + dstBox.width / 2;
-                const dy = dstBox.y + dstBox.height / 2;
-                const mx = (sx + dx) / 2;
-                const my = Math.min(sy, dy) - 35;
+            {/* Bounding Box: 100% Transparent Interior (Zero Evidence Obstruction) */}
+            <rect
+              x={x}
+              y={y}
+              width={w}
+              height={h}
+              fill={isSelected ? "rgba(186, 37, 24, 0.04)" : "none"}
+              stroke={strokeColor}
+              strokeWidth={isSelected ? 2.5 : 1.5}
+              strokeDasharray={
+                ev.category === "FONT_BASELINE_INCONSISTENCY" ? "5 3" : "none"
+              }
+              className="transition-all duration-150"
+            />
 
-                return (
-                  <g
-                    className={`select-none pointer-events-none transition-opacity ${
-                      isSelected
-                        ? "opacity-100"
-                        : "opacity-40 group-hover:opacity-100"
-                    }`}
-                  >
-                    <path
-                      d={`M ${sx} ${sy} Q ${mx} ${my} ${dx} ${dy}`}
-                      fill="none"
-                      stroke="#BA2518"
-                      strokeWidth={isSelected ? 2.5 : 1.5}
-                      strokeDasharray="6 3"
-                      markerEnd="url(#arrow-cmfd)"
-                    />
-                    <rect
-                      x={mx - 40}
-                      y={my - 12}
-                      width={80}
-                      height={16}
-                      fill="#BA2518"
-                      rx={2}
-                    />
-                    <text
-                      x={mx}
-                      y={my}
-                      fill="#FFFFFF"
-                      fontSize="9"
-                      fontFamily="monospace"
-                      fontWeight="bold"
-                      textAnchor="middle"
-                    >
-                      Δ: {Math.round(dx - sx)}px
-                    </text>
-                  </g>
-                );
-              })()
+            {/* Selection Outer Glow Ring */}
+            {isSelected && (
+              <rect
+                x={x - 4}
+                y={y - 4}
+                width={w + 8}
+                height={h + 8}
+                fill="none"
+                stroke={strokeColor}
+                strokeWidth={1.5}
+                strokeDasharray="4 2"
+                opacity={0.65}
+                className="animate-pulse"
+              />
             )}
 
-            {/* Intra-Page Outer Margin Connector (Dual-Anchor Reconciliation / In-Place Tampering) */}
-            {ev.ruleId !== "RULE_CV_COPY_MOVE_FORGERY" && boxes.length >= 2 && (
-              (() => {
-                const sorted = [...boxes].sort((a, b) => a.y - b.y);
-                const topBox = sorted[0];
-                const bottomBox = sorted[sorted.length - 1];
-                const marginX = 20; // 20px = ~9.6 pt, safely in outer document margin (x <= 15 pt)
-                const ty = topBox.y + topBox.height / 2;
-                const by = bottomBox.y + bottomBox.height / 2;
-                const strokeColor = ev.severity === "CRITICAL" ? "#BA2518" : "#C27803";
-
-                return (
-                  <g
-                    className={`select-none pointer-events-none transition-opacity ${
-                      isSelected
-                        ? "opacity-100"
-                        : "opacity-45 group-hover:opacity-100"
-                    }`}
-                  >
-                    {/* Orthogonal connector path routed along outer margin gutter */}
-                    <path
-                      d={`M ${topBox.x} ${ty} L ${marginX} ${ty} L ${marginX} ${by} L ${bottomBox.x} ${by}`}
-                      fill="none"
-                      stroke={strokeColor}
-                      strokeWidth={isSelected ? 2.5 : 1.5}
-                      strokeDasharray={isSelected ? "none" : "5 3"}
-                    />
-                    <circle cx={topBox.x} cy={ty} r={3.5} fill={strokeColor} />
-                    <circle cx={bottomBox.x} cy={by} r={3.5} fill={strokeColor} />
-
-                    {/* Margin Gutter Proof Tag */}
-                    <g transform={`translate(${marginX + 4}, ${(ty + by) / 2 - 8})`}>
-                      <rect
-                        x={0}
-                        y={0}
-                        width={ev.pattern ? 120 : 100}
-                        height={16}
-                        fill="#141413"
-                        rx={2}
-                      />
-                      <text
-                        x={4}
-                        y={11}
-                        fill="#FBF9F5"
-                        fontSize="8"
-                        fontFamily="monospace"
-                        fontWeight="bold"
-                      >
-                        {ev.pattern
-                          ? `PROOF: ${ev.pattern.replace(/_/g, " ").toUpperCase()}`
-                          : "RECONCILIATION ↔"}
-                      </text>
-                    </g>
-                  </g>
-                );
-              })()
+            {/* Forensic Corner HUD Brackets */}
+            {cornerLen > 2 && (
+              <>
+                {/* Top-Left */}
+                <path
+                  d={`M ${x} ${y + cornerLen} L ${x} ${y} L ${x + cornerLen} ${y}`}
+                  fill="none"
+                  stroke={strokeColor}
+                  strokeWidth={isSelected ? 3 : 2}
+                />
+                {/* Top-Right */}
+                <path
+                  d={`M ${x + w - cornerLen} ${y} L ${x + w} ${y} L ${x + w} ${y + cornerLen}`}
+                  fill="none"
+                  stroke={strokeColor}
+                  strokeWidth={isSelected ? 3 : 2}
+                />
+                {/* Bottom-Left */}
+                <path
+                  d={`M ${x} ${y + h - cornerLen} L ${x} ${y + h} L ${x + cornerLen} ${y + h}`}
+                  fill="none"
+                  stroke={strokeColor}
+                  strokeWidth={isSelected ? 3 : 2}
+                />
+                {/* Bottom-Right */}
+                <path
+                  d={`M ${x + w - cornerLen} ${y + h} L ${x + w} ${y + h} L ${x + w} ${y + h - cornerLen}`}
+                  fill="none"
+                  stroke={strokeColor}
+                  strokeWidth={isSelected ? 3 : 2}
+                />
+              </>
             )}
 
-            {boxes.map((box) => {
-              const strokeColor =
-                ev.severity === "CRITICAL"
-                  ? "#BA2518"
-                  : ev.severity === "HIGH"
-                  ? "#C27803"
-                  : "#1E5E3A";
+            {/* Leader Line: Anchor Dot on Bounding Box Perimeter */}
+            <circle cx={anchorX} cy={anchorY} r={4} fill={strokeColor} />
 
-              const x = box.x;
-              const y = box.y;
-              const w = Math.max(8, box.width);
-              const h = Math.max(8, box.height);
+            {/* Leader Line: Vector Dogleg Path from Box to Pin */}
+            <path
+              d={`M ${anchorX} ${anchorY} L ${elbowX} ${anchorY} L ${elbowX} ${pinY} L ${pinX} ${pinY}`}
+              fill="none"
+              stroke={strokeColor}
+              strokeWidth={isSelected ? 2.5 : 1.8}
+              strokeDasharray={isSelected ? "none" : "4 2"}
+              className="transition-all duration-150"
+            />
 
-              return (
-                <g key={box.id}>
-                  {/* Bounding Rectangle */}
-                  <rect
-                    x={x}
-                    y={y}
-                    width={w}
-                    height={h}
-                    fill={isSelected ? "url(#hatch-red)" : `${strokeColor}14`}
-                    stroke={strokeColor}
-                    strokeWidth={isSelected ? 2.5 : 1.5}
-                    strokeDasharray={
-                      ev.category === "FONT_BASELINE_INCONSISTENCY"
-                        ? "4 2"
-                        : "none"
-                    }
-                    className="transition-all duration-150"
-                  />
+            {/* Pin Active Selection Halo */}
+            {isSelected && (
+              <circle
+                cx={pinX}
+                cy={pinY}
+                r={27}
+                fill="none"
+                stroke={strokeColor}
+                strokeWidth={2}
+                strokeDasharray="4 2"
+                className="animate-pulse opacity-75"
+              />
+            )}
 
-                  {/* Active Selection Glow Ring */}
-                  {isSelected && (
-                    <rect
-                      x={x - 4}
-                      y={y - 4}
-                      width={w + 8}
-                      height={h + 8}
-                      fill="none"
-                      stroke="#BA2518"
-                      strokeWidth={1.5}
-                      strokeDasharray="4 2"
-                      opacity={0.85}
-                      className="animate-pulse"
-                    />
-                  )}
+            {/* Numbered Pin Circular Badge */}
+            <circle
+              cx={pinX}
+              cy={pinY}
+              r={20}
+              fill={strokeColor}
+              stroke="#FFFFFF"
+              strokeWidth={2.5}
+              className="transition-transform duration-150 group-hover:scale-110 shadow-md"
+            />
 
+            {/* Pin Number / Label */}
+            <text
+              x={pinX}
+              y={pinY}
+              fill="#FFFFFF"
+              fontSize="16"
+              fontFamily="monospace"
+              fontWeight="bold"
+              textAnchor="middle"
+              dominantBaseline="central"
+              className="select-none pointer-events-none"
+            >
+              {pinLabel}
+            </text>
 
-                  {/* Corner Crosshairs */}
-                  <line
-                    x1={x - 4}
-                    y1={y}
-                    x2={x + 4}
-                    y2={y}
-                    stroke={strokeColor}
-                    strokeWidth={1}
-                  />
-                  <line
-                    x1={x}
-                    y1={y - 4}
-                    x2={x}
-                    y2={y + 4}
-                    stroke={strokeColor}
-                    strokeWidth={1}
-                  />
-
-                  {/* Label Tag on Top */}
-                  <g
-                    transform={`translate(${x}, ${Math.max(16, y - 4)})`}
-                    className="select-none"
-                  >
-                    <rect
-                      x={0}
-                      y={-14}
-                      width={Math.max(70, (box.label?.length || 10) * 6.5)}
-                      height={14}
-                      fill={strokeColor}
-                    />
-                    <text
-                      x={4}
-                      y={-3}
-                      fill="#FFFFFF"
-                      fontSize="9"
-                      fontFamily="monospace"
-                      fontWeight="bold"
-                    >
-                      {box.label || ev.ruleId}
-                    </text>
-                  </g>
-
-                  {/* Cross-Page Proof Target Jump Pill */}
-                  {(() => {
-                    const remoteEndpoint = ev.endpoints?.find(
-                      (ep) => ep.page !== currentPage
-                    );
-                    if (!remoteEndpoint) return null;
-                    return (
-                      <g
-                        className="cursor-pointer select-none"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSelectEvidence(ev.id);
-                          onNavigatePage?.(remoteEndpoint.page);
-                        }}
-                      >
-                        <rect
-                          x={x}
-                          y={y + h + 2}
-                          width={Math.max(130, (remoteEndpoint.label?.length || 10) * 5.2)}
-                          height={16}
-                          fill="#BA2518"
-                          rx={2}
-                          className="hover:fill-red-800 transition-colors"
-                        />
-                        <text
-                          x={x + 4}
-                          y={y + h + 13}
-                          fill="#FFFFFF"
-                          fontSize="8.5"
-                          fontFamily="monospace"
-                          fontWeight="bold"
-                        >
-                          [Proof Target: P.{remoteEndpoint.page} {remoteEndpoint.role === "stated" ? "Stated" : "Terminal"} ↗]
-                        </text>
-                      </g>
-                    );
-                  })()}
-
-                  {/* Bottom Baseline Projection on Selected Box */}
-                  {isSelected && (
-                    <g className="select-none pointer-events-none">
-                      <line
-                        x1={0}
-                        y1={y + h}
-                        x2={canvasWidth}
-                        y2={y + h}
-                        stroke={strokeColor}
-                        strokeWidth={1.2}
-                        strokeDasharray="6 3"
-                        opacity="0.8"
-                      />
-                      <rect
-                        x={canvasWidth - 145}
-                        y={Math.max(4, y + h - 18)}
-                        width={140}
-                        height={16}
-                        fill={strokeColor}
-                        rx={2}
-                      />
-                      <text
-                        x={canvasWidth - 140}
-                        y={Math.max(4, y + h - 18) + 11}
-                        fill="#FFFFFF"
-                        fontSize="9"
-                        fontFamily="monospace"
-                        fontWeight="bold"
-                      >
-                        BASELINE: {((y + h) * (72 / 150)).toFixed(1)} pt
-                      </text>
-                    </g>
-                  )}
-
-                  {/* Sub-pixel baseline ruler projection across the canvas */}
-                  {showRuler &&
-                    ev.category === "FONT_BASELINE_INCONSISTENCY" && (
-                      <g className="select-none pointer-events-none">
-                        {/* Reference Median Baseline Guide (Blue) */}
-                        <line
-                          x1={0}
-                          y1={y + h}
-                          x2={canvasWidth}
-                          y2={y + h}
-                          stroke="#1D4ED8"
-                          strokeWidth={1}
-                          strokeDasharray="6 3"
-                          opacity="0.8"
-                        />
-                        {/* Actual Offset Baseline (Red) */}
-                        <line
-                          x1={x - 20}
-                          y1={y + h + 4}
-                          x2={x + w + 20}
-                          y2={y + h + 4}
-                          stroke="#BA2518"
-                          strokeWidth={1.5}
-                          strokeDasharray="2 2"
-                        />
-                        <text
-                          x={x + w + 8}
-                          y={y + h + 3}
-                          fill="#BA2518"
-                          fontSize="10"
-                          fontFamily="monospace"
-                          fontWeight="bold"
-                        >
-                          {ev.discrepancy || "Δy: +2.50 pt"}
-                        </text>
-                      </g>
-                    )}
-                </g>
-              );
-            })}
+            {/* Non-intrusive Hover Tooltip */}
+            <title>{`Finding #${findingNum}: ${ev.title || ev.ruleId}`}</title>
           </g>
         );
+      })}
+
+      {/* Sub-pixel Baseline Projection on Active Selection */}
+      {pageEvidence.map((ev) => {
+        const isSelected = activeEvidenceId === ev.id;
+        if (!isSelected) return null;
+        const boxes = (ev.boundingBoxes || []).filter(
+          (b) => b.pageNumber === currentPage
+        );
+        const strokeColor = ev.severity === "CRITICAL" ? "#BA2518" : "#C27803";
+
+        return boxes.map((box) => {
+          const y = box.y;
+          const h = box.height;
+          return (
+            <g key={`proj-${box.id}`} className="select-none pointer-events-none">
+              <line
+                x1={0}
+                y1={y + h}
+                x2={canvasWidth}
+                y2={y + h}
+                stroke={strokeColor}
+                strokeWidth={1.5}
+                strokeDasharray="6 3"
+                opacity="0.8"
+              />
+              <rect
+                x={canvasWidth - 180}
+                y={Math.max(4, y + h - 24)}
+                width={175}
+                height={22}
+                fill={strokeColor}
+                rx={2}
+              />
+              <text
+                x={canvasWidth - 172}
+                y={Math.max(4, y + h - 24) + 15}
+                fill="#FFFFFF"
+                fontSize="14"
+                fontFamily="monospace"
+                fontWeight="bold"
+              >
+                BASELINE: {((y + h) * (72 / 150)).toFixed(1)} pt
+              </text>
+            </g>
+          );
+        });
       })}
     </svg>
   );

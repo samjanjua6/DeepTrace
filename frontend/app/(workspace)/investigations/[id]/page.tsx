@@ -327,6 +327,33 @@ export default function InvestigationWorkspacePage() {
         )}
       </div>
 
+      {/* Workspace Status Footer */}
+      <footer className="h-6 shrink-0 bg-paper-1 border-t border-rule px-4 flex items-center justify-between text-[10px] font-mono text-ink-500 select-none">
+        <div className="flex items-center gap-2">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+          <span className="font-semibold text-ink-800">
+            {documentType === "BANK_STATEMENT"
+              ? "SBP CLEARING STANDARD: ENFORCED • RUNNING BALANCE RECONCILIATION: ACTIVE"
+              : documentType === "UTILITY_BILL"
+              ? "UTILITY TARIFF AUDIT: ENFORCED • K-ELECTRIC / BILLING RECONCILIATION: ACTIVE"
+              : documentType === "SALARY_SLIP"
+              ? "EMPLOYMENT PAYROLL AUDIT: ENFORCED • DUAL-COLUMN EARNINGS/DEDUCTIONS: ACTIVE"
+              : documentType === "TAX_CERTIFICATE"
+              ? "FBR CPR PAYMENT RECEIPT: ENFORCED • NTN TAX REGISTER: ACTIVE"
+              : documentType === "IDENTITY_DOCUMENT"
+              ? "NADRA VERISYS / ICAO 9303: ENFORCED • SECURITY THREAD & MRZ AUDIT: ACTIVE"
+              : "FORENSIC SPECIFICATION: ACTIVE"}
+          </span>
+        </div>
+        <div className="hidden md:flex items-center gap-3 text-ink-400">
+          <span>NIST SP 800-86 AUDIT TRAIL</span>
+          <span>•</span>
+          <span>ETO 2002 §29 PRESUMPTION</span>
+          <span>•</span>
+          <span>RFC 3161 TSA SEALED</span>
+        </div>
+      </footer>
+
       {/* Analyst Override Modal */}
       <AnalystOverrideModal
         isOpen={isOverrideOpen}

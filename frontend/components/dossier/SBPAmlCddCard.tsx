@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { AlertTriangle, CheckCircle, ShieldAlert, ShieldCheck, UserCheck, UserX, FileWarning } from "lucide-react";
+import { AlertOctagon, AlertTriangle, CheckCircle, ShieldAlert, ShieldCheck, UserCheck, UserX, FileWarning } from "lucide-react";
 import { EvidenceItem, formatRecommendation } from "@/lib/types/forensics";
 
 interface MatchedEntity {
@@ -106,17 +106,17 @@ export function SBPAmlCddCard({ screening, evidence, onFocusCanvas }: SBPAmlCddC
           ) : (
             <ShieldAlert className="w-4 h-4 text-forensic-red flex-shrink-0" />
           )}
-          <span className="font-semibold text-ink-900 uppercase tracking-wider text-[10px]">
+          <span className="font-bold text-ink-900 uppercase tracking-wider text-[11px]">
             § 03B / SBP AML/CFT & CUSTOMER DUE DILIGENCE (CDD) AUDIT
           </span>
         </div>
         <span
-          className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider border rounded-none ${
+          className={`px-2.5 py-1 text-xs font-bold uppercase tracking-wider border rounded-none ${
             isClean
-              ? "bg-forensic-green/10 text-forensic-green border-forensic-green"
+              ? "bg-emerald-100 text-emerald-950 border-emerald-700/80"
               : effectiveStatus === "PEP_DETECTED"
-              ? "bg-amber-500/15 text-amber-800 border-amber-500/40"
-              : "bg-forensic-red text-white border-forensic-red"
+              ? "bg-amber-100 text-amber-950 border-amber-700/80"
+              : "bg-rose-100 text-rose-950 border-rose-700/80"
           }`}
         >
           {isClean
@@ -128,7 +128,7 @@ export function SBPAmlCddCard({ screening, evidence, onFocusCanvas }: SBPAmlCddC
       </div>
 
       {/* Statutory Mandate Citation */}
-      <div className="text-[10px] text-ink-500 uppercase tracking-wider">
+      <div className="text-[11px] text-ink-700 uppercase tracking-wider font-medium">
         Statutory Framework: SBP BPRD Circular No. 1/2021 • ATA 1997 §11EE • UNSC Act 1948
       </div>
 
@@ -236,7 +236,7 @@ export function SBPAmlCddCard({ screening, evidence, onFocusCanvas }: SBPAmlCddC
       {/* Detailed Matched Entities (if any adverse hit) */}
       {matchedEntities.length > 0 && (
         <div className="space-y-2 pt-1">
-          <span className="text-[10px] text-ink-500 uppercase tracking-wider block font-bold">
+          <span className="text-[11px] text-ink-700 uppercase tracking-wider block font-bold">
             Matched Regulatory Sanctions / PEP Records ({matchedEntities.length}):
           </span>
           {matchedEntities.map((m, idx) => {
@@ -244,38 +244,43 @@ export function SBPAmlCddCard({ screening, evidence, onFocusCanvas }: SBPAmlCddC
             return (
               <div
                 key={idx}
-                className={`p-3 border text-xs space-y-1.5 rounded-none ${
+                className={`p-3 border text-xs space-y-2 rounded-none ${
                   isCritical
-                    ? "bg-forensic-red/5 border-forensic-red/40 text-ink-900"
-                    : "bg-amber-500/5 border-amber-500/30 text-ink-900"
+                    ? "bg-rose-50/50 border-rose-700/60 text-ink-900"
+                    : "bg-amber-50/50 border-amber-600/60 text-ink-900"
                 }`}
               >
-                <div className="flex flex-wrap justify-between items-start gap-1">
+                <div className="flex flex-wrap justify-between items-start gap-1.5">
                   <div className="font-bold text-ink-900 text-xs">
                     {m.list_type.replace(/_/g, " ")}: {m.entity_name}
                   </div>
                   <span
-                    className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded-none border ${
+                    className={`px-2.5 py-1 text-xs font-bold uppercase rounded-none border inline-flex items-center gap-1.5 ${
                       isCritical
                         ? "bg-forensic-red text-white border-forensic-red"
-                        : "bg-amber-500/20 text-amber-900 border-amber-500/40"
+                        : "bg-amber-100 text-amber-950 border-amber-600"
                     }`}
                   >
+                    {isCritical ? (
+                      <AlertOctagon className="w-3.5 h-3.5 text-white shrink-0 stroke-[2.5]" />
+                    ) : (
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-900 shrink-0 stroke-[2.5]" />
+                    )}
                     {Math.round(m.match_score * 100)}% Confidence ({m.match_type})
                   </span>
                 </div>
 
-                <div className="text-[11px] text-ink-700 space-y-0.5">
-                  {m.role && <div><span className="text-ink-500">Designation / Role:</span> {m.role}</div>}
-                  {m.public_office && <div><span className="text-ink-500">Public Office:</span> {m.public_office}</div>}
+                <div className="text-[11px] text-ink-800 space-y-0.5">
+                  {m.role && <div><span className="text-ink-700 font-semibold">Designation / Role:</span> {m.role}</div>}
+                  {m.public_office && <div><span className="text-ink-700 font-semibold">Public Office:</span> {m.public_office}</div>}
                   {m.statutory_reference && (
-                    <div><span className="text-ink-500">Statutory Ground:</span> {m.statutory_reference}</div>
+                    <div><span className="text-ink-700 font-semibold">Statutory Ground:</span> {m.statutory_reference}</div>
                   )}
-                  {m.unsc_id && <div><span className="text-ink-500">UN Committee Reference:</span> {m.unsc_id}</div>}
+                  {m.unsc_id && <div><span className="text-ink-700 font-semibold">UN Committee Reference:</span> {m.unsc_id}</div>}
                 </div>
 
-                <div className="pt-1 border-t border-rule/40 flex justify-between items-center text-[10px]">
-                  <span className="text-ink-500 uppercase">Forensic Recommendation:</span>
+                <div className="pt-1.5 border-t border-rule/60 flex justify-between items-center text-[11px]">
+                  <span className="text-ink-700 font-semibold uppercase">Forensic Recommendation:</span>
                   <span className="font-bold text-forensic-red">{formatRecommendation(m.action_directive)}</span>
                 </div>
               </div>
@@ -298,12 +303,12 @@ export function SBPAmlCddCard({ screening, evidence, onFocusCanvas }: SBPAmlCddC
 
         return (
           <div className="space-y-2 pt-1">
-            <span className="text-[10px] text-ink-500 uppercase tracking-wider block font-bold">
+            <span className="text-[11px] text-ink-700 uppercase tracking-wider block font-bold">
               {headerTitle}:
             </span>
             <div className="border border-rule divide-y divide-rule rounded-none max-h-64 overflow-y-auto">
               {narrationFlags.slice(0, 10).map((n, idx) => (
-                <div key={idx} className="p-2 bg-paper-1 text-[11px] flex justify-between items-center gap-2">
+                <div key={idx} className="p-2.5 bg-paper-1 text-xs flex justify-between items-center gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-ink-900">{n.narration}</span>
@@ -316,14 +321,14 @@ export function SBPAmlCddCard({ screening, evidence, onFocusCanvas }: SBPAmlCddC
                               onFocusCanvas(n.page_number);
                             }
                           }}
-                          className="text-[9px] px-1.5 py-0.5 bg-paper-2 hover:bg-ink-900 hover:text-white text-ink-900 border border-rule transition-colors font-mono font-bold cursor-pointer"
+                          className="text-[11px] px-2 py-0.5 bg-paper-2 hover:bg-ink-900 hover:text-white text-ink-900 border border-rule transition-colors font-mono font-bold cursor-pointer"
                           title={`Jump to Page ${n.page_number || 1}${n.row_number ? `, Row ${n.row_number}` : ""}`}
                         >
                           P.{n.page_number || 1}{n.row_number ? ` R.${n.row_number}` : ""} ↗
                         </button>
                       )}
                     </div>
-                    <span className="text-[10px] text-forensic-red block mt-0.5">
+                    <span className="text-[11px] text-forensic-red font-semibold block mt-0.5">
                       Triggered Keyword: &quot;{n.matched_term}&quot; ({n.category})
                     </span>
                   </div>
@@ -341,8 +346,8 @@ export function SBPAmlCddCard({ screening, evidence, onFocusCanvas }: SBPAmlCddC
 
       {/* Action Directive Summary Callout */}
       {!isClean ? (
-        <div className="bg-forensic-red/10 border border-forensic-red/30 p-3 text-xs font-mono space-y-1 rounded-none">
-          <div className="flex items-center gap-1.5 text-forensic-red font-bold uppercase text-[10px]">
+        <div className="bg-forensic-red/10 border border-forensic-red/30 p-3 text-xs font-mono space-y-1.5 rounded-none">
+          <div className="flex items-center gap-1.5 text-forensic-red font-bold uppercase text-[11px]">
             <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
             <span>SBP STATUTORY COMPLIANCE DIRECTIVE</span>
           </div>
