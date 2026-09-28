@@ -177,7 +177,6 @@ export function AgentStatusBadge({
       {/* 4 Agent Cards Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         {agents.map((agent) => {
-          const Icon = agent.icon;
           const isActive = agent.status === "active";
           return (
             <div

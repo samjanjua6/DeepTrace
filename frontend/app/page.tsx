@@ -1,15 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
 import { Masthead } from "@/components/editorial/Masthead";
 import { FolioTag } from "@/components/editorial/FolioTag";
 import { HairlineRule } from "@/components/editorial/HairlineRule";
 import { useAuth } from "@/context/AuthContext";
-import { ArrowRight, ShieldCheck, Cpu, Sliders, FileCode } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 export default function EditorialHomePage() {
-  const [sliderPos, setSliderPos] = useState<number>(50);
   const { isAuthenticated } = useAuth();
 
   return (

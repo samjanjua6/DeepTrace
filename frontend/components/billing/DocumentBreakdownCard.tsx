@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { FileText, Layers, PieChart } from "lucide-react";
+import { FileText, Layers } from "lucide-react";
 
 interface DocumentBreakdownCardProps {
   breakdown: Record<string, number>;

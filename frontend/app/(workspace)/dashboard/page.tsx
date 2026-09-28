@@ -4,7 +4,6 @@ import React, { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { Masthead } from "@/components/editorial/Masthead";
 import { FolioTag } from "@/components/editorial/FolioTag";
-import { HairlineRule } from "@/components/editorial/HairlineRule";
 import { useAuth } from "@/context/AuthContext";
 import { getDashboardMetrics } from "@/lib/api/client";
 import { DashboardMetrics, formatRecommendation } from "@/lib/types/forensics";
@@ -16,14 +15,8 @@ import {
   FileText,
   RotateCcw,
   ArrowRight,
-  TrendingUp,
-  Activity,
   AlertTriangle,
-  CheckCircle2,
   Lock,
-  Layers,
-  Sparkles,
-  ExternalLink,
 } from "lucide-react";
 
 export default function ExecutiveDashboardPage() {
@@ -71,14 +64,6 @@ export default function ExecutiveDashboardPage() {
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
   }, []);
-
-  // Format stage names into clean display labels
-  const formatStageName = (raw: string): string => {
-    return raw
-      .replace(/_/g, " ")
-      .toLowerCase()
-      .replace(/\b\w/g, (c) => c.toUpperCase());
-  };
 
   // Quota bar color logic
   const quotaColor = useMemo(() => {

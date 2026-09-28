@@ -24,7 +24,7 @@ export const RECOMMENDATION_MAP: Record<string, string> = {
   ENHANCED_DUE_DILIGENCE: "Recommend: Enhanced Due Diligence / Compliance Review",
 };
 
-export function formatRecommendation(directive?: string | null, tier?: string | null): string {
+export function formatRecommendation(directive?: string | null, _tier?: string | null): string {
   if (!directive) return "Recommend: Operational Verification";
   const norm = directive.trim().toUpperCase();
   if (RECOMMENDATION_MAP[norm]) {

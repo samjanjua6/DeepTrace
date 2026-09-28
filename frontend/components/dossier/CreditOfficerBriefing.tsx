@@ -82,7 +82,7 @@ export function CreditOfficerBriefing({
   actionDirective,
   evidenceItems,
   authenticityScore,
-  tamperScore,
+  tamperScore: _tamperScore,
   authenticityTier,
   transactionRiskScore,
   transactionRiskTier,
@@ -90,20 +90,18 @@ export function CreditOfficerBriefing({
   overriddenTier,
   overrideReason,
   overriddenById,
-  overriddenAt,
-  onFocusCanvas,
-  onSelectEvidence,
+  overriddenAt: _overriddenAt,
+  onFocusCanvas: _onFocusCanvas,
+  onSelectEvidence: _onSelectEvidence,
 }: CreditOfficerBriefingProps) {
   const [activeLang, setActiveLang] = useState<"en" | "ur">("en");
   const [copied, setCopied] = useState(false);
   const [analysis, setAnalysis] = useState<LeadInvestigatorAnalysis | null>(null);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!investigationId || investigationId === "sample") return;
 
     let isMounted = true;
-    setLoading(true);
 
     fetch(`/api/v1/investigations/${investigationId}/analysis`)
       .then((res) => {
@@ -117,9 +115,6 @@ export function CreditOfficerBriefing({
       })
       .catch((err) => {
         console.warn("Could not fetch lead investigator analysis:", err);
-      })
-      .finally(() => {
-        if (isMounted) setLoading(false);
       });
 
     return () => {
@@ -131,11 +126,6 @@ export function CreditOfficerBriefing({
     analysis?.authenticity_score ??
     authenticityScore ??
     Math.max(0, 100 - overallScore);
-
-  const effectiveTamperScore =
-    analysis?.tamper_score ??
-    tamperScore ??
-    overallScore;
 
   const effectiveAuthTier =
     analysis?.authenticity_tier ??
@@ -172,23 +162,6 @@ export function CreditOfficerBriefing({
   const adverseEvidence = evidenceItems.filter(
     (it) => it.severity !== "INFO" && !it.ruleId?.endsWith("_VERIFIED")
   );
-  const verifiedEvidence = evidenceItems.filter(
-    (it) => it.severity === "INFO" || it.ruleId?.endsWith("_VERIFIED")
-  );
-
-  const advisoryEn =
-    effectiveTamperScore > 0 && effectiveTxnScore > 0
-      ? "Compound Forensic & Compliance Alert: Severe document tampering detected alongside statutory AML/CFT violations. Financial figures have been artificially manipulated post-generation, and transactional counterparties trigger regulatory red flags. Recommend loan rejection and compliance escalation to fraud unit."
-      : effectiveTamperScore > 0
-      ? "Credit Risk Advisory: The financial figures in this statement have been artificially inflated or modified post-generation. Document authenticity is compromised. Recommend halting loan application pending formal verification."
-      : "Statutory AML/CFT Compliance Advisory: The document is genuine with verified typographical and ledger consistency; however, high-risk transactional patterns (SBP AML/CFT / FATF red flags) were detected. Recommend forwarding docket to AML Compliance for Enhanced Due Diligence (EDD) without alleging document tampering.";
-
-  const advisoryUr =
-    effectiveTamperScore > 0 && effectiveTxnScore > 0
-      ? "مشترکہ فرانزک و تعمیل انتباہ: دستاویز میں جعل سازی اور اسٹیٹ بینک AML/CFT کے ضوابط کی سنگین خلاف ورزی پائی گئی ہے۔ اعداد و شمار میں غیر قانونی ردوبدل پایا گیا ہے اور ممنوعہ عناصر شامل ہیں۔ درخواست مسترد کرنے اور اینٹی فراڈ یونٹ کو بھیجنے کی سفارش کی جاتی ہے۔"
-      : effectiveTamperScore > 0
-      ? "کریڈٹ رسک ایڈوائزری: اس بینک سٹیٹمنٹ کے اعداد و شمار میں سافٹ ویئر کے ذریعے ردوبدل کر کے بیلنس تبدیل کیا گیا ہے۔ دستاویز کی اصلیت مشکوک ہے، لہٰذا درخواست مسترد کرنے یا سینیئر کمیٹی کو برائے فیصلہ پیش کرنے کی سفارش کی جاتی ہے۔"
-      : "اسٹیٹ بینک ضوابط و AML ایڈوائزری: دستاویز کی ساخت اور کھاتہ جاتی تسلسل درست اور مصدقہ ہے، البتہ کھاتے دار کے لین دین میں مشکوک ٹرانزیکشنز پائی گئی ہیں۔ اسے جعل سازی کے بجائے منی لانڈرنگ انکوائری کے لیے بھیجنے کی سفارش کی جاتی ہے۔";
 
   const overrideNoteEn = isOverridden
     ? `\n\n[HUMAN ADJUDICATION AUDIT NOTICE]: Automated risk score of ${overallScore}/100 (${riskTier}) was manually adjudicated to ${effectiveScore}/100 (${effectiveTier}) by officer ${overriddenById || "Authorized Officer"}.\nCompliance Justification: "${overrideReason || "Documented branch operational review cleared discrepancy."}"`

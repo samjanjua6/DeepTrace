@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { AlertOctagon, AlertTriangle, CheckCircle, ShieldAlert, ShieldCheck, UserCheck, UserX, FileWarning } from "lucide-react";
+import { AlertOctagon, AlertTriangle, CheckCircle, ShieldAlert, ShieldCheck } from "lucide-react";
 import { EvidenceItem, formatRecommendation } from "@/lib/types/forensics";
 
 interface MatchedEntity {

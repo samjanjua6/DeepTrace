@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Download, Receipt, CheckCircle2, ShieldCheck, FileSpreadsheet } from "lucide-react";
+import { Download, Receipt, CheckCircle2, ShieldCheck } from "lucide-react";
 import { BillingStatement } from "@/lib/types/forensics";
 
 interface BillingHistoryTableProps {
@@ -15,7 +15,7 @@ export function BillingHistoryTable({
   currentTier,
   monthlyLimit,
   monthlyUsed,
-  billingCycleStart,
+  billingCycleStart: _billingCycleStart,
 }: BillingHistoryTableProps) {
   // Generate realistic historical billing statements based on active organization data
   const statements: BillingStatement[] = [

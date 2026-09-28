@@ -4,8 +4,6 @@ import React, { useEffect, useState } from "react";
 import {
   X,
   History,
-  CheckCircle2,
-  AlertCircle,
   RotateCcw,
   Loader2,
   ChevronDown,

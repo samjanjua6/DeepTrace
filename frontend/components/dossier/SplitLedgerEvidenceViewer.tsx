@@ -6,15 +6,10 @@ import { EvidenceItem, LedgerRow } from "@/lib/types/forensics";
 import {
   AlertTriangle,
   CheckCircle2,
-  Filter,
   Search,
   Crosshair,
   Type,
   Calculator,
-  ChevronDown,
-  ChevronUp,
-  ArrowUpRight,
-  Sparkles,
 } from "lucide-react";
 
 interface SplitLedgerEvidenceViewerProps {
@@ -112,7 +107,6 @@ export function SplitLedgerEvidenceViewer({
 
   // Financial summary metrics
   const statedOpening = financialData?.stated_opening;
-  const impliedOpening = financialData?.implied_opening;
   const statedClosing = financialData?.stated_closing;
   const impliedClosing = financialData?.implied_closing;
   const closingDiscrepancy = financialData?.closing_discrepancy;

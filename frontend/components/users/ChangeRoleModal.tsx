@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, ShieldAlert, Shield, Check, AlertCircle, Loader2, UserCheck } from "lucide-react";
+import { X, ShieldAlert, Shield, AlertCircle, Loader2, UserCheck } from "lucide-react";
 import { updateUserRole } from "@/lib/api/client";
 import { OrgMemberItem, OrgUserRole } from "@/lib/types/forensics";
 import { useFocusTrap } from "@/lib/hooks/useFocusTrap";

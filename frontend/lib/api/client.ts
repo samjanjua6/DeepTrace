@@ -6,7 +6,6 @@ import {
   RiskAssessment,
   PipelineRun,
   CustodyEvent,
-  AgentMessage,
   AskResponse,
   AgentSessionInfo,
   AskHistoryResponse,

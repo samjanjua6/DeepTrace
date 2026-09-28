@@ -9,13 +9,10 @@ import {
   Trash2,
   Shield,
   ShieldAlert,
-  Clock,
-  CheckCircle2,
   AlertTriangle,
   RotateCcw,
   Loader2,
   ArrowLeft,
-  ExternalLink,
 } from "lucide-react";
 import { getApiKeys } from "@/lib/api/client";
 import { ApiKeyItem, ApiKeyCreatedResponse } from "@/lib/types/forensics";

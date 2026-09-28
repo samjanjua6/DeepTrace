@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Sparkles, ArrowUpRight, ShieldCheck, Check, Database, Zap } from "lucide-react";
+import { Sparkles, ArrowUpRight, Check } from "lucide-react";
 
 interface SubscriptionTierCardProps {
   currentTier: string;
@@ -59,7 +59,7 @@ const TIER_DESCRIPTIONS: Record<string, { label: string; tag: string; descriptio
 
 export function SubscriptionTierCard({
   currentTier,
-  monthlyLimit,
+  monthlyLimit: _monthlyLimit,
   isAdmin,
   onOpenUpgrade,
 }: SubscriptionTierCardProps) {

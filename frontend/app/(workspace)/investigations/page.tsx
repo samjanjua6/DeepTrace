@@ -9,7 +9,6 @@ import { getInvestigations } from "@/lib/api/client";
 import { formatDatePKT } from "@/lib/formatters";
 import { formatRecommendation } from "@/lib/types/forensics";
 import {
-  AlertTriangle,
   RotateCcw,
   FileText,
   Loader2,

@@ -19,7 +19,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   XCircle,
-  ExternalLink,
 } from "lucide-react";
 import { getWebhooks, deleteWebhook, getWebhookSecret } from "@/lib/api/client";
 import {

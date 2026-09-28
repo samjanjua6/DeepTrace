@@ -6,7 +6,6 @@ import { useAuth } from "@/context/AuthContext";
 import {
   Users,
   UserPlus,
-  Shield,
   ShieldAlert,
   ShieldCheck,
   RotateCcw,
@@ -21,9 +20,6 @@ import {
   Scale,
   X,
   AlertCircle,
-  Clock,
-  UserX,
-  UserCheck,
 } from "lucide-react";
 import {
   getOrgUsers,
@@ -31,7 +27,7 @@ import {
   unlockUserAccount,
   resetUserMfa,
 } from "@/lib/api/client";
-import { OrgMemberItem, OrgUserRole } from "@/lib/types/forensics";
+import { OrgMemberItem } from "@/lib/types/forensics";
 import { InviteUserModal } from "@/components/users/InviteUserModal";
 import { ChangeRoleModal } from "@/components/users/ChangeRoleModal";
 import { RolePermissionMatrixModal } from "@/components/users/RolePermissionMatrixModal";

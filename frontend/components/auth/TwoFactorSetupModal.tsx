@@ -12,7 +12,6 @@ import {
   Check,
   RefreshCw,
   KeyRound,
-  Lock,
   AlertTriangle,
   Smartphone,
 } from "lucide-react";

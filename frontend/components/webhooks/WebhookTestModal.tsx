@@ -4,12 +4,8 @@ import React, { useState } from "react";
 import {
   X,
   Play,
-  CheckCircle2,
-  AlertCircle,
   Loader2,
-  Terminal,
   Clock,
-  ShieldCheck,
 } from "lucide-react";
 import { testWebhookEndpoint } from "@/lib/api/client";
 import { WebhookEndpointItem, WebhookTestResult } from "@/lib/types/forensics";

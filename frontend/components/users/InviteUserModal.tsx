@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, UserPlus, Key, Copy, Check, ShieldCheck, AlertCircle, Loader2, FileText, Lock } from "lucide-react";
+import { X, UserPlus, Copy, Check, ShieldCheck, AlertCircle, Loader2, FileText, Lock } from "lucide-react";
 import { inviteOrgUser } from "@/lib/api/client";
 import { InviteUserResponse, OrgUserRole } from "@/lib/types/forensics";
 import { useFocusTrap } from "@/lib/hooks/useFocusTrap";

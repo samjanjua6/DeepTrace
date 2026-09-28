@@ -1,12 +1,10 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import {
-  Gauge,
   Building2,
-  Receipt,
   Sparkles,
   RotateCcw,
   Loader2,
@@ -14,10 +12,6 @@ import {
   AlertTriangle,
   ArrowLeft,
   Settings,
-  Layers,
-  ArrowUpRight,
-  Clock,
-  CheckCircle2,
 } from "lucide-react";
 import { getOrganization, getOrganizationUsage } from "@/lib/api/client";
 import { OrganizationDetails, OrganizationUsageStats } from "@/lib/types/forensics";

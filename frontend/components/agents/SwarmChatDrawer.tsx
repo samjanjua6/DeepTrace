@@ -7,7 +7,6 @@ import {
   Sparkles,
   Download,
   Trash2,
-  RefreshCw,
   Loader2,
   AlertCircle,
   HelpCircle,

@@ -24,7 +24,7 @@ export function BoundingBoxLayer({
   canvasHeight,
   activeEvidenceId,
   onSelectEvidence,
-  onNavigatePage,
+  onNavigatePage: _onNavigatePage,
   showRuler,
   mousePos,
   pinnedBaselines = [],

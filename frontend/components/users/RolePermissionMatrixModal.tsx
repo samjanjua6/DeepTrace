@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { X, Shield, Check, Minus, FileCheck, Scale } from "lucide-react";
+import { X, Shield, Check, Minus, Scale } from "lucide-react";
 
 interface RolePermissionMatrixModalProps {
   isOpen: boolean;
