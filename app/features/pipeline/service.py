@@ -272,9 +272,9 @@ async def trigger_pipeline(
             data={"status": "PROCESSING"},
         )
 
-    # Dispatch: Check Celery / Redis availability
-    if is_redis_available():
-        logger.info(f"Redis reachable. Dispatching pipeline run {pipeline_run.id} to Celery worker queue")
+    # Dispatch: Check if Celery pipeline is explicitly enabled AND Redis is reachable
+    if getattr(settings, "enable_celery_pipeline", False) and is_redis_available():
+        logger.info(f"Celery dispatch enabled. Dispatching pipeline run {pipeline_run.id} to Celery worker queue")
         if use_canvas_chain:
             # Granular stage-by-stage Celery canvas chain
             chain_workflow = build_celery_canvas_chain(
@@ -293,7 +293,7 @@ async def trigger_pipeline(
                 queue="pipeline",
             )
     else:
-        logger.info(f"Redis offline. Executing pipeline run {pipeline_run.id} via in-process async worker")
+        logger.info(f"Executing pipeline run {pipeline_run.id} via in-process async worker (non-blocking)")
         asyncio.create_task(
             run_pipeline_inline(pipeline_run.id, org_id, investigation_id, document_id)
         )

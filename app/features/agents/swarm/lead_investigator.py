@@ -558,7 +558,12 @@ async def _call_groq_llm(
             logger.info("Dispatching forensic synthesis to Groq LLM model: %s", model)
             from groq import AsyncGroq
 
-            client = AsyncGroq(api_key=key, base_url=base_url)
+            clean_base_url = (
+                base_url.replace("/openai/v1", "").rstrip("/")
+                if base_url
+                else None
+            )
+            client = AsyncGroq(api_key=key, base_url=clean_base_url) if clean_base_url else AsyncGroq(api_key=key)
             completion = await client.chat.completions.create(
                 model=model,
                 messages=[

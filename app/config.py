@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     celery_broker_url: str = "redis://localhost:6379/1"
     celery_result_backend: str = "redis://localhost:6379/2"
+    enable_celery_pipeline: bool = False
 
     # ── Object Storage ───────────────────────────────────────────────────────
     s3_endpoint_url: str | None = None  # None = real AWS S3
@@ -66,7 +67,7 @@ class Settings(BaseSettings):
     groq_api_key: str | None = None
     groq_model_primary: str = "gpt-oss-120b"
     groq_model_fallback: str = "gpt-oss-20b"
-    groq_api_base_url: str = "https://api.groq.com/openai/v1"
+    groq_api_base_url: str = "https://api.groq.com"
     google_gemini_api_key: str | None = None
     anthropic_api_key: str | None = None
 
