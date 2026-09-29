@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import { initiateSso, SsoInitiateResponse } from "@/lib/api/client";
-import { ExternalLink, KeyRound, CheckCircle2 } from "lucide-react";
+import { ExternalLink, CheckCircle2 } from "lucide-react";
 
 interface SsoFederationModalProps {
   isOpen: boolean;
@@ -20,35 +19,38 @@ export function SsoFederationModal({
   defaultDomain = "",
 }: SsoFederationModalProps) {
   const [selectedProvider, setSelectedProvider] = useState<string>("azure_ad");
-  const [domain, setDomain] = useState<string>(defaultDomain);
+  const [domain, setDomain] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [ssoResult, setSsoResult] = useState<SsoInitiateResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Sync domain only if a genuine enterprise domain is passed
+  useEffect(() => {
+    if (defaultDomain && !defaultDomain.includes("internal") && !defaultDomain.includes("platform")) {
+      setDomain(defaultDomain);
+    } else {
+      setDomain("");
+    }
+  }, [defaultDomain, isOpen]);
 
   const providers = [
     {
       id: "azure_ad",
       name: "Microsoft Entra ID (Azure AD)",
-      protocol: "SAML 2.0 / WS-FED",
-      recommended: true,
-      description:
-        "Direct SAML 2.0 & OIDC federation with enterprise Azure Active Directory tenants for Pakistani core banks.",
+      protocol: "SAML 2.0",
+      description: "Direct SAML & OIDC federation for enterprise bank directories.",
     },
     {
       id: "okta",
       name: "Okta Identity Cloud",
-      protocol: "OIDC / SAML 2.0",
-      recommended: false,
-      description:
-        "Automated SCIM user provisioning and hardware security token authentication (FIDO2 / WebAuthn).",
+      protocol: "OIDC",
+      description: "Cloud identity and multi-factor hardware token authentication.",
     },
     {
       id: "saml",
-      name: "Institutional SAML 2.0 / ADFS",
-      protocol: "SAML 2.0 (ETO 2002)",
-      recommended: false,
-      description:
-        "On-premise Active Directory Federation Services (ADFS) or Shibboleth IdP connector.",
+      name: "Institutional SAML / ADFS",
+      protocol: "SAML 2.0",
+      description: "On-premise Active Directory Federation Services or Shibboleth.",
     },
   ];
 
@@ -73,7 +75,6 @@ export function SsoFederationModal({
 
   const handleProceedRedirect = () => {
     if (ssoResult?.sso_url) {
-      // In production, redirects to the institutional IdP
       window.location.href = ssoResult.sso_url;
     }
   };
@@ -82,20 +83,20 @@ export function SsoFederationModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      category="ENTERPRISE WORKFORCE FEDERATION"
-      title="Single Sign-On (SSO) Directory Gateway"
-      maxWidth="xl"
+      category="Enterprise Authentication"
+      title="Single Sign-On (SSO)"
+      maxWidth="lg"
     >
       {!ssoResult ? (
-        <form onSubmit={handleInitiateSso} className="space-y-4 font-mono text-xs select-none">
-          <p className="text-xs text-ink-700 leading-relaxed">
-            Federate your institutional session using SAML 2.0, Active Directory, or Okta Identity Cloud in compliance with SBP Enterprise Cyber Security Framework.
+        <form onSubmit={handleInitiateSso} className="space-y-4 font-sans text-xs select-none">
+          <p className="text-xs text-ink-600 leading-relaxed">
+            Sign in using your organization&apos;s identity provider.
           </p>
 
           {/* Provider Selection */}
           <div className="space-y-2">
-            <label className="block text-[11px] font-bold text-ink-700 uppercase tracking-wider">
-              Select Enterprise Identity Provider:
+            <label className="block text-[11px] font-mono font-bold text-ink-700 uppercase tracking-wider">
+              Identity Provider
             </label>
             <div className="space-y-2">
               {providers.map((p) => {
@@ -104,26 +105,32 @@ export function SsoFederationModal({
                   <div
                     key={p.id}
                     onClick={() => setSelectedProvider(p.id)}
-                    className={`p-3 border-2 transition-all cursor-pointer ${
+                    className={`p-3 border transition-colors cursor-pointer flex items-center justify-between gap-3 ${
                       isSelected
-                        ? "border-ink-900 bg-paper-1 shadow-sm"
+                        ? "border-ink-900 bg-paper-1"
                         : "border-rule bg-paper-0 hover:bg-paper-1/60"
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <KeyRound className="w-3.5 h-3.5 text-ink-900 shrink-0" />
-                        <span className="font-bold text-ink-900 text-xs uppercase">
-                          {p.name}
-                        </span>
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                          isSelected ? "border-ink-900" : "border-ink-300"
+                        }`}
+                      >
+                        {isSelected && <div className="w-2 h-2 rounded-full bg-ink-900" />}
                       </div>
-                      <Badge variant={isSelected ? "inverse" : "neutral"} size="xs">
-                        {p.protocol}
-                      </Badge>
+                      <div>
+                        <div className="font-semibold text-ink-900 text-xs">
+                          {p.name}
+                        </div>
+                        <p className="text-[11px] text-ink-500 mt-0.5">
+                          {p.description}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-[11px] text-ink-600 leading-snug">
-                      {p.description}
-                    </p>
+                    <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 border border-rule text-ink-600 bg-paper-0 shrink-0">
+                      {p.protocol}
+                    </span>
                   </div>
                 );
               })}
@@ -132,47 +139,51 @@ export function SsoFederationModal({
 
           {/* Institutional Domain Input */}
           <div>
-            <label htmlFor="sso-domain" className="block text-[11px] font-bold text-ink-700 uppercase tracking-wider mb-1">
-              Institutional Email Domain (Optional for Auto-Routing):
+            <label
+              htmlFor="sso-domain"
+              className="block text-[11px] font-mono font-bold text-ink-700 uppercase tracking-wider mb-1"
+            >
+              Organization Domain (Optional)
             </label>
             <Input
               id="sso-domain"
               type="text"
-              placeholder="e.g. meezanbank.com, hbl.com, ubl.com.pk"
+              placeholder="e.g. meezanbank.com, hbl.com"
               value={domain}
               onChange={(e) => setDomain(e.target.value)}
             />
             <span className="text-[11px] text-ink-500 mt-1 block">
-              Directs SAML AuthnRequest to your bank&apos;s dedicated single sign-on realm.
+              Auto-routes authentication to your organization&apos;s dedicated realm.
             </span>
           </div>
 
           {error && (
-            <div className="p-2.5 bg-forensic-red/10 border border-forensic-red/40 text-forensic-red text-[11px]">
+            <div className="p-2.5 bg-forensic-red/10 border border-forensic-red/40 text-forensic-red text-xs font-mono">
               {error}
             </div>
           )}
 
-          <div className="pt-3 border-t border-rule flex items-center justify-end gap-3">
-            <Button type="button" variant="secondary" onClick={onClose}>
+          <div className="pt-3 border-t border-rule flex items-center justify-end gap-2.5">
+            <Button type="button" variant="secondary" size="md" onClick={onClose}>
               Cancel
             </Button>
             <Button
               type="submit"
               variant="primary"
+              size="md"
               isLoading={isLoading}
               rightIcon={<ExternalLink className="w-3.5 h-3.5" />}
             >
-              Initiate SSO Handshake
+              Continue with SSO
             </Button>
           </div>
         </form>
       ) : (
         <div className="space-y-4 font-mono text-xs select-none">
-          <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-900 space-y-1">
+          <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-900 space-y-1 font-sans">
             <div className="flex items-center gap-2 font-bold text-xs uppercase">
               <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
-              <span>SAML 2.0 / OAuth2 Handshake Ready</span>
+              <span>Identity Provider Handshake Ready</span>
             </div>
             <p className="text-[11px] text-emerald-800 leading-relaxed">
               {ssoResult.message}
@@ -181,23 +192,17 @@ export function SsoFederationModal({
 
           <div className="bg-paper-1 border border-rule p-3 space-y-2 text-[11px]">
             <div className="flex justify-between">
-              <span className="text-ink-500 uppercase text-[11px]">Identity Provider:</span>
+              <span className="text-ink-500 uppercase">Provider:</span>
               <strong className="text-ink-900 uppercase">{ssoResult.provider}</strong>
             </div>
             <div className="flex justify-between">
-              <span className="text-ink-500 uppercase text-[11px]">Protocol:</span>
+              <span className="text-ink-500 uppercase">Protocol:</span>
               <strong className="text-ink-900">{ssoResult.protocol}</strong>
             </div>
             <div className="flex flex-col gap-0.5">
-              <span className="text-ink-500 uppercase text-[11px]">Service Provider Entity ID:</span>
-              <span className="text-ink-900 font-bold break-all bg-paper-0 p-1 border border-rule text-[11px]">
+              <span className="text-ink-500 uppercase">Entity ID:</span>
+              <span className="text-ink-900 font-bold break-all bg-paper-0 p-1 border border-rule">
                 {ssoResult.entity_id}
-              </span>
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <span className="text-ink-500 uppercase text-[11px]">Target IdP Authorization URL:</span>
-              <span className="text-ink-900 font-bold break-all bg-paper-0 p-1 border border-rule text-[11px]">
-                {ssoResult.sso_url}
               </span>
             </div>
           </div>
@@ -209,15 +214,16 @@ export function SsoFederationModal({
               size="sm"
               onClick={() => setSsoResult(null)}
             >
-              ← Choose Different Provider
+              ← Back
             </Button>
             <div className="flex items-center gap-2">
-              <Button type="button" variant="secondary" onClick={onClose}>
+              <Button type="button" variant="secondary" size="sm" onClick={onClose}>
                 Close
               </Button>
               <Button
                 type="button"
                 variant="primary"
+                size="sm"
                 onClick={handleProceedRedirect}
                 rightIcon={<ExternalLink className="w-3.5 h-3.5" />}
               >
