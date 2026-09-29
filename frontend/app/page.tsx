@@ -139,17 +139,19 @@ export default function EditorialHomePage() {
               </div>
 
               {/* Row 3 (The Tampered Row) */}
-              <div className="relative flex justify-between items-center py-3 bg-forensic-red/5 border border-forensic-red/30 px-3">
+              <div className="relative flex justify-between items-center py-3.5 bg-forensic-red/5 border border-forensic-red/30 px-3">
                 <span className="w-24">12/03/2026</span>
                 <span className="flex-1">Counter Cash Withdrawal</span>
                 <span className="w-32 text-right text-ink-500">Debit: 75,000.00</span>
 
-                <div className="w-32 text-right relative">
-                  <span className="font-bold text-forensic-red text-sm tracking-tight">
-                    25,00,000.00
-                  </span>
-                  {/* Bounding box marker */}
-                  <div className="absolute -inset-1 border-2 border-forensic-red pointer-events-none" />
+                <div className="w-32 text-right flex justify-end items-center">
+                  <div className="relative inline-flex items-center px-1.5 py-0.5">
+                    <span className="font-bold text-forensic-red text-sm tracking-tight font-mono">
+                      25,00,000.00
+                    </span>
+                    {/* Forensic Bounding box marker */}
+                    <div className="absolute inset-0 border-2 border-forensic-red pointer-events-none" />
+                  </div>
                 </div>
               </div>
             </div>
