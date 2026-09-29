@@ -4,7 +4,6 @@ import React, { useState, useEffect, useRef, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { TenantBrandHeader, TenantIdentity } from "@/components/auth/TenantBrandHeader";
-import { SecurityComplianceBanner } from "@/components/auth/SecurityComplianceBanner";
 import { SsoFederationModal } from "@/components/auth/SsoFederationModal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -14,8 +13,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   KeyRound,
-  Check,
-  X,
 } from "lucide-react";
 
 // Client-side RFC 6238 TOTP helper for testing seeded account (JBSWY3DPEHPK3PXP)
@@ -31,12 +28,7 @@ function getClientTotp(secret = "JBSWY3DPEHPK3PXP"): string {
   return String(code).padStart(6, "0");
 }
 
-// Regex patterns for client-side institutional validation
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-const PWD_UPPERCASE_REGEX = /[A-Z]/;
-const PWD_LOWERCASE_REGEX = /[a-z]/;
-const PWD_NUMBER_REGEX = /[0-9]/;
-const PWD_SPECIAL_REGEX = /[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\\/]/;
 
 function LoginFormContent() {
   const router = useRouter();
@@ -57,7 +49,6 @@ function LoginFormContent() {
   const [timeStr, setTimeStr] = useState<string>("");
   const [presetNotice, setPresetNotice] = useState<string | null>(null);
   const [isSsoModalOpen, setIsSsoModalOpen] = useState<boolean>(false);
-  const [hasInteractedWithPassword, setHasInteractedWithPassword] = useState<boolean>(false);
 
   const digitRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -163,65 +154,39 @@ function LoginFormContent() {
 
     // Default Central Clearance Enclave
     return {
-      name: "Central Institutional Clearance Enclave",
+      name: "DeepTrace Forensic Platform",
       slug: "platform-default",
       domain: "central.deeptrace.internal",
-      tier: "SBP BPRD ENCLAVE",
+      tier: "CENTRAL",
     };
   }, [tenantParam, email]);
-
-  // Client-side validation status
-  const isEmailValid = useMemo(() => {
-    if (!email) return false;
-    return EMAIL_REGEX.test(email.trim());
-  }, [email]);
-
-  const passwordChecks = useMemo(() => {
-    return {
-      length: password.length >= 8,
-      upper: PWD_UPPERCASE_REGEX.test(password),
-      lower: PWD_LOWERCASE_REGEX.test(password),
-      number: PWD_NUMBER_REGEX.test(password),
-      special: PWD_SPECIAL_REGEX.test(password),
-    };
-  }, [password]);
-
-  const isPasswordValid = useMemo(() => {
-    return (
-      passwordChecks.length &&
-      passwordChecks.upper &&
-      passwordChecks.lower &&
-      (passwordChecks.number || passwordChecks.special)
-    );
-  }, [passwordChecks]);
 
   const handlePreset = (type: "analyst" | "admin") => {
     setError(null);
     setIsMfaRequired(false);
     setTempToken(null);
     setMfaCode(["", "", "", "", "", ""]);
-    setHasInteractedWithPassword(false);
 
     if (type === "analyst") {
       setEmail("analyst@meezan.pk");
       setPassword("Analyst@12345");
-      setPresetNotice("Loaded Meezan Bank Analyst (Standard)");
+      setPresetNotice("Loaded Meezan Analyst");
     } else if (type === "admin") {
       setEmail("admin@deeptrace.test");
       setPassword("Admin@12345");
-      setPresetNotice("Loaded Platform Administrator");
+      setPresetNotice("Loaded Platform Admin");
     }
-    setTimeout(() => setPresetNotice(null), 3500);
+    setTimeout(() => setPresetNotice(null), 3000);
   };
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isEmailValid) {
-      setError("Please provide a valid institutional email address (e.g. analyst@bank.pk).");
+    if (!email || !EMAIL_REGEX.test(email.trim())) {
+      setError("Please provide a valid institutional email address.");
       return;
     }
-    if (password.length < 8) {
-      setError("Security Policy Violation: Clearance password must contain at least 8 characters.");
+    if (!password) {
+      setError("Please enter your password.");
       return;
     }
 
@@ -238,7 +203,7 @@ function LoginFormContent() {
         router.push(redirectUrl);
       }
     } catch (err: any) {
-      setError(err.message || "Authentication failed. Please verify institutional credentials.");
+      setError(err.message || "Authentication failed. Please verify credentials.");
     } finally {
       setLoading(false);
     }
@@ -302,17 +267,16 @@ function LoginFormContent() {
     <div className="min-h-[100dvh] bg-paper-0 text-ink-900 flex flex-col font-mono selection:bg-forensic-red selection:text-white">
       {/* Top Compliance Folio */}
       <div className="w-full border-b border-rule bg-paper-0">
-        <div className="flex items-center justify-between px-6 py-1.5 text-[11px] font-mono text-ink-500">
-          <div className="flex items-center gap-4">
+        <div className="flex items-center justify-between px-6 py-2 text-[11px] font-mono text-ink-500">
+          <div className="flex items-center gap-3">
             <span className="font-bold text-ink-900 tracking-wider">
-              DEEPTRACE FORENSIC PLATFORM
+              DEEPTRACE FORENSICS
             </span>
-            <span className="text-ink-300">|</span>
-            <span>SBP BPRD CIRCULAR NO. 05 &amp; ETO 2002 STANDARDS</span>
+            <span className="text-rule-dark">|</span>
+            <span className="hidden sm:inline">SBP BPRD COMPLIANT GATEWAY</span>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="text-ink-700">CENTRAL ACCESS GATEWAY</span>
-            <span className="text-ink-300">|</span>
+          <div className="flex items-center gap-3">
+            <span className="hidden sm:inline text-ink-600">PKT TIME</span>
             <span className="tabular-nums font-semibold text-ink-900">
               {timeStr || "—"}
             </span>
@@ -320,30 +284,27 @@ function LoginFormContent() {
         </div>
       </div>
 
-      {/* Main Enclave Container */}
-      <main className="flex-1 flex flex-col items-center justify-center p-3 sm:py-3 sm:px-6">
-        <div className="w-full max-w-lg border-2 border-ink-900 bg-paper-0 p-4 sm:p-5 shadow-2xl">
+      {/* Main Container */}
+      <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6">
+        <div className="w-full max-w-md border border-ink-900/30 bg-paper-0 p-6 sm:p-8 shadow-sm">
           {/* Institutional Logo & Dynamic Tenant Identification */}
           <TenantBrandHeader tenant={detectedTenant} />
 
-          {/* Statutory Security Advisory & Penal Warning Notice */}
-          <SecurityComplianceBanner />
-
-          {/* 1-Click Evaluation Presets */}
-          <div className="mb-2.5">
-            <div className="text-[11px] uppercase tracking-wider text-ink-500 mb-1 flex items-center justify-between">
-              <span className="font-bold text-ink-700">Quick Evaluation Presets:</span>
+          {/* Quick Presets */}
+          <div className="mb-5">
+            <div className="flex items-center justify-between text-[11px] mb-1.5 font-mono">
+              <span className="text-ink-500 font-medium">Quick Presets:</span>
               {presetNotice && (
-                <span className="text-forensic-green font-semibold text-[11px]">
+                <span className="text-forensic-green font-semibold">
                   {presetNotice}
                 </span>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
+            <div className="grid grid-cols-2 gap-2 font-mono text-xs">
               <button
                 type="button"
                 onClick={() => handlePreset("analyst")}
-                className={`py-1.5 px-3 border text-left transition-colors cursor-pointer select-none ${
+                className={`py-1.5 px-3 border text-center transition-colors cursor-pointer select-none ${
                   email === "analyst@meezan.pk"
                     ? "bg-ink-900 text-paper-0 border-ink-900 font-semibold"
                     : "bg-paper-1 text-ink-700 border-rule hover:bg-paper-2"
@@ -354,7 +315,7 @@ function LoginFormContent() {
               <button
                 type="button"
                 onClick={() => handlePreset("admin")}
-                className={`py-1.5 px-3 border text-left transition-colors cursor-pointer select-none ${
+                className={`py-1.5 px-3 border text-center transition-colors cursor-pointer select-none ${
                   email === "admin@deeptrace.test"
                     ? "bg-ink-900 text-paper-0 border-ink-900 font-semibold"
                     : "bg-paper-1 text-ink-700 border-rule hover:bg-paper-2"
@@ -367,34 +328,23 @@ function LoginFormContent() {
 
           {/* Error Banner */}
           {error && (
-            <div className="mb-3.5 p-2.5 bg-red-50 border-2 border-forensic-red font-mono text-xs text-red-950 flex items-start gap-2.5">
+            <div className="mb-4 p-3 bg-red-50 border border-forensic-red font-mono text-xs text-red-950 flex items-start gap-2.5">
               <AlertTriangle className="w-4 h-4 text-forensic-red shrink-0 mt-0.5" />
-              <div>
-                <span className="font-bold uppercase tracking-wider">Security Alert: </span>
-                {error}
-              </div>
+              <div>{error}</div>
             </div>
           )}
 
           {/* Conditional Form: Login Credentials or 2FA Challenge */}
           {!isMfaRequired ? (
-            <form onSubmit={handleLoginSubmit} className="space-y-2 font-mono text-xs select-none">
-              {/* Institutional Email Field with Regex Validation */}
+            <form onSubmit={handleLoginSubmit} className="space-y-4 font-mono text-xs">
+              {/* Institutional Email Field */}
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label htmlFor="login-email" className="block text-[11px] font-bold text-ink-700 uppercase tracking-wider">
-                    Institutional Email / Clearance ID
-                  </label>
-                  {email && (
-                    <span
-                      className={`text-[11px] font-bold uppercase tracking-wider ${
-                        isEmailValid ? "text-forensic-green" : "text-forensic-red"
-                      }`}
-                    >
-                      {isEmailValid ? "Format Validated" : "Invalid Email Pattern"}
-                    </span>
-                  )}
-                </div>
+                <label
+                  htmlFor="login-email"
+                  className="block text-[11px] font-bold text-ink-700 uppercase tracking-wider mb-1"
+                >
+                  Institutional Email
+                </label>
                 <Input
                   id="login-email"
                   type="email"
@@ -402,116 +352,41 @@ function LoginFormContent() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="analyst@bank.pk"
-                  isError={Boolean(email && !isEmailValid)}
+                  placeholder="analyst@meezan.pk"
                 />
-                {email && !isEmailValid && (
-                  <span className="text-[11px] text-forensic-red mt-1 block">
-                    Institutional email required (e.g. analyst@bank.pk, user@domain.com).
-                  </span>
-                )}
               </div>
 
-              {/* Password Field with Regex & Security Criteria Validation */}
+              {/* Password Field */}
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label htmlFor="login-password" className="block text-[11px] font-bold text-ink-700 uppercase tracking-wider">
-                    Clearance Password
-                  </label>
-                  {password && (
-                    <span
-                      className={`text-[11px] font-bold uppercase tracking-wider ${
-                        isPasswordValid ? "text-forensic-green" : "text-forensic-amber"
-                      }`}
-                    >
-                      {isPasswordValid ? "Policy Satisfied" : "Policy Pending"}
-                    </span>
-                  )}
-                </div>
+                <label
+                  htmlFor="login-password"
+                  className="block text-[11px] font-bold text-ink-700 uppercase tracking-wider mb-1"
+                >
+                  Password
+                </label>
                 <Input
                   id="login-password"
                   type="password"
                   autoComplete="current-password"
                   required
                   value={password}
-                  onFocus={() => setHasInteractedWithPassword(true)}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    setHasInteractedWithPassword(true);
-                  }}
-                  placeholder="Enter clearance password"
-                  isError={Boolean(hasInteractedWithPassword && password && !isPasswordValid)}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••••••"
                 />
-
-                {/* Password Criteria Checklist (Shows when user starts typing) */}
-                {hasInteractedWithPassword && (
-                  <div className="mt-1.5 p-2 bg-paper-1 border border-rule text-[11px] space-y-1">
-                    <span className="font-bold text-ink-700 uppercase tracking-wider block">
-                      SBP Password Complexity Standard:
-                    </span>
-                    <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 pt-0.5">
-                      <span
-                        className={`flex items-center gap-1 ${
-                          passwordChecks.length ? "text-forensic-green font-semibold" : "text-ink-500"
-                        }`}
-                      >
-                        {passwordChecks.length ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-                        <span>Min 8 characters</span>
-                      </span>
-                      <span
-                        className={`flex items-center gap-1 ${
-                          passwordChecks.upper ? "text-forensic-green font-semibold" : "text-ink-500"
-                        }`}
-                      >
-                        {passwordChecks.upper ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-                        <span>Uppercase letter</span>
-                      </span>
-                      <span
-                        className={`flex items-center gap-1 ${
-                          passwordChecks.lower ? "text-forensic-green font-semibold" : "text-ink-500"
-                        }`}
-                      >
-                        {passwordChecks.lower ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-                        <span>Lowercase letter</span>
-                      </span>
-                      <span
-                        className={`flex items-center gap-1 ${
-                          passwordChecks.number || passwordChecks.special
-                            ? "text-forensic-green font-semibold"
-                            : "text-ink-500"
-                        }`}
-                      >
-                        {passwordChecks.number || passwordChecks.special ? (
-                          <Check className="w-3 h-3" />
-                        ) : (
-                          <X className="w-3 h-3" />
-                        )}
-                        <span>Number or symbol</span>
-                      </span>
-                    </div>
-                  </div>
-                )}
               </div>
 
-              {/* Remember Device Toggle (Generates 30-Day Refresh Token) */}
-              <div className="pt-0.5 pb-0.5">
-                <label className="flex items-start gap-2.5 cursor-pointer select-none">
+              {/* Remember Device Toggle */}
+              <div className="pt-0.5">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={rememberDevice}
                     onChange={(e) => setRememberDevice(e.target.checked)}
-                    className="mt-0.5 w-4 h-4 rounded-none accent-ink-900 cursor-pointer"
+                    className="w-4 h-4 rounded-none accent-ink-900 cursor-pointer"
                   />
-                  <div>
-                    <span className="font-bold text-[11px] text-ink-900 uppercase tracking-wider block">
-                      Remember this authorized workstation
-                    </span>
-                    <span className="text-[11px] text-ink-500 leading-snug block mt-0.5">
-                      {rememberDevice
-                        ? "Issues 30-day cryptographic refresh token for trusted branch terminals."
-                        : "Transient 24-hour session. Purges session on browser window closure."}
-                    </span>
-                  </div>
+                  <span className="text-xs text-ink-600 font-sans">
+                    Remember this device for 30 days
+                  </span>
                 </label>
               </div>
 
@@ -522,17 +397,22 @@ function LoginFormContent() {
                   variant="primary"
                   size="lg"
                   isLoading={loading}
-                  className="w-full"
+                  className="w-full text-xs font-mono uppercase tracking-wider"
                   rightIcon={<ArrowRight className="w-4 h-4" />}
                 >
-                  Authenticate Credentials
+                  Sign In
                 </Button>
               </div>
 
-              {/* Enterprise SSO Separator & Button */}
-              <div className="pt-2 border-t border-rule space-y-1.5">
-                <div className="text-center text-[11px] uppercase tracking-widest text-ink-500 font-bold">
-                  — OR FEDERATE IDENTITY —
+              {/* Enterprise SSO Divider & Button */}
+              <div className="pt-4 border-t border-rule space-y-3">
+                <div className="relative flex items-center justify-center">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-rule" />
+                  </div>
+                  <span className="relative bg-paper-0 px-2 text-[10px] uppercase tracking-widest text-ink-400 font-mono">
+                    or
+                  </span>
                 </div>
 
                 <Button
@@ -540,41 +420,34 @@ function LoginFormContent() {
                   variant="outline"
                   size="md"
                   onClick={() => setIsSsoModalOpen(true)}
-                  className="w-full box-border flex items-center justify-center gap-2.5 py-1.5 px-3 text-xs whitespace-normal"
-                  aria-label="Sign in with Institutional SSO (SAML 2.0 / Azure AD)"
+                  className="w-full flex items-center justify-center gap-2 py-2 text-xs font-mono"
+                  aria-label="Sign in with Institutional SSO"
                 >
-                  <KeyRound className="w-4 h-4 shrink-0 text-ink-700" />
-                  <div className="flex flex-col items-center justify-center leading-tight">
-                    <span className="font-bold text-ink-900 text-xs tracking-wider">
-                      Sign in with SSO
-                    </span>
-                    <span className="text-[11px] text-ink-500 font-normal lowercase tracking-normal">
-                      SAML 2.0 / Azure AD
-                    </span>
-                  </div>
+                  <KeyRound className="w-3.5 h-3.5 text-ink-600 shrink-0" />
+                  <span>Institutional SSO (SAML / Azure AD)</span>
                 </Button>
-                <p className="text-[11px] text-center text-ink-500">
-                  Federated with Microsoft Entra ID (Azure AD), Okta, and institutional ADFS under SBP BPRD/2020.
-                </p>
               </div>
             </form>
           ) : (
             /* RFC 6238 Two-Factor Challenge Form */
-            <form onSubmit={handleMfaSubmit} className="space-y-5 font-mono text-xs select-none">
-              <div className="p-3.5 bg-paper-1 border border-rule text-ink-700 space-y-1">
-                <div className="flex items-center gap-2 font-bold text-ink-900 text-[11px] uppercase">
+            <form onSubmit={handleMfaSubmit} className="space-y-4 font-mono text-xs select-none">
+              <div className="p-3 bg-paper-1 border border-rule text-ink-700 space-y-1">
+                <div className="flex items-center gap-2 font-bold text-ink-900 text-xs uppercase">
                   <ShieldCheck className="w-4 h-4 text-forensic-green" />
-                  <span>Two-Factor Challenge (RFC 6238 TOTP)</span>
+                  <span>Two-Factor Authentication</span>
                 </div>
-                <p className="text-[11px] text-ink-600 leading-relaxed">
-                  Enter the 6-digit verification code from your institutional authenticator application (Google Authenticator, Microsoft Authenticator, or physical YubiKey token).
+                <p className="text-[11px] text-ink-600 leading-relaxed font-sans">
+                  Enter the 6-digit verification code from your authenticator app (Google Authenticator, Microsoft Authenticator, or security token).
                 </p>
               </div>
 
               {/* Segmented 6-digit input */}
-              <div>
-                <label htmlFor="mfa-digit-0" className="block text-[11px] font-bold text-ink-700 uppercase tracking-wider mb-2 text-center">
-                  6-Digit Cryptographic Authenticator Token
+              <div className="py-2">
+                <label
+                  htmlFor="mfa-digit-0"
+                  className="block text-[11px] font-bold text-ink-700 uppercase tracking-wider mb-2.5 text-center"
+                >
+                  6-Digit Authenticator Code
                 </label>
                 <div className="flex justify-center gap-2">
                   {mfaCode.map((digit, idx) => (
@@ -608,7 +481,7 @@ function LoginFormContent() {
                     }}
                     className="text-[11px] text-ink-600 hover:text-ink-900 underline decoration-dotted font-mono cursor-pointer"
                   >
-                    [Auto-Fill Demo TOTP Token: JBSWY3DPEHPK3PXP]
+                    [Auto-Fill Demo TOTP Token]
                   </button>
                 </div>
               )}
@@ -620,10 +493,10 @@ function LoginFormContent() {
                   size="lg"
                   isLoading={loading}
                   disabled={mfaCode.join("").length !== 6}
-                  className="w-full"
+                  className="w-full text-xs font-mono uppercase tracking-wider"
                   rightIcon={<CheckCircle2 className="w-4 h-4" />}
                 >
-                  Verify &amp; Enter Workspace
+                  Verify &amp; Continue
                 </Button>
 
                 <Button
@@ -636,19 +509,17 @@ function LoginFormContent() {
                     setMfaCode(["", "", "", "", "", ""]);
                     setError(null);
                   }}
-                  className="w-full text-[11px]"
+                  className="w-full text-xs"
                 >
-                  ← Return to Email / Password Clearance
+                  ← Back to Email &amp; Password
                 </Button>
               </div>
             </form>
           )}
 
           {/* Footer Notice */}
-          <div className="border-t border-rule mt-2.5 pt-2 text-[11px] font-mono text-ink-500 text-center leading-normal">
-            Protected by State Bank of Pakistan Enterprise Cyber Security Framework.
-            <br />
-            Unauthorized access attempts are monitored and recorded under ETO 2002.
+          <div className="border-t border-rule mt-5 pt-3 text-[11px] font-mono text-ink-400 text-center leading-normal">
+            Protected under State Bank of Pakistan Cybersecurity Framework
           </div>
         </div>
       </main>
