@@ -62,7 +62,8 @@ async def test_stage_0_pipeline_auto_classification():
                 data={
                     "organizationId": org.id,
                     "email": "test-stage0@meezan.pk",
-                    "fullName": "Test Analyst",
+                    "firstName": "Test",
+                    "lastName": "Analyst",
                     "passwordHash": "$2b$12$e8S91Xsamplehashedpassword",
                     "role": "ANALYST",
                 }

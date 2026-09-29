@@ -76,10 +76,11 @@ async def run_pipeline_inline(
         stage_map = {s.stageOrder: s for s in stages}
 
     # Stage 0: Automated Multi-Modal Document Classification & Layout Triage
+    stage_0_telemetry = None
     try:
         logger.info(f"Executing Stage 0: DOCUMENT_CLASSIFICATION for run {pipeline_run_id}")
         from app.features.pipeline.tasks.stage_0_classifier import process_document_classification
-        await process_document_classification(
+        stage_0_telemetry = await process_document_classification(
             pipeline_run_id=pipeline_run_id,
             org_id=org_id,
             investigation_id=investigation_id,
@@ -91,25 +92,54 @@ async def run_pipeline_inline(
     failed = False
     failure_reason = None
 
-    for order, stage_type, stage_func, _ in STAGE_FLOW:
-        stage_record = stage_map.get(order)
-        if not stage_record:
-            continue
+    # Pipeline Verification Gate: DeepTrace strictly executes forensic pipeline on Bank Statements
+    primary_cls = stage_0_telemetry.get("primary_classification") if stage_0_telemetry else None
+    primary_sub = stage_0_telemetry.get("primary_subtype") if stage_0_telemetry else "GENERIC"
 
-        try:
-            logger.info(f"Executing pipeline stage {order}: {stage_type} for run {pipeline_run_id}")
-            await stage_func(
-                pipeline_run_id=pipeline_run_id,
-                pipeline_stage_id=stage_record.id,
-                org_id=org_id,
-                investigation_id=investigation_id,
-                document_id=document_id,
+    if primary_cls and primary_cls != "BANK_STATEMENT":
+        readable_types = {
+            "SALARY_SLIP": "Salary Slip / Payslip",
+            "UTILITY_BILL": "Utility Bill",
+            "TAX_CERTIFICATE": "Tax Return / Challan",
+            "IDENTITY_DOCUMENT": "Identity Document / CNIC",
+            "OTHER": "General / Non-Banking Document",
+        }
+        det_name = readable_types.get(primary_cls, primary_cls)
+        sub_str = f" ({primary_sub})" if primary_sub and primary_sub not in ("GENERIC", "GENERIC_DOCUMENT", "UNCERTAIN_DOCUMENT") else ""
+        failed = True
+        failure_reason = (
+            f"Analysis rejected: DeepTrace strictly executes forensic analysis on Bank Statements. "
+            f"The uploaded document was classified as {det_name}{sub_str}. "
+            f"Pipeline stages 1–8 were halted."
+        )
+        logger.warning(f"Pipeline run {pipeline_run_id} rejected: {failure_reason}")
+
+        # Mark all pending stages as CANCELLED
+        async with set_org_context(org_id) as tx:
+            await tx.pipelinestage.update_many(
+                where={"pipelineRunId": pipeline_run_id, "status": "PENDING"},
+                data={"status": "CANCELLED", "errorMessage": "Halted: Non-bank statement rejected by Stage 0 classifier."},
             )
-        except Exception as exc:
-            logger.error(f"Pipeline stage {stage_type} failed: {exc}", exc_info=True)
-            failed = True
-            failure_reason = str(exc)
-            break
+    else:
+        for order, stage_type, stage_func, _ in STAGE_FLOW:
+            stage_record = stage_map.get(order)
+            if not stage_record:
+                continue
+
+            try:
+                logger.info(f"Executing pipeline stage {order}: {stage_type} for run {pipeline_run_id}")
+                await stage_func(
+                    pipeline_run_id=pipeline_run_id,
+                    pipeline_stage_id=stage_record.id,
+                    org_id=org_id,
+                    investigation_id=investigation_id,
+                    document_id=document_id,
+                )
+            except Exception as exc:
+                logger.error(f"Pipeline stage {stage_type} failed: {exc}", exc_info=True)
+                failed = True
+                failure_reason = str(exc)
+                break
 
     total_duration_ms = int((time.perf_counter() - start_time) * 1000)
 

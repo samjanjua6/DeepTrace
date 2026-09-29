@@ -109,11 +109,18 @@ BANK_STATEMENT_ANCHORS = {
     "bank al habib": 3.5, "bahl": 2.5, "js bank": 3.0, "soneri bank": 3.0,
     "dubai islamic bank": 4.0, "national bank of pakistan": 4.0, "nbp": 2.5,
     "bank of punjab": 3.5, "bop": 2.5, "samba bank": 3.0, "silkbank": 3.0,
-    "statement of account": 3.5, "account statement": 3.5, "bank statement": 4.0,
-    "opening balance": 2.5, "closing balance": 2.5, "available balance": 2.0,
-    "total debits": 2.5, "total credits": 2.5, "transaction date": 2.0,
+    "statement of account": 4.0, "account statement": 4.0, "bank statement": 4.5,
+    "opening balance": 3.0, "closing balance": 3.0, "available balance": 2.5,
+    "total debits": 2.5, "total credits": 2.5, "transaction date": 2.5,
     "value date": 2.5, "cheque no": 2.0, "withdrawal": 2.0, "deposit": 2.0,
-    "running balance": 3.0, "ledger balance": 3.0, "iban": 2.5, "pkr": 1.5,
+    "running balance": 3.5, "ledger balance": 3.5, "iban": 3.0, "pkr": 1.5,
+    "account number": 3.0, "account no": 2.5, "account title": 2.5,
+    "statement period": 3.0, "transaction history": 3.0, "current account": 3.0,
+    "savings account": 3.0, "checking account": 3.0, "pls account": 2.5,
+    "profit and loss sharing": 2.5, "branch code": 2.0, "swift": 2.5,
+    "bic": 2.5, "sort code": 3.0, "routing number": 3.0,
+    "hsbc": 3.5, "barclays": 3.5, "citi": 3.5, "citibank": 3.5,
+    "chase": 3.5, "jpmorgan": 3.5, "wells fargo": 3.5, "bank of america": 3.5,
 }
 
 SALARY_SLIP_ANCHORS = {
@@ -295,7 +302,7 @@ class DocumentClassifier:
         try:
             from app.features.pipeline.tasks.ocr_backends import RapidOCRBackend
             backend = RapidOCRBackend()
-            result = backend.ocr_image(np_img)
+            result = backend.extract(np_img)
 
             for w_item in result.words:
                 x0, y0, x1, y1, text = w_item[0], w_item[1], w_item[2], w_item[3], w_item[4]
@@ -461,7 +468,7 @@ class DocumentClassifier:
                 try:
                     doc = pymupdf.open(stream=data, filetype="pdf")
                     if len(doc) > 0:
-                        pix = doc[0].get_pixmap(dpi=96)
+                        pix = doc[0].get_pixmap(dpi=150)
                         page_image = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
                         if pix.n == 4:
                             page_image = cv2.cvtColor(page_image, cv2.COLOR_RGBA2BGR)
@@ -470,6 +477,12 @@ class DocumentClassifier:
                     doc.close()
                 except Exception:
                     page_image = None
+            if len(tokens) < 10 and page_image is not None:
+                try:
+                    ocr_tokens, _ = self.extract_tokens_from_image(page_image)
+                    tokens.extend(ocr_tokens)
+                except Exception:
+                    pass
         else:
             try:
                 pil_img = Image.open(io.BytesIO(data))

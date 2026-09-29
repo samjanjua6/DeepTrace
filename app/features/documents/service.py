@@ -77,35 +77,7 @@ async def upload_document(
     sha256 = security.compute_sha256(data)
     md5 = security.compute_md5(data)
 
-    # Normalize document type
-    raw_type = (document_type or "OTHER").strip().upper()
-    if raw_type == "CNIC":
-        norm_doc_type = "IDENTITY_DOCUMENT"
-    elif raw_type in ("TAX_CHALLAN", "FBR_CHALLAN"):
-        norm_doc_type = "TAX_CERTIFICATE"
-    elif raw_type in VALID_DOCUMENT_TYPES:
-        norm_doc_type = raw_type
-    else:
-        norm_doc_type = "OTHER"
-
-    # Fast-path multi-modal auto-classification (Stage 0 triage)
-    if norm_doc_type in ("OTHER", "AUTO", "AUTO_DETECT"):
-        try:
-            from app.features.pipeline.tasks.document_classifier import document_classifier
-            cls_res = document_classifier.classify_document(data, mime)
-            if cls_res and cls_res.document_type in VALID_DOCUMENT_TYPES:
-                norm_doc_type = cls_res.document_type
-        except Exception:
-            pass
-
-    doc_uuid = str(uuid.uuid4())
-    primary_key = f"documents/{investigation.id}/{doc_uuid}/{filename}"
-    clone_key = f"custody/{investigation.id}/{sha256}/{filename}"
-    thumb_key = None
-
-    # 4. Page Rendering & Physical Point Geometry
-    pages_to_create = []
-
+    # 4. Preliminary Structure & Encryption Verification
     if mime == "application/pdf":
         try:
             pdf_doc = fitz.open(stream=data, filetype="pdf")
@@ -129,7 +101,63 @@ async def upload_document(
                 status_code=HTTP_422,
                 detail="PDF contains 0 pages."
             )
+    else:
+        # Raster Image preliminary verification
+        try:
+            pil_img_check = Image.open(io.BytesIO(data))
+            pil_img_check.verify()
+        except Exception as e:
+            raise HTTPException(
+                status_code=HTTP_422,
+                detail=f"Corrupt or unreadable image file: {str(e)}"
+            )
 
+    # 5. Mandatory Institutional Classification Gate: Bank Statements Only
+    from app.features.pipeline.tasks.document_classifier import document_classifier
+    try:
+        cls_res = document_classifier.classify_document(data, mime)
+    except Exception as exc:
+        cls_res = None
+
+    if not cls_res or cls_res.document_type != "BANK_STATEMENT":
+        if mime == "application/pdf" and "pdf_doc" in locals() and not pdf_doc.is_closed:
+            pdf_doc.close()
+
+        readable_types = {
+            "SALARY_SLIP": "Salary Slip / Payslip",
+            "UTILITY_BILL": "Utility Bill",
+            "TAX_CERTIFICATE": "Tax Return / Challan",
+            "IDENTITY_DOCUMENT": "Identity Document / CNIC",
+            "OTHER": "General / Non-Banking Document",
+        }
+        detected = readable_types.get(
+            cls_res.document_type if cls_res else "OTHER",
+            cls_res.document_type if cls_res else "Non-Banking Document",
+        )
+        subtype_str = ""
+        if cls_res and cls_res.subtype and cls_res.subtype not in ("GENERIC_DOCUMENT", "UNCERTAIN_DOCUMENT"):
+            subtype_str = f" ({cls_res.subtype.replace('_', ' ')})"
+
+        raise HTTPException(
+            status_code=HTTP_422,
+            detail=(
+                f"Document intake rejected: DeepTrace strictly accepts and analyzes Bank Statements. "
+                f"The uploaded document was classified as {detected}{subtype_str}. "
+                f"Please upload an official bank account statement."
+            ),
+        )
+
+    norm_doc_type = "BANK_STATEMENT"
+
+    doc_uuid = str(uuid.uuid4())
+    primary_key = f"documents/{investigation.id}/{doc_uuid}/{filename}"
+    clone_key = f"custody/{investigation.id}/{sha256}/{filename}"
+    thumb_key = None
+
+    # 6. Page Rendering & Physical Point Geometry
+    pages_to_create = []
+
+    if mime == "application/pdf":
         zoom = 150.0 / 72.0  # 150 DPI render
         mat = fitz.Matrix(zoom, zoom)
 

@@ -119,7 +119,8 @@ async def test_org_quotas_and_billing_lifecycle():
             # Attempt upload when limit reached -> 402 Payment Required
             import fitz
             pdf_doc = fitz.open()
-            pdf_doc.new_page()
+            page = pdf_doc.new_page()
+            page.insert_text((50, 50), "MEEZAN BANK STATEMENT - ACCOUNT NUMBER 0102-0103492819 - OPENING BALANCE PKR 1000 - CLOSING BALANCE PKR 2000")
             valid_pdf = pdf_doc.tobytes()
             pdf_doc.close()
 

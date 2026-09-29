@@ -192,8 +192,8 @@ async def run_tests():
         fake_msg = resp_fake.json().get("error", {}).get("message", resp_fake.text)
         print(f"✓ Spoofed extension rejected: {fake_msg}")
 
-        # ── Test 7: Upload Scanned Image (PNG) ───────────────────────────────
-        print("\n[Test 7] Uploading Scanned Image Document (PNG)...")
+        # ── Test 7: Non-Bank Document Intake Rejection (Enforce Bank Statement Only) ─────
+        print("\n[Test 7] Uploading Non-Bank Document (Expect 422 Unprocessable)...")
         png_bytes = create_sample_png()
         resp_png = await client.post(
             f"/api/v1/investigations/{inv.id}/documents",
@@ -201,10 +201,31 @@ async def run_tests():
             files={"file": ("salary_slip_scan.png", png_bytes, "image/png")},
             data={"document_type": "SALARY_SLIP"},
         )
-        assert resp_png.status_code == 201
-        data_png = resp_png.json()
-        assert data_png["page_count"] == 1
-        print(f"✓ Image document uploaded: ID={data_png['id']}, Type={data_png['document_type']}, Pages={data_png['page_count']}")
+        assert resp_png.status_code == 422
+        png_err = resp_png.json().get("detail", resp_png.text)
+        assert "strictly accepts and analyzes Bank Statements" in png_err
+        print(f"✓ Non-bank document rejected with 422: {png_err[:70]}...")
+
+        # Also verify uploading a second valid bank statement succeeds
+        print("\n[Test 7b] Uploading Second Valid Bank Statement PDF...")
+        p2_doc = fitz.open()
+        p = p2_doc.new_page(width=595, height=842)
+        p.insert_text((50, 50), f"RUN_ID: {time.time() + 100}", fontsize=8)
+        p.insert_text((50, 80), "HABIB BANK LIMITED - ACCOUNT STATEMENT", fontsize=16)
+        p.insert_text((50, 120), "Account Number: 01928374650192 (PK12HABB0001928374650192)", fontsize=11)
+        p.insert_text((50, 160), "Opening Balance: PKR 500,000.00", fontsize=11)
+        p.insert_text((50, 200), "Closing Balance: PKR 850,000.00", fontsize=11)
+        hbl_bytes = p2_doc.tobytes()
+        p2_doc.close()
+
+        resp_hbl = await client.post(
+            f"/api/v1/investigations/{inv.id}/documents",
+            headers=headers,
+            files={"file": ("hbl_statement.pdf", hbl_bytes, "application/pdf")},
+            data={"document_type": "BANK_STATEMENT"},
+        )
+        assert resp_hbl.status_code == 201
+        print("✓ Second valid bank statement accepted with 201")
 
         # ── Test 8: List Documents in Investigation ──────────────────────────
         print("\n[Test 8] Listing Documents in Investigation...")
