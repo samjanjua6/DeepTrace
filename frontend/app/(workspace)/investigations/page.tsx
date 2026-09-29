@@ -127,7 +127,7 @@ export default function InvestigationsDocketPage() {
               className="px-6 py-2.5 bg-ink-900 hover:bg-black text-paper-0 font-mono text-xs uppercase tracking-widest font-semibold transition-colors inline-flex items-center gap-2"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>+ Intake New Document</span>
+              <span>Intake New Document</span>
             </Link>
           </div>
         </div>
