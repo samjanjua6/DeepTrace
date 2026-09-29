@@ -134,7 +134,7 @@ export function TwoFactorSetupModal({ isOpen, onClose }: TwoFactorSetupModalProp
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg bg-paper-0 border-2 border-ink-900 shadow-2xl p-6 sm:p-8 font-sans"
+        className="w-full max-w-xl bg-paper-0 border-2 border-ink-900 shadow-2xl p-6 sm:p-8 font-sans"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -257,43 +257,54 @@ export function TwoFactorSetupModal({ isOpen, onClose }: TwoFactorSetupModalProp
             </div>
 
             {/* QR Display */}
-            <div className="flex flex-col sm:flex-row items-center gap-6 p-4 bg-paper-1 border border-rule">
-              <div className="bg-white p-3 border border-ink-900 shrink-0">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 p-4 sm:p-5 bg-paper-1 border border-rule">
+              <div className="bg-white p-3 border border-ink-900 shrink-0 shadow-xs">
                 <QRCodeSVG
                   value={setupData.otpauth_uri}
-                  size={160}
+                  size={144}
                   level="M"
                   includeMargin={false}
                 />
               </div>
-              <div className="space-y-3 font-mono text-xs">
+              <div className="flex-1 min-w-0 w-full space-y-3 font-mono text-xs">
                 <div>
-                  <span className="text-[10px] text-ink-500 uppercase tracking-wider block">
+                  <span className="text-[10px] text-ink-500 uppercase tracking-wider block mb-0.5">
                     Account Identity:
                   </span>
-                  <span className="font-semibold text-ink-900">{user.email}</span>
+                  <span className="font-semibold text-ink-900 text-xs truncate block" title={user.email}>
+                    {user.email}
+                  </span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-ink-500 uppercase tracking-wider block">
+                  <span className="text-[10px] text-ink-500 uppercase tracking-wider block mb-1">
                     Manual Base32 Secret Key:
                   </span>
-                  <div className="flex items-center gap-2 mt-1">
-                    <code className="px-2 py-1 bg-paper-0 border border-rule text-ink-900 font-bold tracking-widest text-[11px] select-all">
+                  <div className="flex items-center gap-1.5 p-1.5 bg-paper-0 border border-rule w-full">
+                    <code className="px-1.5 py-0.5 text-ink-900 font-mono font-bold text-[11px] tracking-wider break-all select-all flex-1 min-w-0">
                       {setupData.secret}
                     </code>
                     <button
                       type="button"
                       onClick={handleCopySecret}
-                      className="p-1 border border-rule hover:border-ink-900 text-ink-600 hover:text-ink-900 transition-colors"
+                      className="px-2 py-1 border border-rule hover:border-ink-900 bg-paper-1 text-ink-700 hover:text-ink-900 transition-colors shrink-0 flex items-center gap-1 text-[10px] font-mono uppercase cursor-pointer"
                       title="Copy secret key"
                     >
                       {copied ? (
-                        <Check className="w-3.5 h-3.5 text-forensic-green" />
+                        <>
+                          <Check className="w-3.5 h-3.5 text-forensic-green" />
+                          <span className="text-forensic-green font-semibold">Copied</span>
+                        </>
                       ) : (
-                        <Copy className="w-3.5 h-3.5" />
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Copy</span>
+                        </>
                       )}
                     </button>
                   </div>
+                  <span className="text-[10px] text-ink-500 block mt-1 font-sans">
+                    Enter this key manually if unable to scan the barcode.
+                  </span>
                 </div>
               </div>
             </div>
