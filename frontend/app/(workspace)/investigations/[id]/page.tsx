@@ -19,6 +19,7 @@ import { DocketErrorView } from "@/components/dossier/DocketErrorView";
 import { FindingsTab } from "@/components/dossier/tabs/FindingsTab";
 import { CustodyTab } from "@/components/dossier/tabs/CustodyTab";
 import { RegulatoryTab } from "@/components/dossier/tabs/RegulatoryTab";
+import { WorkspaceSplitter } from "@/components/canvas/WorkspaceSplitter";
 import { useInvestigationDocket } from "@/lib/hooks/useInvestigationDocket";
 
 export default function InvestigationWorkspacePage() {
@@ -70,6 +71,109 @@ export default function InvestigationWorkspacePage() {
     [evidence]
   );
 
+  // ── Adjustable Workbench Division State (Viewer vs. Explanation) ──────────
+  const workbenchRef = React.useRef<HTMLDivElement>(null);
+  const [splitRatio, setSplitRatio] = React.useState<number>(() =>
+    viewMode === "split" && isFinancial ? 50 : 58
+  );
+  const [isDragging, setIsDragging] = React.useState<boolean>(false);
+
+  // Restore saved ratio for active viewMode or fall back to default
+  React.useEffect(() => {
+    try {
+      const key = `deeptrace_split_pct_${viewMode}`;
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const val = parseFloat(saved);
+        if (!isNaN(val) && val >= 20 && val <= 80) {
+          setSplitRatio(val);
+          return;
+        }
+      }
+    } catch {}
+    setSplitRatio(viewMode === "split" && isFinancial ? 50 : 58);
+  }, [viewMode, isFinancial]);
+
+  // Persist user-adjusted split ratio to localStorage
+  React.useEffect(() => {
+    if (!isDragging) {
+      try {
+        const key = `deeptrace_split_pct_${viewMode}`;
+        localStorage.setItem(key, splitRatio.toFixed(1));
+      } catch {}
+    }
+  }, [splitRatio, isDragging, viewMode]);
+
+  // Handle pointer down on the splitter grip
+  const handleSplitterPointerDown = React.useCallback(
+    (e: React.PointerEvent) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      setIsDragging(true);
+    },
+    []
+  );
+
+  // Reset split ratio to default on double-click
+  const handleResetSplit = React.useCallback(() => {
+    const def = viewMode === "split" && isFinancial ? 50 : 58;
+    setSplitRatio(def);
+    try {
+      localStorage.removeItem(`deeptrace_split_pct_${viewMode}`);
+    } catch {}
+  }, [viewMode, isFinancial]);
+
+  // Keyboard navigation for splitter handle
+  const handleSplitterKeyDown = React.useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setSplitRatio((prev) => Math.max(20, Math.min(80, prev - 2)));
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        setSplitRatio((prev) => Math.max(20, Math.min(80, prev + 2)));
+      } else if (e.key === "Home" || e.key === "Enter") {
+        e.preventDefault();
+        handleResetSplit();
+      }
+    },
+    [handleResetSplit]
+  );
+
+  // Track global pointer movements during active drag
+  React.useEffect(() => {
+    if (!isDragging) return;
+
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!workbenchRef.current) return;
+      const rect = workbenchRef.current.getBoundingClientRect();
+      if (rect.width <= 0) return;
+      const mouseX = e.clientX - rect.left;
+      const rawPct = (mouseX / rect.width) * 100;
+
+      // Minimum 320px for viewer, minimum 360px for explanation pane
+      const minPct = Math.max(20, (320 / rect.width) * 100);
+      const maxPct = Math.min(80, ((rect.width - 360) / rect.width) * 100);
+      const clamped = Math.min(Math.max(rawPct, minPct), maxPct);
+
+      setSplitRatio(clamped);
+    };
+
+    const handlePointerUp = () => {
+      setIsDragging(false);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
+    };
+  }, [isDragging]);
+
   if (isLoading) {
     return <DocketLoadingView documentType={documentType} />;
   }
@@ -98,12 +202,11 @@ export default function InvestigationWorkspacePage() {
       />
 
       {/* Asymmetric 2-Column Split Workbench */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Column 1: Sticky Left Forensic Canvas */}
+      <div ref={workbenchRef} className="flex flex-1 overflow-hidden relative">
+        {/* Column 1: Sticky Left Forensic Canvas (Viewer Window) */}
         <div
-          className={`w-full ${
-            viewMode === "split" && isFinancial ? "lg:w-[50%]" : "lg:w-[58%]"
-          } h-full flex flex-col relative border-r border-rule`}
+          style={{ width: `${splitRatio}%` }}
+          className="h-full flex flex-col relative border-r border-rule shrink-0 overflow-hidden"
         >
           <ForensicCanvas
             pages={pages}
@@ -122,9 +225,21 @@ export default function InvestigationWorkspacePage() {
           />
         </div>
 
-        {/* Column 2: Right Interactive Pane (Split Ledger or Full Dossier) */}
+        {/* Resizable Divider Between Viewer and Explanation Windows */}
+        <WorkspaceSplitter
+          splitRatio={splitRatio}
+          isDragging={isDragging}
+          onPointerDown={handleSplitterPointerDown}
+          onDoubleClick={handleResetSplit}
+          onKeyDown={handleSplitterKeyDown}
+        />
+
+        {/* Column 2: Right Interactive Pane (Split Ledger or Full Dossier Explanation Window) */}
         {viewMode === "split" && isFinancial ? (
-          <div className="w-full lg:w-[50%] h-full flex flex-col overflow-hidden bg-paper-0">
+          <div
+            style={{ width: `${100 - splitRatio}%` }}
+            className="flex-1 h-full flex flex-col overflow-hidden bg-paper-0 min-w-0"
+          >
             <SplitLedgerEvidenceViewer
               rows={financialData?.rows}
               evidence={evidence}
@@ -162,7 +277,10 @@ export default function InvestigationWorkspacePage() {
             />
           </div>
         ) : (
-          <div className="w-full lg:w-[42%] h-full overflow-y-auto bg-paper-0 p-6 space-y-6">
+          <div
+            style={{ width: `${100 - splitRatio}%` }}
+            className="flex-1 h-full overflow-y-auto bg-paper-0 p-6 space-y-6 min-w-0"
+          >
             {/* Live Pipeline Execution Banner */}
             <PipelineExecutionBanner
               isAnalyzing={isAnalyzing}
