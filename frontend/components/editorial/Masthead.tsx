@@ -38,10 +38,12 @@ export function Masthead({
 
   const [timeStr, setTimeStr] = useState<string>("");
   const [orgDropdownOpen, setOrgDropdownOpen] = useState<boolean>(false);
+  const [settingsDropdownOpen, setSettingsDropdownOpen] = useState<boolean>(false);
   const [switching, setSwitching] = useState<boolean>(false);
   const [mfaModalOpen, setMfaModalOpen] = useState<boolean>(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const settingsDropdownRef = useRef<HTMLDivElement>(null);
   const drawerRef = useFocusTrap<HTMLDivElement>(mobileMenuOpen);
 
   // Clock ticker
@@ -63,20 +65,25 @@ export function Masthead({
     return () => clearInterval(interval);
   }, []);
 
-  // Close org dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setOrgDropdownOpen(false);
+      }
+      if (settingsDropdownRef.current && !settingsDropdownRef.current.contains(event.target as Node)) {
+        setSettingsDropdownOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Close mobile drawer on route change
+  // Close mobile drawer and dropdowns on route change
   useEffect(() => {
     setMobileMenuOpen(false);
+    setSettingsDropdownOpen(false);
+    setOrgDropdownOpen(false);
   }, [pathname]);
 
   // Body scroll lock when mobile drawer is open
@@ -201,14 +208,14 @@ export function Masthead({
       </div>
 
       {/* Main Masthead row */}
-      <div className="flex items-center justify-between px-6 py-4">
-        <div className="flex items-baseline gap-6">
+      <div className="flex items-center justify-between px-6 py-4 gap-6">
+        <div className="flex items-baseline gap-4 xl:gap-6 shrink-0">
           <Link href="/" className="group">
-            <h1 className="font-serif text-3xl md:text-4xl tracking-tight text-ink-900 font-normal">
+            <h1 className="font-serif text-3xl md:text-4xl tracking-tight text-ink-900 font-normal whitespace-nowrap">
               DeepTrace
             </h1>
           </Link>
-          <span className="hidden md:inline font-mono text-[10px] tracking-[0.2em] uppercase text-ink-500 border-l border-rule pl-4">
+          <span className="hidden xl:inline font-mono text-[10px] tracking-[0.2em] uppercase text-ink-500 border-l border-rule pl-4 whitespace-nowrap">
             Document Forensics &amp; Verification API
           </span>
         </div>
@@ -216,7 +223,7 @@ export function Masthead({
         {/* Desktop Navigation */}
         <nav
           aria-label="Main navigation"
-          className="hidden md:flex items-center gap-6 font-mono text-xs uppercase tracking-wider"
+          className="hidden md:flex items-center gap-4 lg:gap-6 font-mono text-xs uppercase tracking-wider shrink-0"
         >
           <Link
             href={isAuthenticated ? "/dashboard" : "/login?redirect=/dashboard"}
@@ -239,20 +246,76 @@ export function Masthead({
             + New Intake
           </Link>
           {(user?.role === "ADMIN" || user?.role === "OWNER") && (
-            <>
-              <Link href="/settings/users" className={navLinkClass(pathname.startsWith("/settings/users"))}>
-                Users
-              </Link>
-              <Link href="/settings/api-keys" className={navLinkClass(pathname.startsWith("/settings/api-keys"))}>
-                API Keys
-              </Link>
-              <Link href="/settings/webhooks" className={navLinkClass(pathname.startsWith("/settings/webhooks"))}>
-                Webhooks
-              </Link>
-              <Link href="/settings/billing" className={navLinkClass(pathname.startsWith("/settings/billing"))}>
-                Billing
-              </Link>
-            </>
+            <div className="relative" ref={settingsDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setSettingsDropdownOpen(!settingsDropdownOpen)}
+                className={`flex items-center gap-1.5 transition-colors cursor-pointer py-1 ${
+                  pathname.startsWith("/settings")
+                    ? "border-b-2 border-ink-900 pb-1 text-ink-900 font-bold"
+                    : "text-ink-600 hover:text-ink-900"
+                }`}
+              >
+                <span>Settings</span>
+                <ChevronDown
+                  className={`w-3 h-3 transition-transform ${
+                    settingsDropdownOpen ? "rotate-180 opacity-90" : "opacity-60"
+                  }`}
+                />
+              </button>
+
+              {settingsDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-paper-0 border-2 border-ink-900 shadow-xl z-50 py-1 font-mono text-xs">
+                  <div className="px-3 py-1.5 border-b border-rule text-[10px] text-ink-500 uppercase tracking-wider font-semibold">
+                    Administration
+                  </div>
+                  <Link
+                    href="/settings/users"
+                    onClick={() => setSettingsDropdownOpen(false)}
+                    className={`block px-3 py-2 hover:bg-paper-2 transition-colors ${
+                      pathname.startsWith("/settings/users")
+                        ? "bg-amber-50 font-bold text-ink-900"
+                        : "text-ink-700"
+                    }`}
+                  >
+                    Users &amp; Roles
+                  </Link>
+                  <Link
+                    href="/settings/api-keys"
+                    onClick={() => setSettingsDropdownOpen(false)}
+                    className={`block px-3 py-2 hover:bg-paper-2 transition-colors ${
+                      pathname.startsWith("/settings/api-keys")
+                        ? "bg-amber-50 font-bold text-ink-900"
+                        : "text-ink-700"
+                    }`}
+                  >
+                    API Keys
+                  </Link>
+                  <Link
+                    href="/settings/webhooks"
+                    onClick={() => setSettingsDropdownOpen(false)}
+                    className={`block px-3 py-2 hover:bg-paper-2 transition-colors ${
+                      pathname.startsWith("/settings/webhooks")
+                        ? "bg-amber-50 font-bold text-ink-900"
+                        : "text-ink-700"
+                    }`}
+                  >
+                    Webhooks
+                  </Link>
+                  <Link
+                    href="/settings/billing"
+                    onClick={() => setSettingsDropdownOpen(false)}
+                    className={`block px-3 py-2 hover:bg-paper-2 transition-colors ${
+                      pathname.startsWith("/settings/billing")
+                        ? "bg-amber-50 font-bold text-ink-900"
+                        : "text-ink-700"
+                    }`}
+                  >
+                    Billing &amp; Quotas
+                  </Link>
+                </div>
+              )}
+            </div>
           )}
 
           {/* User Profile / Logout */}
