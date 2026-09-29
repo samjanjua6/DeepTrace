@@ -14,36 +14,14 @@ import { Upload, ShieldCheck, FileText, CheckCircle2 } from "lucide-react";
 
 export default function NewCaseIntakePage() {
   const router = useRouter();
-  const [documentType, setDocumentType] = useState<string>("AUTO");
   const [title, setTitle] = useState<string>(
-    "Automated Forensic Docket (Stage 0 Multi-Modal Classifier)"
+    "Bank Statement & Financial Ledger Forensic Audit"
   );
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [step, setStep] = useState<string>("");
   const [sha256, setSha256] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
-
-  const handleDocTypeChange = (newType: string) => {
-    setDocumentType(newType);
-    if (newType === "AUTO") {
-      setTitle("Automated Forensic Docket (Stage 0 Multi-Modal Classifier)");
-    } else if (newType === "OTHER") {
-      setTitle("BISE Examination Certificate / Academic Result Verification");
-    } else if (newType === "BANK_STATEMENT") {
-      setTitle("Bank Statement & Financial Ledger Forensic Audit");
-    } else if (newType === "SALARY_SLIP") {
-      setTitle("Employment Verification & Salary Slip Audit");
-    } else if (newType === "UTILITY_BILL") {
-      setTitle("Utility Consumer Bill Verification (WAPDA / SNGPL / KE)");
-    } else if (newType === "TAX_CERTIFICATE") {
-      setTitle("FBR Active Taxpayer & Income Tax Return Verification");
-    } else if (newType === "IDENTITY_DOCUMENT") {
-      setTitle("Identity Credential & Official Document Verification");
-    } else {
-      setTitle("Official Document Forensics Docket");
-    }
-  };
 
   const computeSHA256 = async (f: File): Promise<string> => {
     const buffer = await f.arrayBuffer();
@@ -73,7 +51,7 @@ export default function NewCaseIntakePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) {
-      setError("Please select a document file for custody acquisition.");
+      setError("Please select a bank statement PDF for custody acquisition.");
       return;
     }
 
@@ -83,12 +61,12 @@ export default function NewCaseIntakePage() {
     try {
       setStep("1/4: Registering case docket and custody record...");
       const inv = await createInvestigation({
-        title,
-        notes: `Acquired via DeepTrace Ingestion Gateway (${documentType})`,
+        title: title.trim() || "Bank Statement & Financial Ledger Forensic Audit",
+        notes: "Acquired via DeepTrace Institutional Bank Statement Gateway",
       });
 
-      setStep("2/4: Uploading document & rendering 150 DPI canvas pages...");
-      const doc = await uploadDocument(inv.id, file, documentType);
+      setStep("2/4: Uploading statement & rendering 150 DPI canvas pages...");
+      const doc = await uploadDocument(inv.id, file, "BANK_STATEMENT");
 
       setStep("3/4: Dispatching 8-stage forensic pipeline...");
       await triggerPipeline(inv.id, doc.id);
@@ -102,7 +80,7 @@ export default function NewCaseIntakePage() {
       setIsProcessing(false);
       setError(
         err.message ||
-          "Failed to ingest document. Please verify the backend API server is running on port 8000."
+          "Failed to ingest bank statement. Please verify the backend API server is running on port 8000."
       );
     }
   };
@@ -118,39 +96,40 @@ export default function NewCaseIntakePage() {
         />
 
         <h1 className="font-serif text-3xl md:text-5xl text-ink-900 font-normal tracking-tight mt-2 mb-3">
-          Document Intake & Custody Lock
+          Bank Statement Intake &amp; Custody Lock
         </h1>
 
         <p className="text-sm md:text-base text-ink-700 leading-relaxed max-w-2xl">
-          Ingested documents are immediately cryptographically fingerprinted under
+          Ingested bank statements are immediately cryptographically fingerprinted under
           SHA-256, locked against alteration pursuant to Pakistan’s Electronic
           Transactions Ordinance (ETO 2002), and rasterized at 150 DPI for
-          sub-pixel forensic inspection.
+          dual-anchor ledger reconciliation and sub-pixel forensic inspection.
         </p>
 
         <HairlineRule className="my-8" />
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Document Type Selector */}
-          <div>
-            <label htmlFor="new-doc-type" className="block font-mono text-xs uppercase tracking-wider text-ink-700 mb-2">
-              Document Category &amp; Forensic Module:
-            </label>
-            <select
-              id="new-doc-type"
-              value={documentType}
-              onChange={(e) => handleDocTypeChange(e.target.value)}
-              className="w-full bg-paper-1 border border-rule px-4 py-3 text-sm text-ink-900 font-mono focus:outline-none focus:border-ink-900 cursor-pointer"
-            >
-              <option value="AUTO">Auto-Detect via Stage 0 Classifier (Bank, Salary, K-Electric, FBR, CNIC)</option>
-              <option value="OTHER">Academic &amp; Educational (Matric / Inter / University Degree / BISE)</option>
-              <option value="BANK_STATEMENT">Bank Statement &amp; Financial Ledger (Lakh/Crore &amp; IBAN)</option>
-              <option value="SALARY_SLIP">Salary Slip &amp; Employment Certificate</option>
-              <option value="UTILITY_BILL">Utility Consumer Bill (Electricity / Gas / Water)</option>
-              <option value="TAX_CERTIFICATE">Tax Certificate &amp; FBR Return</option>
-              <option value="IDENTITY_DOCUMENT">Identity Document &amp; Official Credential</option>
-              <option value="COMMERCIAL_INVOICE">Commercial Invoice &amp; Trade Bill</option>
-            </select>
+          {/* Institutional Forensic Protocol Banner (Dedicated Bank Statement Engine) */}
+          <div className="bg-paper-1 border border-rule p-4 font-mono text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-2.5 h-2.5 rounded-full bg-forensic-green animate-pulse flex-shrink-0" />
+              <div>
+                <span className="font-semibold text-ink-900 block text-xs tracking-wider uppercase">
+                  Institutional Intake: Bank Statement &amp; Financial Ledger
+                </span>
+                <span className="text-[11px] text-ink-600 block mt-0.5 font-sans">
+                  Enforcing SBP clearing standards, Lakh/Crore ledger reconciliation, and IBAN checksum verification.
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 self-start sm:self-center flex-shrink-0">
+              <span className="px-2.5 py-1 bg-paper-0 border border-rule text-ink-700 font-mono text-[10px] uppercase tracking-wider font-semibold">
+                SBP ENFORCED
+              </span>
+              <span className="px-2.5 py-1 bg-paper-0 border border-rule text-ink-700 font-mono text-[10px] uppercase tracking-wider font-semibold">
+                LEDGER ENGINE
+              </span>
+            </div>
           </div>
 
           {/* Case Title Input */}
@@ -289,7 +268,7 @@ export default function NewCaseIntakePage() {
               disabled={isProcessing || !file}
               className="px-8 py-3 bg-ink-900 hover:bg-black text-paper-0 font-mono text-xs uppercase tracking-widest font-semibold transition-colors disabled:opacity-40"
             >
-              {isProcessing ? "Processing Custody Lock..." : "Seal & Analyze Document →"}
+              {isProcessing ? "Processing Custody Lock..." : "Seal & Analyze Statement →"}
             </button>
           </div>
         </form>
