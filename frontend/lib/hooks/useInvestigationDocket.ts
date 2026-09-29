@@ -197,7 +197,7 @@ export function useInvestigationDocket(investigationId: string) {
   const [activeEvidenceId, setActiveEvidenceId] = useState<string | null>(null);
   const [isOverrideOpen, setIsOverrideOpen] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>("findings");
-  const [viewMode, setViewMode] = useState<"split" | "dossier">("split");
+  const [viewMode, setViewMode] = useState<"split" | "dossier">("dossier");
   const [focusedPageNumber, setFocusedPageNumber] = useState<number | null>(null);
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(!isSample);
