@@ -195,7 +195,7 @@ function LoginFormContent() {
     );
   }, [passwordChecks]);
 
-  const handlePreset = (type: "analyst" | "mfa" | "admin") => {
+  const handlePreset = (type: "analyst" | "admin") => {
     setError(null);
     setIsMfaRequired(false);
     setTempToken(null);
@@ -206,10 +206,6 @@ function LoginFormContent() {
       setEmail("analyst@meezan.pk");
       setPassword("Analyst@12345");
       setPresetNotice("Loaded Meezan Bank Analyst (Standard)");
-    } else if (type === "mfa") {
-      setEmail("analyst.mfa@meezan.pk");
-      setPassword("Analyst@12345");
-      setPresetNotice("Loaded Meezan Analyst (2FA Enforced)");
     } else if (type === "admin") {
       setEmail("admin@deeptrace.test");
       setPassword("Admin@12345");
@@ -343,11 +339,11 @@ function LoginFormContent() {
                 </span>
               )}
             </div>
-            <div className="grid grid-cols-3 gap-1.5 font-mono text-[11px]">
+            <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
               <button
                 type="button"
                 onClick={() => handlePreset("analyst")}
-                className={`py-1 px-2 border text-left transition-colors cursor-pointer select-none ${
+                className={`py-1.5 px-3 border text-left transition-colors cursor-pointer select-none ${
                   email === "analyst@meezan.pk"
                     ? "bg-ink-900 text-paper-0 border-ink-900 font-semibold"
                     : "bg-paper-1 text-ink-700 border-rule hover:bg-paper-2"
@@ -357,19 +353,8 @@ function LoginFormContent() {
               </button>
               <button
                 type="button"
-                onClick={() => handlePreset("mfa")}
-                className={`py-1 px-2 border text-left transition-colors cursor-pointer select-none ${
-                  email === "analyst.mfa@meezan.pk"
-                    ? "bg-ink-900 text-paper-0 border-ink-900 font-semibold"
-                    : "bg-paper-1 text-ink-700 border-rule hover:bg-paper-2"
-                }`}
-              >
-                Analyst + 2FA
-              </button>
-              <button
-                type="button"
                 onClick={() => handlePreset("admin")}
-                className={`py-1 px-2 border text-left transition-colors cursor-pointer select-none ${
+                className={`py-1.5 px-3 border text-left transition-colors cursor-pointer select-none ${
                   email === "admin@deeptrace.test"
                     ? "bg-ink-900 text-paper-0 border-ink-900 font-semibold"
                     : "bg-paper-1 text-ink-700 border-rule hover:bg-paper-2"
