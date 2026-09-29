@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { DocumentPage, EvidenceItem } from "@/lib/types/forensics";
 import { CanvasToolbar } from "./CanvasToolbar";
 import { BoundingBoxLayer } from "./BoundingBoxLayer";
+import { ThumbnailStrip } from "./ThumbnailStrip";
 
 interface ForensicCanvasProps {
   pages: DocumentPage[];
@@ -21,6 +22,8 @@ export function ForensicCanvas({
   focusedPageNumber,
 }: ForensicCanvasProps) {
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const [showThumbnails, setShowThumbnails] = useState<boolean>(pages.length > 1);
+  const [thumbnailDensity, setThumbnailDensity] = useState<"expanded" | "compact">("expanded");
 
   // Sync with external focusedPageNumber (e.g. from ledger row selection)
   useEffect(() => {
@@ -28,6 +31,58 @@ export function ForensicCanvas({
       setCurrentPage(focusedPageNumber);
     }
   }, [focusedPageNumber]);
+
+  // Flagged pages index for keyboard triage jumps
+  const flaggedPageNumbers = useMemo(() => {
+    const s = new Set<number>();
+    for (const ev of evidence) {
+      if (ev.severity === "INFO") continue;
+      const p =
+        ev.pageNumber ??
+        ev.boundingBoxes?.[0]?.pageNumber ??
+        ev.anchors?.[0]?.pageNumber;
+      if (p) s.add(p);
+    }
+    return Array.from(s).sort((a, b) => a - b);
+  }, [evidence]);
+
+  // Global keyboard shortcuts: [ / ] for page step, Shift + [ / ] for flagged page jump
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (["INPUT", "TEXTAREA"].includes((e.target as HTMLElement)?.tagName)) {
+        return;
+      }
+
+      if (e.key === "[" || e.key === "PageUp") {
+        e.preventDefault();
+        if (e.shiftKey) {
+          const prev = flaggedPageNumbers.filter((p) => p < currentPage);
+          if (prev.length > 0) {
+            setCurrentPage(prev[prev.length - 1]);
+          } else if (flaggedPageNumbers.length > 0) {
+            setCurrentPage(flaggedPageNumbers[flaggedPageNumbers.length - 1]);
+          }
+        } else {
+          setCurrentPage((p) => Math.max(1, p - 1));
+        }
+      } else if (e.key === "]" || e.key === "PageDown") {
+        e.preventDefault();
+        if (e.shiftKey) {
+          const next = flaggedPageNumbers.filter((p) => p > currentPage);
+          if (next.length > 0) {
+            setCurrentPage(next[0]);
+          } else if (flaggedPageNumbers.length > 0) {
+            setCurrentPage(flaggedPageNumbers[0]);
+          }
+        } else {
+          setCurrentPage((p) => Math.min(pages.length || 1, p + 1));
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [currentPage, flaggedPageNumbers, pages.length]);
 
   const [zoom, setZoom] = useState<number>(1.0);
   const [showELA, setShowELA] = useState<boolean>(false);
@@ -210,11 +265,29 @@ export function ForensicCanvas({
         selectedCategory={selectedCategory}
         onCategoryChange={setSelectedCategory}
         categoryCounts={categoryCounts}
+        showThumbnails={showThumbnails}
+        onToggleThumbnails={setShowThumbnails}
+        flaggedPagesCount={flaggedPageNumbers.length}
       />
 
-      {/* Main Viewport */}
-      <div
-        ref={containerRef}
+      {/* Main Workspace Body: Left Thumbnail Filmstrip Rail + Center Viewport */}
+      <div className="flex flex-1 overflow-hidden relative">
+        <ThumbnailStrip
+          pages={pages}
+          currentPage={currentPage}
+          onSelectPage={setCurrentPage}
+          evidence={evidence}
+          isOpen={showThumbnails}
+          onToggleOpen={() => setShowThumbnails(false)}
+          density={thumbnailDensity}
+          onToggleDensity={() =>
+            setThumbnailDensity((d) => (d === "expanded" ? "compact" : "expanded"))
+          }
+        />
+
+        {/* Main Viewport */}
+        <div
+          ref={containerRef}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -346,5 +419,6 @@ export function ForensicCanvas({
         </div>
       </div>
     </div>
+  </div>
   );
 }

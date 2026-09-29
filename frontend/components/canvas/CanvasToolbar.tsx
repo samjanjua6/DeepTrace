@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { ZoomIn, ZoomOut, Maximize2, Layers } from "lucide-react";
+import { ZoomIn, ZoomOut, Maximize2, Layers, PanelLeft } from "lucide-react";
 
 interface CanvasToolbarProps {
   zoom: number;
@@ -25,6 +25,9 @@ interface CanvasToolbarProps {
     visual: number;
     dates: number;
   };
+  showThumbnails?: boolean;
+  onToggleThumbnails?: (show: boolean) => void;
+  flaggedPagesCount?: number;
 }
 
 export function CanvasToolbar({
@@ -44,29 +47,52 @@ export function CanvasToolbar({
   selectedCategory = "ALL",
   onCategoryChange,
   categoryCounts,
+  showThumbnails = true,
+  onToggleThumbnails,
+  flaggedPagesCount = 0,
 }: CanvasToolbarProps) {
   return (
     <div className="w-full bg-paper-1 border-b border-rule px-4 py-2 flex flex-wrap items-center justify-between gap-3 text-xs font-mono text-ink-700 select-none">
-      {/* Page Navigation */}
+      {/* Page Navigation & Filmstrip Toggle */}
       <div className="flex items-center gap-2">
-        <span className="text-ink-500 uppercase">PAGE:</span>
-        <button
-          onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-          disabled={currentPage <= 1}
-          className="px-2 py-1 bg-paper-0 border border-rule hover:bg-paper-2 disabled:opacity-40 disabled:hover:bg-paper-0 transition-colors"
-        >
-          ‹
-        </button>
-        <span className="px-2 py-1 bg-paper-0 border border-rule tabular-nums font-semibold">
-          {currentPage} / {Math.max(1, totalPages)}
-        </span>
-        <button
-          onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-          disabled={currentPage >= totalPages}
-          className="px-2 py-1 bg-paper-0 border border-rule hover:bg-paper-2 disabled:opacity-40 disabled:hover:bg-paper-0 transition-colors"
-        >
-          ›
-        </button>
+        {onToggleThumbnails && (
+          <button
+            type="button"
+            onClick={() => onToggleThumbnails(!showThumbnails)}
+            className={`px-2 py-1 border text-[11px] uppercase font-mono flex items-center gap-1.5 transition-colors cursor-pointer ${
+              showThumbnails
+                ? "bg-ink-900 text-paper-0 border-ink-900 font-bold"
+                : "bg-paper-0 text-ink-700 border-rule hover:bg-paper-2 font-semibold"
+            }`}
+            title={showThumbnails ? "Collapse Page Overview Filmstrip" : "Open Page Overview Filmstrip"}
+          >
+            <PanelLeft className="w-3.5 h-3.5" />
+            <span>PAGES ({totalPages})</span>
+            {flaggedPagesCount > 0 && (
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-600 block animate-pulse" />
+            )}
+          </button>
+        )}
+
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+            disabled={currentPage <= 1}
+            className="px-2 py-1 bg-paper-0 border border-rule hover:bg-paper-2 disabled:opacity-40 disabled:hover:bg-paper-0 transition-colors cursor-pointer"
+          >
+            ‹
+          </button>
+          <span className="px-2 py-1 bg-paper-0 border border-rule tabular-nums font-semibold">
+            {currentPage} / {Math.max(1, totalPages)}
+          </span>
+          <button
+            onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+            disabled={currentPage >= totalPages}
+            className="px-2 py-1 bg-paper-0 border border-rule hover:bg-paper-2 disabled:opacity-40 disabled:hover:bg-paper-0 transition-colors cursor-pointer"
+          >
+            ›
+          </button>
+        </div>
       </div>
 
       {/* Zoom Controls */}
