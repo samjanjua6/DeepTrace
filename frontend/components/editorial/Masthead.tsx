@@ -254,14 +254,6 @@ export function Masthead({
               </Link>
             </>
           )}
-          <a
-            href="http://localhost:8000/docs"
-            target="_blank"
-            rel="noreferrer"
-            className="text-ink-500 hover:text-ink-900 transition-colors"
-          >
-            API Docs ↗
-          </a>
 
           {/* User Profile / Logout */}
           {isAuthenticated && user ? (
@@ -434,15 +426,6 @@ export function Masthead({
                   </Link>
                 </>
               )}
-
-              <a
-                href="http://localhost:8000/docs"
-                target="_blank"
-                rel="noreferrer"
-                className="px-5 py-3 border-l-4 border-transparent text-ink-600 hover:bg-paper-1 transition-colors"
-              >
-                API Docs ↗
-              </a>
             </nav>
 
             {/* User info & actions */}
