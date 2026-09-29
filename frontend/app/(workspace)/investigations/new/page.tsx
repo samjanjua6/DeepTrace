@@ -246,8 +246,18 @@ export default function NewCaseIntakePage() {
           </div>
 
           {error && (
-            <div className="bg-forensic-red/10 border border-forensic-red/40 p-3 font-mono text-xs text-forensic-red">
-              {error}
+            <div className="bg-forensic-red/10 border border-forensic-red/40 p-4 font-mono text-xs text-forensic-red flex items-start gap-3">
+              <div className="w-2.5 h-2.5 rounded-full bg-forensic-red mt-0.5 flex-shrink-0" />
+              <div className="space-y-1">
+                <span className="font-bold tracking-wider uppercase block text-forensic-red text-xs">
+                  {error.includes("strictly accepts and analyzes Bank Statements")
+                    ? "NON-BANK STATEMENT MATERIAL REJECTED"
+                    : "INTAKE ERROR"}
+                </span>
+                <p className="text-ink-800 font-sans text-xs leading-relaxed">
+                  {error}
+                </p>
+              </div>
             </div>
           )}
 

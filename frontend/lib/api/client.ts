@@ -515,9 +515,13 @@ export async function uploadDocument(
 
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
-    throw new Error(
-      errorData.detail || `Upload failed with status ${res.status}`
-    );
+    const message =
+      errorData.error?.message ||
+      errorData.detail?.message ||
+      (typeof errorData.detail === "string" ? errorData.detail : "") ||
+      errorData.message ||
+      `Upload failed with status ${res.status}`;
+    throw new Error(message);
   }
   const d = await res.json();
   return {

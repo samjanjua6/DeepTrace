@@ -37,11 +37,11 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException):
         detail = exc.detail
-        if isinstance(detail, dict) and "code" in detail:
-            return JSONResponse(status_code=exc.status_code, content={"error": detail})
+        msg = detail.get("message", str(detail)) if isinstance(detail, dict) else str(detail)
+        err_body = detail if (isinstance(detail, dict) and "code" in detail) else {"code": "HTTP_ERROR", "message": msg}
         return JSONResponse(
             status_code=exc.status_code,
-            content={"error": {"code": "HTTP_ERROR", "message": str(detail)}},
+            content={"error": err_body, "detail": msg},
         )
 
     @app.exception_handler(PrismaError)
