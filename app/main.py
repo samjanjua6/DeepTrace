@@ -42,7 +42,7 @@ def create_app() -> FastAPI:
         title="DeepTrace Forensics API",
         description=(
             "Explainable AI Document Forensics & Verification API Platform. "
-            "SBP & NIST compliant. Pakistan & Global Edition."
+            "Aligned with SBP regulatory circulars and NIST SP 800-86 forensic guidance. Pakistan & Global Edition."
         ),
         version="1.0.0",
         lifespan=lifespan,
