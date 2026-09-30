@@ -81,7 +81,7 @@ export function FindingsTab({
         <CheckCircle2 className="w-6 h-6 text-forensic-green flex-shrink-0 mt-0.5" />
         <div>
           <span className="text-[11px] text-forensic-green font-bold uppercase tracking-widest block">
-            VERIFICATION CERTIFICATE - NIST SP 800-86 AUDIT PASSED
+            FORENSIC AUDIT SUMMARY - ALIGNED WITH NIST SP 800-86 GUIDELINES
           </span>
           <h3 className="font-serif text-lg text-ink-900 font-medium">
             Authentic Document - Zero Tampering Detected

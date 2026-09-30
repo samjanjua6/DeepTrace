@@ -3,7 +3,7 @@ State Bank of Pakistan (SBP) AML/CFT & Customer Due Diligence (CDD) Sanctions Da
 Curated, offline-first compliance registry covering:
 1. National Counter Terrorism Authority (NACTA) 4th Schedule / Proscribed Entities & Persons (ATA 1997 §11EE)
 2. United Nations Security Council (UNSC) 1267 / 1988 / 2253 Consolidated Sanctions List
-3. Politically Exposed Persons (PEPs) Registry under SBP BPRD Circular No. 1 of 2021 & Circular No. 2 of 2012
+3. Politically Exposed Persons (PEPs) Registry under SBP BPRD Circular No. 05 of 2020 & Circular No. 2 of 2012
 4. Hawala, Hundi & Trade-Based Money Laundering Suspicious Narration Lexicon
 """
 
@@ -203,7 +203,7 @@ UNSC_SANCTIONED_INDIVIDUALS: list[dict[str, Any]] = [
         "committee": "1267 / 1989 / 2253 ISIL (Da'esh) & Al-Qaida Sanctions Committee",
         "designation_date": "2008-12-10",
         "nationality": "Pakistan",
-        "statutory_reference": "UNSC Resolution 1267 & SBP BPRD Circular 1/2021",
+        "statutory_reference": "UNSC Resolution 1267 & SBP BPRD Circular 05/2020",
     },
     {
         "name": "Mohammed Masood Azhar Alvi",
@@ -211,7 +211,7 @@ UNSC_SANCTIONED_INDIVIDUALS: list[dict[str, Any]] = [
         "committee": "1267 / 1989 / 2253 ISIL (Da'esh) & Al-Qaida Sanctions Committee",
         "designation_date": "2019-05-01",
         "nationality": "Pakistan",
-        "statutory_reference": "UNSC Resolution 1267 & SBP BPRD Circular 1/2021",
+        "statutory_reference": "UNSC Resolution 1267 & SBP BPRD Circular 05/2020",
     },
     {
         "name": "Zaki-ur-Rehman Lakhvi",
@@ -219,7 +219,7 @@ UNSC_SANCTIONED_INDIVIDUALS: list[dict[str, Any]] = [
         "committee": "1267 / 1989 / 2253 ISIL (Da'esh) & Al-Qaida Sanctions Committee",
         "designation_date": "2008-12-10",
         "nationality": "Pakistan",
-        "statutory_reference": "UNSC Resolution 1267 & SBP BPRD Circular 1/2021",
+        "statutory_reference": "UNSC Resolution 1267 & SBP BPRD Circular 05/2020",
     },
     {
         "name": "Haji Muhammad Ashraf",
@@ -227,7 +227,7 @@ UNSC_SANCTIONED_INDIVIDUALS: list[dict[str, Any]] = [
         "committee": "1267 / 1989 / 2253 ISIL (Da'esh) & Al-Qaida Sanctions Committee",
         "designation_date": "2008-12-10",
         "nationality": "Pakistan",
-        "statutory_reference": "UNSC Resolution 1267 & SBP BPRD Circular 1/2021",
+        "statutory_reference": "UNSC Resolution 1267 & SBP BPRD Circular 05/2020",
     },
     {
         "name": "Mahmoud Mohammad Ahmed Bahaziq",
@@ -235,7 +235,7 @@ UNSC_SANCTIONED_INDIVIDUALS: list[dict[str, Any]] = [
         "committee": "1267 / 1989 / 2253 ISIL (Da'esh) & Al-Qaida Sanctions Committee",
         "designation_date": "2008-12-10",
         "nationality": "Saudi Arabia / Pakistan",
-        "statutory_reference": "UNSC Resolution 1267 & SBP BPRD Circular 1/2021",
+        "statutory_reference": "UNSC Resolution 1267 & SBP BPRD Circular 05/2020",
     },
     {
         "name": "Ayman al-Zawahiri",
@@ -273,7 +273,7 @@ UNSC_SANCTIONED_INDIVIDUALS: list[dict[str, Any]] = [
 
 # =============================================================================
 # 3. Politically Exposed Persons (PEPs) Registry
-# SBP BPRD Circular No. 1 of 2021 (Regulation-2 & Guidelines on PEPs)
+# SBP BPRD Circular No. 05 of 2020 (Regulation-2 & Guidelines on PEPs)
 # Mandatory Requirements: Senior Management Approval (SMA), Enhanced Due Diligence (EDD),
 # Determination of Source of Wealth & Source of Funds.
 # =============================================================================

@@ -187,8 +187,8 @@ export function HmacGuideModal({ isOpen, onClose }: HmacGuideModalProps) {
         <div className="space-y-4 text-xs text-ink-700 leading-relaxed mb-6">
           <p>
             DeepTrace signs all outbound webhook deliveries using institutional HMAC-SHA256
-            signatures complying with NIST SP 800-86 and SBP BPRD/2020 operational resilience
-            guidelines. Receiving endpoints must verify the signature to prevent tampering and
+            signatures aligned with NIST SP 800-86 forensic guidelines and SBP BPRD operational resilience
+            recommendations. Receiving endpoints must verify the signature to prevent tampering and
             spoofing.
           </p>
 

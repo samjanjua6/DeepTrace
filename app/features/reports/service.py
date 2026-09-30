@@ -57,8 +57,8 @@ def _draw_header_footer(page: pymupdf.Page, case_number: str, page_num: int, tot
 
 async def generate_report(db: Prisma, investigation_id: str, options: dict | None = None) -> schemas.ReportResponse:
     """
-    Build a court-admissible forensic PDF dossier containing:
-    - SHA-256 chain-of-custody header (ETO 2002 / NIST SP 800-86)
+    Build an evidentiary forensic PDF audit dossier containing:
+    - SHA-256 chain-of-custody header (ETO 2002 / aligned with NIST SP 800-86)
     - Risk score summary and tier classification
     - Per-evidence finding with bounding box annotations
     - Multi-Agent Lead Investigator narrative synthesis
@@ -169,7 +169,7 @@ async def generate_report(db: Prisma, investigation_id: str, options: dict | Non
     # Top Dark Navy Banner
     p1.draw_rect(pymupdf.Rect(40, 50, 555, 115), color=None, fill=(0.06, 0.09, 0.16))
     p1.insert_text((55, 78), "DEEPTRACE DOCUMENT FORENSICS", fontsize=14, color=(1, 1, 1), fontname="hebo")
-    p1.insert_text((55, 98), "COURT-ADMISSIBLE FORENSIC AUDIT DOSSIER", fontsize=9, color=(0.8, 0.85, 0.95), fontname="helv")
+    p1.insert_text((55, 98), "FORENSIC AUDIT DOSSIER (SUPPORTING EVIDENTIARY EVALUATION)", fontsize=8.5, color=(0.8, 0.85, 0.95), fontname="helv")
     p1.insert_text((430, 98), f"CASE: {case_num}", fontsize=8, color=(0.9, 0.9, 0.9), fontname="helv")
 
     curr_y = 135
@@ -202,7 +202,7 @@ async def generate_report(db: Prisma, investigation_id: str, options: dict | Non
     p1.draw_rect(pymupdf.Rect(40, curr_y + 30, 292, curr_y + 76), color=auth_col, fill=auth_bg, width=1.0)
     p1.insert_text((50, curr_y + 44), f"DOCUMENT AUTHENTICITY: {authenticity_score}%", fontsize=10, fontname="hebo", color=auth_col)
     p1.insert_text((50, curr_y + 58), f"Integrity Tier: {authenticity_tier.replace('_', ' ')} (Tamper: {tamper_score}/100)", fontsize=7.5, fontname="hebo", color=auth_col)
-    p1.insert_text((50, curr_y + 70), "Statutory Basis: ETO 2002 §29 / PECA 2016 §33", fontsize=6.8, fontname="helv", color=(0.35, 0.4, 0.45))
+    p1.insert_text((50, curr_y + 70), "Regulatory Reference: ETO 2002 §29 / PECA 2016 §33", fontsize=6.8, fontname="helv", color=(0.35, 0.4, 0.45))
 
     # Right Box: Transaction & AML Risk (SBP BPRD / AMLA 2010)
     txn_col = (0.05, 0.45, 0.15) if transaction_risk_score <= 20 else ((0.1, 0.35, 0.7) if transaction_risk_score <= 45 else ((0.8, 0.4, 0.0) if transaction_risk_score <= 70 else (0.7, 0.1, 0.1)))
@@ -210,7 +210,7 @@ async def generate_report(db: Prisma, investigation_id: str, options: dict | Non
     p1.draw_rect(pymupdf.Rect(302, curr_y + 30, 555, curr_y + 76), color=txn_col, fill=txn_bg, width=1.0)
     p1.insert_text((312, curr_y + 44), f"TRANSACTION & AML RISK: {transaction_risk_score}/100", fontsize=10, fontname="hebo", color=txn_col)
     p1.insert_text((312, curr_y + 58), f"Compliance Tier: {transaction_risk_tier.replace('_', ' ')}", fontsize=7.5, fontname="hebo", color=txn_col)
-    p1.insert_text((312, curr_y + 70), "Statutory Basis: SBP BPRD 03/2018 & AMLA 2010", fontsize=6.8, fontname="helv", color=(0.35, 0.4, 0.45))
+    p1.insert_text((312, curr_y + 70), "Regulatory Reference: SBP BPRD 03/2018, BPRD 05/2020 & AMLA 2010", fontsize=6.8, fontname="helv", color=(0.35, 0.4, 0.45))
 
     curr_y += 84
 
@@ -436,7 +436,7 @@ async def generate_report(db: Prisma, investigation_id: str, options: dict | Non
     # ─────────────────────────────────────────────────────────────────────────
     p3 = doc.new_page(width=595, height=842)
     p3_y = 55
-    p3.insert_text((40, p3_y), "PAKISTANI REGULATORY FRAMEWORK & STATUTORY ADMISSIBILITY", fontsize=11, fontname="hebo", color=(0.1, 0.1, 0.1))
+    p3.insert_text((40, p3_y), "REGULATORY FRAMEWORK & EVIDENTIARY DISCLOSURES", fontsize=11, fontname="hebo", color=(0.1, 0.1, 0.1))
     p3_y += 25
 
     reg_sections = [
@@ -460,12 +460,13 @@ async def generate_report(db: Prisma, investigation_id: str, options: dict | Non
             ),
         ),
         (
-            "3. State Bank of Pakistan (SBP) AML/CFT & Customer Due Diligence (CDD) Compliance",
+            "3. State Bank of Pakistan (SBP) AML/CFT & Customer Due Diligence (CDD) Framework",
             (
-                "Under SBP BPRD Circular No. 1 of 2021, Circular No. 2 of 2012, Section 11EE of the Anti-Terrorism Act 1997 "
-                "(ATA 1997), and the United Nations (Security Council) Act 1948, regulated institutions are legally obligated to screen "
-                "customers and transactions against the NACTA 4th Schedule proscribed persons list, UN Security Council Resolution 1267 "
-                "sanctions, and identify Politically Exposed Persons (PEPs) requiring Senior Management Approval and Enhanced Due Diligence (EDD)."
+                "Under SBP BPRD Circular No. 05 of 2020 (AML/CFT/CPF Regulations - sbp.org.pk/bprd/2020/C5.htm), "
+                "BPRD Circular No. 03 of 2018 (Virtual Currency Prohibitions - sbp.org.pk/bprd/2018/C3.htm), "
+                "and PSD Circular No. 02 of 2012 (IBAN Standards - sbp.org.pk/psd/2012/C2.htm), regulated institutions "
+                "are guided to screen customers against NACTA proscribed lists, UN Security Council 1267 sanctions, "
+                "and execute Enhanced Due Diligence (EDD) for Politically Exposed Persons (PEPs)."
             ),
         ),
         (
@@ -492,7 +493,7 @@ async def generate_report(db: Prisma, investigation_id: str, options: dict | Non
             (
                 "All evidentiary artifacts, sub-pixel baseline offsets, discrete cosine transform (DCT) residual heatmaps, "
                 "and multi-page balance reconciliation audits are compiled under deterministic, non-destructive methodologies "
-                "satisfying NIST SP 800-86 forensic standards."
+                "aligned with NIST SP 800-86 incident-response forensics guidance."
             ),
         ),
     ]
@@ -502,6 +503,19 @@ async def generate_report(db: Prisma, investigation_id: str, options: dict | Non
         p3.insert_text((50, p3_y + 16), heading, fontsize=8.5, fontname="hebo", color=(0.15, 0.2, 0.35))
         p3.insert_textbox(pymupdf.Rect(50, p3_y + 22, 545, p3_y + 60), body, fontsize=7.2, fontname="helv")
         p3_y += 75
+
+    # Legal Advisory & Admissibility Disclaimer Box
+    p3.draw_rect(pymupdf.Rect(40, p3_y + 5, 555, p3_y + 82), color=(0.8, 0.8, 0.85), fill=(0.96, 0.96, 0.98), width=1.0)
+    p3.insert_text((50, p3_y + 20), "LEGAL ADMISSIBILITY & STATUTORY PREROGATIVE DISCLAIMER", fontsize=8.5, fontname="hebo", color=(0.7, 0.1, 0.1))
+    disclaimer_text = (
+        "DeepTrace outputs constitute explainable technical, mathematical, and computer-vision forensic analysis "
+        "designed to support institutional credit underwriting, risk assessment, and legal review under applicable "
+        "evidentiary standards (including Qanun-e-Shahadat Order 1984 Article 164 and Electronic Transactions Ordinance 2002). "
+        "DeepTrace does not issue binding legal decrees, statutory orders, or police directives. All lending, rejection, "
+        "asset freeze, or Suspicious Transaction Report (STR) decisions remain the exclusive prerogative of "
+        "authorized human credit & compliance officers. Final legal admissibility remains subject to judicial determination."
+    )
+    p3.insert_textbox(pymupdf.Rect(50, p3_y + 26, 545, p3_y + 78), disclaimer_text, fontsize=6.8, fontname="helv", color=(0.25, 0.25, 0.3))
 
     # Draw Headers and Footers across all pages
     total_pages = len(doc)
@@ -547,7 +561,7 @@ async def generate_report(db: Prisma, investigation_id: str, options: dict | Non
             data={
                 "investigationId": investigation_id,
                 "eventType": "EXPORTED",
-                "description": f"Court-admissible PDF forensic audit dossier generated ({total_pages} pages) with RFC 3161 TSA seal.",
+                "description": f"Forensic PDF audit dossier generated ({total_pages} pages, designed to support evidentiary evaluation) with RFC 3161 TSA seal.",
                 "actorType": "system",
                 "actorId": "deeptrace-core",
                 "sha256Hash": dossier_sha256,

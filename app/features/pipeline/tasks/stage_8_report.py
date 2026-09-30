@@ -35,7 +35,7 @@ async def process_report_generation(
                 where={"investigationId": investigation_id}
             )
 
-            # Generate and archive court-admissible PDF dossier
+            # Generate and archive evidentiary forensic PDF dossier
             from app.features.reports.service import generate_report
             report_resp = await generate_report(tx, investigation_id)
 

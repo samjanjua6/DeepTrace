@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { AlertTriangle, CheckCircle, ShieldCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle, ExternalLink, ShieldCheck } from "lucide-react";
 import { EvidenceItem } from "@/lib/types/forensics";
 
 interface IBANChecksumCardProps {
@@ -152,7 +152,16 @@ export function IBANChecksumCard({
         </div>
         <div className="flex justify-between items-center border-t border-rule/50 pt-1">
           <span className="text-ink-700 font-medium">Verification Engine:</span>
-          <span className="text-ink-800">State Bank of Pakistan (PSD Circular No. 04 / 2007)</span>
+          <a
+            href="https://www.sbp.org.pk/psd/2012/C2.htm"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-ink-800 hover:text-ink-900 underline decoration-rule hover:decoration-ink-900 inline-flex items-center gap-1 cursor-pointer font-medium"
+            title="State Bank of Pakistan IBAN Implementation Guidelines (PSD Circular No. 02 of 2012)"
+          >
+            <span>State Bank of Pakistan (PSD Circular No. 02 of 2012)</span>
+            <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+          </a>
         </div>
       </div>
 

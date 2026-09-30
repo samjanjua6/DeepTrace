@@ -3,7 +3,7 @@ Unit and Integration Tests for SBP AML/CFT & Customer Due Diligence (CDD) Screen
 Verifies compliance with:
 - NACTA 4th Schedule (Anti-Terrorism Act 1997 §11EE)
 - UN Security Council 1267 / 1988 Sanctions Lists
-- Politically Exposed Persons (PEPs) under SBP BPRD Circular No. 1 of 2021
+- Politically Exposed Persons (PEPs) under SBP BPRD Circular No. 05 of 2020
 - Hawala / Hundi / Trade Structuring Detection (SBP BPRD Circular No. 3 of 2018)
 """
 import pytest

@@ -118,7 +118,7 @@ export function RiskGaugeBlock({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="font-bold text-amber-900 flex items-center gap-1.5">
               <span className="inline-block w-2 h-2 rounded-full bg-amber-500" />
-              HUMAN ANALYST AUDIT OVERRIDE (SBP BPRD COMPLIANT)
+              HUMAN ANALYST AUDIT OVERRIDE (ALIGNED WITH SBP BPRD GOVERNANCE)
             </span>
             <span className="text-[11px] font-semibold text-amber-800">
               {assessment.overriddenAt ? new Date(assessment.overriddenAt).toLocaleString() : "Adjudicated"}
@@ -205,7 +205,7 @@ export function RiskGaugeBlock({
           <div className="flex items-start justify-between">
             <div>
               <span className="font-mono text-[11px] font-bold tracking-[0.12em] uppercase text-ink-700 block">
-                DIMENSION B • STATUTORY COMPLIANCE
+                DIMENSION B • REGULATORY ALIGNMENT
               </span>
               <span className="text-xs font-serif font-semibold text-ink-900">
                 Transaction & AML Risk

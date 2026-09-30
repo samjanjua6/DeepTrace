@@ -47,7 +47,7 @@ export function PipelineExecutionBanner({
       case "EVIDENCE_FUSION":
         return "Stage 7/8: Calibrating Bayesian evidence fusion matrix and deterministic overrides...";
       case "REPORT_GENERATION":
-        return "Stage 8/8: Sealing court-admissible forensic docket and SHA-256 evidence chain...";
+        return "Stage 8/8: Sealing evidentiary forensic dossier and SHA-256 custody chain...";
       default:
         return `Stage ${activeStage.stageOrder}/8: Executing ${activeStage.stageType}...`;
     }

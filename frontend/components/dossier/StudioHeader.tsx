@@ -19,12 +19,12 @@ function getRegulatoryStatus(type: string) {
   switch (type) {
     case "BANK_STATEMENT":
       return {
-        chipLabel: "SBP ENFORCED",
-        shortText: "SBP Clearing Standard: Enforced • Running Balance Reconciliation: Active",
+        chipLabel: "SBP ALIGNED",
+        shortText: "SBP Guidelines Aligned • Running Balance Reconciliation: Active",
         items: [
-          "SBP Clearing Standard: Enforced",
-          "Running Balance Reconciliation: Active",
-          "BPRD Circular 03/2018 & AML Compliance Active",
+          "SBP PSD Cir. 02/2012 (IBAN Standard): Aligned",
+          "Running Balance Ledger Reconciliation: Active",
+          "SBP BPRD 03/2018 (Virtual Assets) & BPRD 05/2020 (AML/CFT): Aligned",
         ],
       };
     case "UTILITY_BILL":
@@ -172,7 +172,7 @@ export function StudioHeader({
                 ))}
               </div>
               <div className="mt-2 pt-1.5 border-t border-ink-800 text-[11px] text-paper-2 font-medium">
-                Continuous background audit decoration (NIST SP 800-86).
+                Forensic audit trail aligned with NIST SP 800-86 incident-response guidance.
               </div>
             </div>
           </div>

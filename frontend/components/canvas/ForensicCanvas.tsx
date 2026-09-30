@@ -378,7 +378,7 @@ export function ForensicCanvas({
                 </div>
 
                 <div className="border-t border-rule pt-3 flex justify-between text-[10px] text-ink-500">
-                  <span>NIST SP 800-86 AUDIT LAYER</span>
+                  <span>ALIGNED WITH NIST SP 800-86 GUIDELINES</span>
                   <span>PAGE {currentPage} OF {pages.length || 1}</span>
                 </div>
               </div>

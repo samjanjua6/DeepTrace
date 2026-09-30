@@ -169,7 +169,7 @@ export function SwarmChatDrawer({
       `DEEPTRACE FORENSIC AGENT SWARM TRANSCRIPT`,
       `Investigation ID: ${investigationId}`,
       `Exported: ${new Date().toISOString()}`,
-      `Evidentiary Compliance: PECA 2016 / SBP BPRD / ETO 2002`,
+      `Evidentiary Framework: PECA 2016 / SBP BPRD / ETO 2002 (Advisory Forensics)`,
       `Zero-Hallucination Verified Evidence Grounding: ACTIVE`,
       `================================================================================\n`,
     ];

@@ -205,9 +205,9 @@ export function PipelineAuditChecklist({
           })()}
         </div>
 
-        {/* 6. Financial Math & Statutory Compliance (SBP, NADRA & FBR) */}
+        {/* 6. Financial Math & Regulatory Alignment (SBP, NADRA & FBR) */}
         <div className="flex justify-between items-center font-semibold">
-          <span>6. Financial Math & Statutory Compliance (SBP, NADRA & FBR)</span>
+          <span>6. Financial Math & Regulatory Alignment (SBP, NADRA & FBR)</span>
           {(() => {
             if (!isFinancial && !isIdentity && !isTaxOrSalary)
               return (
@@ -264,7 +264,7 @@ export function PipelineAuditChecklist({
             if (hasFbrTamper) {
               return (
                 <span className="text-forensic-red font-bold">
-                  ✕ FBR STATUTORY TAX VIOLATION
+                  ✕ FBR TAX RECORD DISCREPANCY
                 </span>
               );
             }
@@ -321,13 +321,13 @@ export function PipelineAuditChecklist({
             if (hasBankTemplateVerified && isFinancial) {
               return (
                 <span className="text-forensic-green">
-                  ✓ CBS TEMPLATE & STATUTORY CLEARED
+                  ✓ CBS TEMPLATE &amp; CDD ALIGNED
                 </span>
               );
             }
             return (
               <span className="text-forensic-green">
-                ✓ RECONCILED & STATUTORY CLEARED
+                ✓ RECONCILED &amp; CDD ALIGNED
               </span>
             );
           })()}
@@ -360,9 +360,9 @@ export function PipelineAuditChecklist({
           })()}
         </div>
 
-        {/* 8. Court-Admissible Dossier Generation */}
+        {/* 8. Forensic Audit Dossier Generation (Designed to Support Admissibility) */}
         <div className="flex justify-between items-center font-semibold">
-          <span>8. Court-Admissible Dossier Generation</span>
+          <span>8. Forensic Audit Dossier Generation (Designed to Support Admissibility)</span>
           {(() => {
             const st = getStageStatus("REPORT_GENERATION");
             if (st === "PENDING")

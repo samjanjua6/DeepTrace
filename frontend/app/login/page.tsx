@@ -273,7 +273,7 @@ function LoginFormContent() {
               DEEPTRACE FORENSICS
             </span>
             <span className="text-rule-dark">|</span>
-            <span className="hidden sm:inline">SBP BPRD COMPLIANT GATEWAY</span>
+            <span className="hidden sm:inline">SBP BPRD ALIGNED ACCESS GATEWAY</span>
           </div>
           <div className="flex items-center gap-3">
             <span className="hidden sm:inline text-ink-600">PKT TIME</span>

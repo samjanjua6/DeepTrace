@@ -494,7 +494,7 @@ export default function ExecutiveDashboardPage() {
                 </h2>
               </div>
               <span className="text-xs bg-paper-1 border border-rule px-2.5 py-1 text-ink-700 font-semibold">
-                NIST SP 800-86 Validated
+                Aligned with NIST SP 800-86
               </span>
             </div>
 
@@ -507,7 +507,7 @@ export default function ExecutiveDashboardPage() {
                 { stage: "OCR_EXTRACTION", name: "Stage 5: OCR Extraction", ms: 77, type: "Multi-Modal OCR" },
                 { stage: "FINANCIAL_VERIFICATION", name: "Stage 6: Financial Reconciler", ms: 82, type: "Deterministic" },
                 { stage: "EVIDENCE_FUSION", name: "Stage 7: Evidence Fusion", ms: 59, type: "Bayesian Fusion" },
-                { stage: "REPORT_GENERATION", name: "Stage 8: Court Dossier", ms: 117, type: "Cryptographic PDF" },
+                { stage: "REPORT_GENERATION", name: "Stage 8: Forensic Dossier", ms: 117, type: "Cryptographic PDF" },
               ].map((item) => {
                 const liveMs = metrics?.verification_latency.stage_latencies?.[item.stage] ?? item.ms;
                 return (
@@ -637,19 +637,20 @@ export default function ExecutiveDashboardPage() {
           </div>
         </section>
 
-        {/* ── STATUTORY REGULATORY ADVISORY FOLIO ─────────────────────────── */}
+        {/* ── REGULATORY ADVISORY & CHAIN OF CUSTODY FOLIO ─────────────────── */}
         <section className="border border-rule bg-paper-1 p-5 font-mono text-xs text-ink-700 space-y-2">
           <div className="flex items-center gap-2 font-bold text-ink-900 uppercase tracking-wider text-[11px]">
             <Lock className="w-3.5 h-3.5 text-ink-700" />
-            <span>Statutory Compliance & Regulatory Chain of Custody</span>
+            <span>Regulatory Framework & Evidentiary Chain of Custody</span>
           </div>
           <p className="text-[11px] text-ink-600 leading-relaxed max-w-5xl">
             All telemetry metrics, sub-pixel typography baselines, Lakh/Crore arithmetic audit
             trails, and Error Level Analysis (ELA) heatmaps within this command center are
-            cryptographically locked under <strong>Electronic Transactions Ordinance (ETO) 2002</strong>{" "}
-            and <strong>Qanun-e-Shahadat Order 1984 (Article 164)</strong>. Audit reports generated
-            herein are legally admissible in banking tribunals and High Courts of Pakistan.
-            Unauthorized tampering or falsification of audit registers is strictly prosecuted under{" "}
+            cryptographically hashed and secured under the <strong>Electronic Transactions Ordinance (ETO) 2002</strong>{" "}
+            and <strong>Qanun-e-Shahadat Order 1984 (Article 164)</strong>. Forensic audit dossiers compiled
+            herein are structured to support institutional review and legal proceedings in banking tribunals
+            and judicial courts of Pakistan; final evidentiary admissibility remains subject to court determination.
+            Unauthorized tampering or falsification of audit registers is prohibited under{" "}
             <strong>Section 3 of the Prevention of Electronic Crimes Act (PECA) 2016</strong>.
           </p>
         </section>

@@ -230,10 +230,10 @@ export default function ApiKeysSettingsPage() {
 
         <div className="p-4 bg-paper-0 border-2 border-ink-900 shadow-sm">
           <span className="text-[10px] uppercase font-bold text-ink-500 tracking-wider block mb-1">
-            Compliance Standard
+            Framework Alignment
           </span>
           <div className="text-xs font-bold text-ink-900 mt-1">
-            SBP BPRD / NIST SP 800-86
+            SBP BPRD / NIST SP 800-86 Aligned
           </div>
           <span className="text-[10px] text-ink-500 block mt-0.5">
             HMAC / SHA-256 Hashed

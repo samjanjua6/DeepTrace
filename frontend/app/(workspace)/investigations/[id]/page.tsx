@@ -464,9 +464,9 @@ export default function InvestigationWorkspacePage() {
           </span>
         </div>
         <div className="hidden md:flex items-center gap-3 text-ink-400">
-          <span>NIST SP 800-86 AUDIT TRAIL</span>
+          <span>ALIGNED WITH NIST SP 800-86</span>
           <span>•</span>
-          <span>ETO 2002 §29 PRESUMPTION</span>
+          <span>ETO 2002 §29 INTEGRITY FRAMEWORK</span>
           <span>•</span>
           <span>RFC 3161 TSA SEALED</span>
         </div>

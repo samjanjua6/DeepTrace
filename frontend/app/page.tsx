@@ -241,7 +241,7 @@ export default function EditorialHomePage() {
           <div>
             <span className="text-ink-900 font-semibold">DEEPTRACE FORENSIC ENGINE</span>
             {" • "}
-            <span>NIST SP 800-86 AUDIT COMPLIANT</span>
+            <span>ALIGNED WITH NIST SP 800-86 FORENSIC GUIDELINES</span>
           </div>
           <div className="flex items-center gap-6">
             <Link

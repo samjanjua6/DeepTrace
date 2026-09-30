@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { AlertOctagon, AlertTriangle, CheckCircle, ShieldAlert, ShieldCheck } from "lucide-react";
+import { AlertOctagon, AlertTriangle, CheckCircle, ExternalLink, ShieldAlert, ShieldCheck } from "lucide-react";
 import { EvidenceItem, formatRecommendation } from "@/lib/types/forensics";
 
 interface MatchedEntity {
@@ -127,9 +127,34 @@ export function SBPAmlCddCard({ screening, evidence, onFocusCanvas }: SBPAmlCddC
         </span>
       </div>
 
-      {/* Statutory Mandate Citation */}
-      <div className="text-[11px] text-ink-700 uppercase tracking-wider font-medium">
-        Statutory Framework: SBP BPRD Circular No. 1/2021 • ATA 1997 §11EE • UNSC Act 1948
+      {/* Regulatory & Advisory Framework Citation */}
+      <div className="text-[11px] text-ink-700 uppercase tracking-wider font-medium flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="font-semibold text-ink-900">Regulatory Framework:</span>
+        <a
+          href="https://www.sbp.org.pk/bprd/2020/C5.htm"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-ink-700 hover:text-ink-900 underline decoration-rule hover:decoration-ink-900 inline-flex items-center gap-1 cursor-pointer"
+          title="State Bank of Pakistan AML/CFT/CPF Regulations (BPRD Circular No. 05 of 2020)"
+        >
+          <span>SBP BPRD Cir. 05/2020</span>
+          <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+        </a>
+        <span>•</span>
+        <a
+          href="https://www.sbp.org.pk/bprd/2018/C3.htm"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-ink-700 hover:text-ink-900 underline decoration-rule hover:decoration-ink-900 inline-flex items-center gap-1 cursor-pointer"
+          title="State Bank of Pakistan Prohibition on Virtual Assets (BPRD Circular No. 03 of 2018)"
+        >
+          <span>BPRD Cir. 03/2018</span>
+          <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+        </a>
+        <span>•</span>
+        <span>ATA 1997 §11EE</span>
+        <span>•</span>
+        <span>UNSC Act 1948</span>
       </div>
 
       {/* Screened Entity Banner */}
@@ -344,29 +369,29 @@ export function SBPAmlCddCard({ screening, evidence, onFocusCanvas }: SBPAmlCddC
         );
       })()}
 
-      {/* Action Directive Summary Callout */}
+      {/* Advisory Action Summary Callout */}
       {!isClean ? (
         <div className="bg-forensic-red/10 border border-forensic-red/30 p-3 text-xs font-mono space-y-1.5 rounded-none">
           <div className="flex items-center gap-1.5 text-forensic-red font-bold uppercase text-[11px]">
             <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
-            <span>SBP STATUTORY COMPLIANCE DIRECTIVE</span>
+            <span>FORENSIC ADVISORY RECOMMENDATION (DESIGNED TO SUPPORT SBP COMPLIANCE)</span>
           </div>
           <p className="text-[11px] text-ink-800 leading-relaxed">
             {hasNacta || hasUnsc
-              ? "Immediate Mandatory Action: Under SBP BPRD Circular No. 1/2021 & Section 11EE of ATA 1997, regulated lending institutions must immediately freeze account balances, refuse disbursement, and submit a Suspicious Transaction Report (STR) to the Financial Monitoring Unit (FMU)."
+              ? "Recommended Compliance Escalation: Under SBP AML/CFT/CPF Regulations (BPRD Circular No. 05 of 2020) and Section 11EE of ATA 1997, regulated lending institutions are advised to immediately escalate for institutional review regarding freezing account balances, withholding disbursement, and filing a Suspicious Transaction Report (STR) with the Financial Monitoring Unit (FMU)."
               : hasPep
-              ? "Mandatory Enhanced Due Diligence (EDD): Politically Exposed Person detected under SBP BPRD guidelines. Establishment or maintenance of credit facility requires Senior Management Approval (SMA) and independent verification of Source of Wealth."
-              : "High Risk Informal Transfer Indicators: Prohibited under SBP BPRD Circular No. 3/2018. Enhanced transaction monitoring and verification of underlying commercial contracts required."}
+              ? "Recommended Enhanced Due Diligence (EDD): Politically Exposed Person indicator identified under SBP BPRD AML/CFT/CPF Regulations (Circular No. 05 of 2020). Establishment or continuation of facilities advised to undergo Senior Management Approval (SMA) and source-of-wealth validation."
+              : "Advisory Alert — High-Risk Informal Transfer Keywords: Scanned terms align with indicators restricted under SBP BPRD Circular No. 03 of 2018. Enhanced transaction scrutiny and verification of commercial invoices recommended."}
           </p>
         </div>
       ) : (
         <div className="bg-paper-1 p-2.5 border border-rule text-[11px] space-y-1 rounded-none">
           <div className="flex items-center gap-1.5 text-forensic-green font-bold text-[10px] uppercase">
             <CheckCircle className="w-3 h-3 flex-shrink-0" />
-            <span>CDD STATUTORY VERIFICATION CLEARED</span>
+            <span>CDD REGULATORY SCREENING CLEARED</span>
           </div>
           <p className="text-ink-600 text-[10px] leading-relaxed">
-            Customer credentials cross-referenced against NACTA proscribed entities and UNSC 1267 counter-terrorism lists. No adverse PEP or Hawala/Hundi red flags identified. Customer Due Diligence (CDD) satisfies SBP BPRD Circular No. 1 of 2021 requirements.
+            Customer credentials cross-referenced against NACTA proscribed entities and UNSC 1267 counter-terrorism lists. No adverse PEP or Hawala/Hundi indicators identified. Customer Due Diligence (CDD) screening aligned with SBP BPRD Circular No. 05 of 2020 guidelines.
           </p>
         </div>
       )}

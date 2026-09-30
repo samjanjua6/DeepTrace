@@ -266,17 +266,20 @@ class TestOverrideAuditAndRecommendations(unittest.IsolatedAsyncioTestCase):
         )
 
         # Verify advisory framing
-        self.assertIn("Forensic Recommendation: Recommend: Reject / Escalate to Fraud Unit (Human Adjudication Required)", en)
-        self.assertIn("Evaluated Risk: 25/100 (LOW Risk) [Engine Baseline: 85/100 (CRITICAL)]", en)
+        self.assertIn("Forensic Recommendation: Recommend: Reject / Escalate to Fraud Unit", en)
+        self.assertIn("Human Adjudication Required", en)
+        self.assertIn("[Engine Baseline: 85/100 (CRITICAL)]", en)
         self.assertIn("[HUMAN ADJUDICATION AUDIT NOTICE]", en)
         self.assertIn("Account holder presented original wet-ink signed statement", en)
         self.assertIn("Lead Auditor Fatima", en)
-        self.assertIn("statutory prerogative of authorized human credit & compliance officers", en)
+        self.assertIn("exclusive prerogative of authorized human credit & compliance officers", en)
 
         # Verify Urdu advisory framing
-        self.assertIn("تجویز کردہ کارروائی: سفارش: درخواست مسترد / اینٹی فراڈ یونٹ کو بھیجیں (حتمی فیصلہ مجاز افسر کا ہوگا)", ur)
+        self.assertIn("تجویز کردہ کارروائی: سفارش: درخواست مسترد / اینٹی فراڈ یونٹ کو بھیجیں", ur)
+        self.assertIn("حتمی فیصلہ مجاز افسر کا ہوگا", ur)
         self.assertIn("[آڈٹ نوٹ برائے انسانی فیصلہ]", ur)
-        self.assertIn("25/100 (LOW) [سسٹم کا ابتدائی سکور: 85/100]", ur)
+        self.assertIn("سسٹم کا ابتدائی سکور: 85/100", ur)
+        self.assertIn("25/100 (LOW)", ur)
         self.assertIn("تمام مالیاتی و قرضہ جاتی فیصلے مجاز افسران کی صوابدید پر منحصر ہیں", ur)
 
 

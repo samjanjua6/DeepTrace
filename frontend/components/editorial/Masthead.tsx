@@ -145,7 +145,7 @@ export function Masthead({
             DEEPTRACE INSTITUTIONAL
           </span>
           <span className="text-ink-300">|</span>
-          <span className="hidden sm:inline">NIST SP 800-86 &amp; ETO 2002 STANDARDS</span>
+          <span className="hidden sm:inline">ALIGNED WITH NIST SP 800-86 FORENSIC GUIDELINES</span>
         </div>
 
         <div className="flex items-center gap-4">
@@ -587,7 +587,7 @@ export function Masthead({
               </>
             ) : (
               <>
-                <span>NIST SP 800-86 AUDIT: ENFORCED</span>
+                <span>NIST SP 800-86 GUIDANCE: ALIGNED</span>
                 <span>•</span>
                 <span>SUB-PIXEL GEOMETRY: ACTIVE</span>
                 <span>•</span>

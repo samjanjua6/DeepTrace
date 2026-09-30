@@ -206,22 +206,22 @@ export function CreditOfficerBriefing({
       ? `CRITICAL BRIEFING FOR CREDIT UNDERWRITERS: Forensic Recommendation: ${recAction} (${effectiveTier} Risk, ${effectiveScore}/100) — Human Decision Required.${baselineStrEn}
 Forensic Radar: Document Authenticity: ${effectiveAuthScore}% (${effectiveAuthTier.replace(/_/g, " ")}) | Transaction Risk: ${effectiveTxnScore}/100 (${effectiveTxnTier.replace(/_/g, " ")}).
 Key Forensic Deficiencies Detected: ${primarySynthesisEn}${overrideNoteEn}
-Advisory Notice: DeepTrace outputs constitute evidentiary forensic analysis. All lending, rejection, freeze, or STR decisions remain the exclusive statutory prerogative of authorized human credit & compliance officers.`
+Advisory Notice: DeepTrace outputs constitute explainable technical and forensic analysis designed to support institutional underwriting and compliance review. All lending, rejection, freeze, or STR decisions remain the exclusive prerogative of authorized institutional credit & compliance officers.`
       : `CRITICAL BRIEFING FOR CREDIT UNDERWRITERS: Forensic Recommendation: ${recAction} (${effectiveTier} Risk, ${effectiveScore}/100) — Human Decision Required.${baselineStrEn}
 Forensic Radar: Document Authenticity: ${effectiveAuthScore}% (${effectiveAuthTier.replace(/_/g, " ")}) | Transaction Risk: ${effectiveTxnScore}/100 (${effectiveTxnTier.replace(/_/g, " ")}).
 Forensic validation confirms 100% document authenticity across all pages with zero ledger or typographic anomalies. State Bank of Pakistan (SBP) IBAN validation passed.${overrideNoteEn}
-Advisory Notice: DeepTrace outputs constitute evidentiary forensic analysis. All lending, rejection, freeze, or STR decisions remain the exclusive statutory prerogative of authorized human credit & compliance officers.`;
+Advisory Notice: DeepTrace outputs constitute explainable technical and forensic analysis designed to support institutional underwriting and compliance review. All lending, rejection, freeze, or STR decisions remain the exclusive prerogative of authorized institutional credit & compliance officers.`;
 
   const fallbackUrduSummary =
     overallScore > 0 && adverseEvidence.length > 0
       ? `کریڈٹ آفیسر اور لون انڈر رائٹر کے لیے فوری خلاصہ: تجویز کردہ کارروائی: ${recAction} (${effectiveTier}، ${effectiveScore}/100) — حتمی فیصلہ مجاز افسر کا ہوگا${isOverridden ? ` [سسٹم سکور: ${overallScore}/100]` : ""}۔
 دستاویزی اصلیت: ${effectiveAuthScore}٪ (${authTierUr}) | ٹرانزیکشن رسک: ${effectiveTxnScore}/100 (${txnTierUr})۔
 اہم فرانزک شواہد اور خامیاں: ${primarySynthesisUr}${overrideNoteUr}
-نوٹ: تمام مالیاتی و قرضہ جاتی فیصلے مجاز افسران کی صوابدید پر منحصر ہیں۔`
+نوٹ: یہ تجزیہ ادارہ جاتی جانچ اور معاونت کے لیے فراہم کیا گیا ہے۔ تمام حتمی مالیاتی، تادیبی و قرضہ جاتی فیصلے مجاز افسران کے دائرہ اختیار میں ہیں۔`
       : `کریڈٹ آفیسر اور لون انڈر رائٹر کے لیے فوری خلاصہ: تجویز کردہ کارروائی: ${recAction} (${effectiveTier}، ${effectiveScore}/100) — حتمی فیصلہ مجاز افسر کا ہوگا${isOverridden ? ` [سسٹم سکور: ${overallScore}/100]` : ""}۔
 دستاویزی اصلیت: ${effectiveAuthScore}٪ (${authTierUr}) | ٹرانزیکشن رسک: ${effectiveTxnScore}/100 (${txnTierUr})۔
 فرانزک تصدیق سے ثابت ہوا ہے کہ یہ دستاویز مکمل طور پر اصل اور غیر تبدیل شدہ ہے اور تمام کھاتہ جاتی اعداد و شمار درست ہیں۔${overrideNoteUr}
-نوٹ: تمام مالیاتی و قرضہ جاتی فیصلے مجاز افسران کی صوابدید پر منحصر ہیں۔`;
+نوٹ: یہ تجزیہ ادارہ جاتی جانچ اور معاونت کے لیے فراہم کیا گیا ہے۔ تمام حتمی مالیاتی، تادیبی و قرضہ جاتی فیصلے مجاز افسران کے دائرہ اختیار میں ہیں۔`;
 
   const currentSummary =
     activeLang === "en"
@@ -387,7 +387,7 @@ Advisory Notice: DeepTrace outputs constitute evidentiary forensic analysis. All
         ) && (
           <div className="px-4 py-2 bg-emerald-500/15 border-b border-emerald-500/30 flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-emerald-800">
             <div className="flex items-center gap-2 font-bold uppercase tracking-wider">
-              <span>ETO 2002 §29 STATUTORY PRESUMPTION SATISFIED</span>
+              <span>ETO 2002 §29 DIGITAL SIGNATURE INTEGRITY VERIFIED (ACCREDITED NIFT CERTIFICATE)</span>
             </div>
             <span className="text-xs font-sans font-medium">
               {activeLang === "ur"

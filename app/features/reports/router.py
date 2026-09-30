@@ -10,7 +10,7 @@ from app.features.reports import schemas, service
 router = APIRouter()
 
 @router.post("/{investigation_id}/report", response_model=schemas.ReportResponse,
-             status_code=202, summary="Generate a court-admissible forensic PDF dossier")
+             status_code=202, summary="Generate an evidentiary forensic PDF dossier")
 async def generate_report(
     body: schemas.ReportGenerateRequest,
     investigation=Depends(get_investigation),

@@ -473,7 +473,7 @@ def _generate_deterministic_briefing(
             f"CRITICAL BRIEFING FOR CREDIT UNDERWRITERS: Forensic Recommendation: {rec_action_en} ({effective_tier} Risk, {effective_score}/100) — Human Adjudication Required.{baseline_str}\n"
             f"Forensic Radar: Document Authenticity: {authenticity_score}% ({authenticity_tier.replace('_', ' ')}) | Transaction Risk: {transaction_risk_score}/100 ({transaction_risk_tier.replace('_', ' ')}).\n"
             f"Forensic validation confirms 100% document authenticity across all pages with zero ledger or typographic anomalies. State Bank of Pakistan (SBP) IBAN validation passed.{override_notice_en}\n"
-            f"Advisory Notice: DeepTrace outputs constitute evidentiary forensic analysis. All lending, rejection, freeze, or STR decisions remain the exclusive statutory prerogative of authorized human credit & compliance officers."
+            f"Advisory Notice: DeepTrace outputs constitute evidentiary forensic analysis designed to support underwriting and compliance review. All lending, rejection, freeze, or STR decisions remain the exclusive prerogative of authorized human credit & compliance officers."
         )
         urdu_summary = (
             f"کریڈٹ آفیسر اور لون انڈر رائٹر کے لیے فوری خلاصہ: تجویز کردہ کارروائی: {rec_action_ur} ({effective_tier}، {effective_score}/100) — حتمی فیصلہ مجاز افسر کا ہوگا"
@@ -509,7 +509,7 @@ def _generate_deterministic_briefing(
             f"CRITICAL BRIEFING FOR CREDIT UNDERWRITERS: Forensic Recommendation: {rec_action_en} ({effective_tier} Risk, {effective_score}/100) — Human Adjudication Required.{baseline_str}\n"
             f"Forensic Radar: Document Authenticity: {authenticity_score}% ({authenticity_tier.replace('_', ' ')}) | Transaction Risk: {transaction_risk_score}/100 ({transaction_risk_tier.replace('_', ' ')}).\n"
             f"Key Forensic Deficiencies Detected: {primary_en}{secondary_en}.{corroboration_en}{override_notice_en}\n"
-            f"Advisory Notice: DeepTrace outputs constitute evidentiary forensic analysis. All lending, rejection, freeze, or STR decisions remain the exclusive statutory prerogative of authorized human credit & compliance officers."
+            f"Advisory Notice: DeepTrace outputs constitute evidentiary forensic analysis designed to support underwriting and compliance review. All lending, rejection, freeze, or STR decisions remain the exclusive prerogative of authorized human credit & compliance officers."
         )
 
         secondary_ur = f" (اور مزید {secondary_count} نقائص؛ تفصیلات نیچے کارڈز میں درج ہیں)" if secondary_count > 0 else ""

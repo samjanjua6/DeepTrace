@@ -4,7 +4,7 @@ Implements high-precision Pakistani name normalization, fuzzy token-sort matchin
 and statutory screening against:
 - NACTA 4th Schedule Proscribed Persons & Entities (ATA 1997 §11EE)
 - UN Security Council 1267 / 1988 / 2253 Sanctions Lists
-- Politically Exposed Persons (PEPs) under SBP BPRD Circular No. 1 of 2021
+- Politically Exposed Persons (PEPs) under SBP BPRD Circular No. 05 of 2020
 - Hawala / Hundi / Trade Structuring Red Flag Narrations
 """
 
@@ -314,7 +314,7 @@ def perform_sbp_cdd_screening(
     2. Screen customer against NACTA, UNSC 1267, and PEP registries.
     3. Screen transaction counterparty remitters/beneficiaries.
     4. Screen narrative hawala/hundi indicators.
-    5. Formulate SBP BPRD statutory action directives.
+    5. Formulate SBP BPRD advisory action recommendations.
     """
     creds = extract_customer_credentials_from_text(all_text)
     account_title = customer_name_hint or creds.get("primary_account_title")
@@ -374,7 +374,7 @@ def perform_sbp_cdd_screening(
             "description": (
                 f"The account title '{nacta_match['candidate_name']}' matches proscribed entity '{nacta_match['entity_name']}' "
                 f"under Section 11EE of the Anti-Terrorism Act 1997 (ATA 1997) with {int(nacta_match['match_score']*100)}% similarity confidence. "
-                "Under State Bank of Pakistan (SBP) BPRD Circular No. 1 of 2021, regulated institutions must immediately halt all transactions, "
+                "Under State Bank of Pakistan (SBP) BPRD Circular No. 05 of 2020 (AML/CFT/CPF Regulations), regulated institutions are advised to immediately halt all transactions, "
                 "freeze account assets, and submit a Suspicious Transaction Report (STR) to the Financial Monitoring Unit (FMU)."
             ),
             "expected_value": "Clean Customer Due Diligence (Non-Proscribed Individual)",
@@ -412,7 +412,7 @@ def perform_sbp_cdd_screening(
             "title": f"Politically Exposed Person (PEP) Identified: '{pep_match['candidate_name']}'",
             "description": (
                 f"Account holder '{pep_match['candidate_name']}' matches Politically Exposed Person (PEP) '{pep_match['entity_name']}' "
-                f"holding public office as '{pep_match.get('public_office')}'. Under SBP BPRD Circular No. 1 of 2021, "
+                f"holding public office as '{pep_match.get('public_office')}'. Under SBP BPRD Circular No. 05 of 2020, "
                 "establishing or maintaining banking relationships with PEPs mandates Senior Management Approval (SMA), "
                 "Enhanced Due Diligence (EDD), and verification of Source of Wealth."
             ),
@@ -495,7 +495,7 @@ def perform_sbp_cdd_screening(
             ),
             "expected_value": "Non-Proscribed, Non-Sanctioned Customer",
             "actual_value": "Clean CDD Verification",
-            "discrepancy": "None — SBP BPRD Circular 1 of 2021 Requirements Satisfied",
+            "discrepancy": "None — SBP BPRD Circular No. 05 of 2020 Standards Satisfied",
             "technical_details": {
                 "account_title": account_title,
                 "cnic": cnic,

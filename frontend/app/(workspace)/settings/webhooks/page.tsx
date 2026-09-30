@@ -313,7 +313,7 @@ export default function WebhooksSettingsPage() {
             <span>HMAC-SHA256</span>
           </div>
           <span className="text-[10px] text-ink-400 mt-0.5 block">
-            NIST SP 800-86 compliant
+            Aligned with NIST SP 800-86
           </span>
         </div>
       </div>
