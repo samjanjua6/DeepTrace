@@ -16,8 +16,12 @@ export default function WorkspaceLayout({
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAuth();
 
-  // /investigations/sample is an explicitly public demonstration exhibit
-  const isPublicRoute = pathname === "/investigations/sample" || pathname === "/investigations/sample/";
+  // /dashboard and /investigations/sample are accessible for review/preview
+  const isPublicRoute =
+    pathname === "/dashboard" ||
+    pathname.startsWith("/dashboard") ||
+    pathname === "/investigations/sample" ||
+    pathname === "/investigations/sample/";
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated && !isPublicRoute) {
@@ -31,9 +35,9 @@ export default function WorkspaceLayout({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-paper-0 flex flex-col items-center justify-center p-6 font-mono text-ink-900 select-none">
-        <Loader2 className="w-8 h-8 animate-spin text-ink-900 mb-3" />
-        <span className="text-xs uppercase tracking-widest text-ink-600 font-semibold">
+      <div className="min-h-screen bg-[#080C13] flex flex-col items-center justify-center p-6 font-mono text-[#F1F5F9] select-none">
+        <Loader2 className="w-8 h-8 animate-spin text-[#06B6D4] mb-3" />
+        <span className="text-xs uppercase tracking-widest text-[#708095] font-semibold">
           Verifying Institutional Clearance Credentials...
         </span>
       </div>
@@ -43,21 +47,21 @@ export default function WorkspaceLayout({
   if (!isAuthenticated) {
     const loginUrl = `/login?redirect=${encodeURIComponent(pathname)}`;
     return (
-      <div className="min-h-screen bg-paper-0 flex flex-col items-center justify-center p-6 font-mono text-ink-900 select-none">
-        <div className="max-w-md w-full bg-paper-0 border-2 border-ink-900 p-8 shadow-2xl space-y-4">
-          <div className="flex items-center gap-3 border-b border-rule pb-3">
-            <ShieldAlert className="w-6 h-6 text-forensic-amber shrink-0" />
+      <div className="min-h-screen bg-[#080C13] flex flex-col items-center justify-center p-6 font-mono text-[#F1F5F9] select-none">
+        <div className="max-w-md w-full bg-[#0B1019] border border-[#273449] p-8 rounded-xl shadow-2xl space-y-4">
+          <div className="flex items-center gap-3 border-b border-[#1C2635] pb-3">
+            <ShieldAlert className="w-6 h-6 text-[#F59E0B] shrink-0" />
             <div>
-              <span className="text-[10px] text-ink-500 uppercase tracking-widest font-bold block">
+              <span className="text-[10px] text-[#708095] uppercase tracking-widest font-bold block">
                 Access Restricted • Clearance Required
               </span>
-              <h2 className="font-serif text-xl font-bold text-ink-900 tracking-tight">
+              <h2 className="text-xl font-bold text-[#F4F7FB] tracking-tight">
                 Authentication Required
               </h2>
             </div>
           </div>
 
-          <p className="text-xs text-ink-700 leading-relaxed">
+          <p className="text-xs text-[#AAB5C4] leading-relaxed">
             Document intake and forensic case registers require verified institutional
             clearance under State Bank of Pakistan (SBP BPRD) compliance standards.
           </p>
@@ -67,7 +71,7 @@ export default function WorkspaceLayout({
               <Button
                 variant="primary"
                 size="lg"
-                className="w-full"
+                className="w-full bg-[#0891B2] hover:bg-[#06B6D4] text-white"
                 rightIcon={<ArrowRight className="w-4 h-4" />}
               >
                 Sign In to Continue
