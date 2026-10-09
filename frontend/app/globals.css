@@ -21,6 +21,28 @@
   --color-forensic-green: #1E5E3A;
   --color-forensic-blue: #1D4ED8;
 
+  /* DeepTrace Dark Forensic Studio Palette (from Figma) */
+  --color-obsidian-950: #080C13;
+  --color-obsidian-900: #0B1019;
+  --color-obsidian-850: #0D131D;
+  --color-obsidian-800: #111925;
+  --color-obsidian-750: #141E2B;
+  --color-obsidian-700: #182333;
+  --color-obsidian-600: #1C2635;
+  --color-obsidian-500: #273449;
+  --color-obsidian-border: #273449;
+  --color-obsidian-border-subtle: #1D2939;
+  --color-obsidian-border-focus: #334563;
+
+  --color-cyan-glow: #06B6D4;
+  --color-cyan-primary: #0891B2;
+  --color-cyan-light: #22C5DF;
+  --color-cyan-bright: #2BBCD2;
+
+  --color-status-critical: #EF4444;
+  --color-status-warning: #F59E0B;
+  --color-status-verified: #10B981;
+
   --font-serif: var(--font-newsreader), "Georgia", "Times New Roman", serif;
   --font-sans: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: var(--font-geist-mono), "JetBrains Mono", Menlo, Consolas, monospace;
