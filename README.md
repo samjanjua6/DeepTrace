@@ -3,6 +3,14 @@
 > **Explainable AI Document Forensics & Tampering Detection Platform**  
 > Compliant with State Bank of Pakistan (SBP) Frameworks, Electronic Transactions Ordinance (ETO 2002), PECA 2016, and NIST SP 800-86.
 
+[![PyPI version](https://img.shields.io/pypi/v/deeptrace-ela.svg?color=blue)](https://pypi.org/project/deeptrace-ela/)
+[![PyPI Downloads](https://img.shields.io/pypi/dm/deeptrace-ela.svg?color=blueviolet)](https://pypi.org/project/deeptrace-ela/)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Author](https://img.shields.io/badge/Author-Shaheer%20Ul%20Hassan-blueviolet)](https://shaheerulhassan.com/)
+
+> 📦 **Open-Source PyPI Distribution**: The core sub-pixel Error Level Analysis (ELA) engine from DeepTrace is open-sourced on PyPI for developers:  
+> `pip install deeptrace-ela` | [View Package on PyPI](https://pypi.org/project/deeptrace-ela/)
+
 ---
 
 ## 📖 Table of Contents
@@ -22,7 +30,7 @@ DeepTrace is built to detect tampered, forged, and synthetic financial PDFs (ban
 
 The platform employs a **Tri-Pillar Architecture**:
 1. **Deterministic Verification**: 100% rule-based checks (Lakh/Crore balance reconciliations, PK-IBAN MOD-97 check digits, FBR tax ratios, PDF incremental save history).
-2. **Computer Vision Forensics**: Error Level Analysis (ELA at $Q=95$), copy-move forgery detection, font baseline displacement analysis, and glyph anomaly bounding boxes.
+2. **Computer Vision Forensics**: Error Level Analysis (ELA at $Q=95$ via [`deeptrace-ela`](https://pypi.org/project/deeptrace-ela/)), copy-move forgery detection, font baseline displacement analysis, and glyph anomaly bounding boxes.
 3. **Multi-Agent AI Swarm**: LangGraph-coordinated specialized LLM agents (Structural, Visual, Semantic PK, and Lead Investigator) operating under a **strict Zero-Hallucination Policy** bound to verified evidence manifests.
 
 ---
